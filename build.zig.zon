@@ -1,0 +1,26 @@
+.{
+    .name = "zgui_cimgui_implot_sokol",
+    .version = "0.0.0",
+
+    .dependencies = .{
+        .cimgui = .{
+            .url = "git+https://github.com/cimgui/cimgui.git#1.90.7dock",
+            .hash = "1220820e37db28faf8008f091ad3c31ceffc9e61b8dc57a3a11b5671b6446df7e1bd"
+        },
+        .imgui = .{
+            .url = "git+https://github.com/ocornut/imgui.git#v1.90.7-docking",
+            .hash = "122087d4c571d9054c9bc0ba3d006a3ad5f0026a0d0d33febd95393c890c63042db0"
+        },
+        .implot = .{
+            .url = "git+https://github.com/epezent/implot.git#v0.16",
+            .hash = "122056e9b7ce4f34fc69e6973792b46f96061f5546a13dcb59ffe8c180de0b24333a"
+        },
+        .sokol = .{
+            .url = "git+https://github.com/floooh/sokol-zig.git#6b5747f936c8d4227acb76f6aa983d1b54c77adc",
+            .hash = "122033f5f20ae70760a6fb94b588cbfe4e58b37f0bb0a4e3c311b7b2549def7535d9",
+        },
+    },
+    .paths = .{
+        "",
+    },
+}
