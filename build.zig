@@ -10,22 +10,26 @@ pub fn build(
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const build_info = struct {
-        .target = target,
-        .optimize = optimize,
-    };
-
     const dep_cimgui = b.dependency(
         "cimgui",
-        build_info
+        .{
+            .target = target,
+            .optimize = optimize,
+        }
     );
     const dep_imgui = b.dependency(
         "imgui",
-        build_info,
+        .{
+            .target = target,
+            .optimize = optimize,
+        }
     );
     const dep_implot = b.dependency(
         "implot",
-        build_info,
+        .{
+            .target = target,
+            .optimize = optimize,
+        }
     );
     const dep_sokol = b.dependency(
         "sokol", 
@@ -39,17 +43,20 @@ pub fn build(
     // create file tree for cimgui and imgui
     const wf = b.addNamedWriteFiles("cimgui");
     _ = wf.addCopyDirectory(
-        dep_cimgui.namedWriteFiles("cimgui").getDirectory(),
-        "",
+        // dep_cimgui.namedWriteFiles("cimgui").getDirectory(),
+    dep_cimgui.path("."),
+        ".",
         .{},
     );
     _ = wf.addCopyDirectory(
-        dep_imgui.namedWriteFiles("imgui").getDirectory(),
+        // dep_imgui.namedWriteFiles("imgui").getDirectory(),
+        dep_imgui.path("."),
         "imgui",
         .{},
     );
     _ = wf.addCopyDirectory(
-        dep_implot.namedWriteFiles("implot").getDirectory(),
+        // dep_implot.namedWriteFiles("implot").getDirectory(),
+        dep_implot.path("."),
         "implot",
         .{}
     );
@@ -166,10 +173,16 @@ pub fn build(
         // get the Emscripten SDK dependency from the sokol dependency
         const dep_emsdk = b.dependency(
             "sokol",
-            build_info,
+            .{
+                .target = target,
+                .optimize = optimize,
+            },
         ).builder.dependency(
-        "emsdk",
-        build_info
+            "emsdk",
+            .{
+                .target = target,
+                .optimize = optimize,
+            },
         );
 
         // need to inject the Emscripten system header include path into the
