@@ -218,3 +218,12 @@ pub fn fetchShellPath(
         .{}
     ).path("src/sokol/web/shell.html");
 }
+pub fn fetchEmSdkIncludePath(
+    dep_ziis: *std.Build.Dependency
+) std.Build.LazyPath
+{
+    const dep_emsdk = fetchEmSdk(dep_ziis);
+    return dep_emsdk.path(
+        "upstream/emscripten/cache/sysroot/include"
+    );
+}
