@@ -40,10 +40,10 @@ pub fn init(allocator: std.mem.Allocator) void {
     if (zgui_initialized == false) {
         zgui_initialized = true;
 
-        mem_allocator = allocator;
-        mem_allocations = std.AutoHashMap(usize, usize).init(allocator);
-        mem_allocations.?.ensureTotalCapacity(32) catch @panic("zgui: out of memory");
-        zguiSetAllocatorFunctions(zguiMemAlloc, zguiMemFree);
+        // mem_allocator = allocator;
+        // mem_allocations = std.AutoHashMap(usize, usize).init(allocator);
+        // mem_allocations.?.ensureTotalCapacity(32) catch @panic("zgui: out of memory");
+        // zguiSetAllocatorFunctions(zguiMemAlloc, zguiMemFree);
 
         if (zguiGetCurrentContext() == null) {
             _ = zguiCreateContext(null);
@@ -68,24 +68,24 @@ pub fn deinit() void {
             // te.deinit();
         // }
 
-        if (mem_allocations.?.count() > 0) {
-            var it = mem_allocations.?.iterator();
-            while (it.next()) |kv| {
-                const address = kv.key_ptr.*;
-                const size = kv.value_ptr.*;
-                mem_allocator.?.free(@as([*]align(mem_alignment) u8, @ptrFromInt(address))[0..size]);
-                std.log.info(
-                    "[zgui] Possible memory leak or static memory usage detected: (address: 0x{x}, size: {d})",
-                    .{ address, size },
-                );
-            }
-            mem_allocations.?.clearAndFree();
-        }
+        // if (mem_allocations.?.count() > 0) {
+        //     var it = mem_allocations.?.iterator();
+        //     while (it.next()) |kv| {
+        //         const address = kv.key_ptr.*;
+        //         const size = kv.value_ptr.*;
+        //         mem_allocator.?.free(@as([*]align(mem_alignment) u8, @ptrFromInt(address))[0..size]);
+        //         std.log.info(
+        //             "[zgui] Possible memory leak or static memory usage detected: (address: 0x{x}, size: {d})",
+        //             .{ address, size },
+        //         );
+        //     }
+        //     mem_allocations.?.clearAndFree();
+        // }
 
-        assert(mem_allocations.?.count() == 0);
-        mem_allocations.?.deinit();
-        mem_allocations = null;
-        mem_allocator = null;
+        // assert(mem_allocations.?.count() == 0);
+        // mem_allocations.?.deinit();
+        // mem_allocations = null;
+        // mem_allocator = null;
     }
 }
 pub fn initNoContext(allocator: std.mem.Allocator) void {
