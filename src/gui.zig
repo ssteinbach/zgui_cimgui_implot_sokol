@@ -60,7 +60,10 @@ pub fn init(allocator: std.mem.Allocator) void {
 pub fn deinit() void {
     if (zguiGetCurrentContext() != null) {
         temp_buffer.?.deinit();
-        zguiDestroyContext(null);
+
+        if (zguiGetCurrentContext() != null) {
+            zguiDestroyContext(null);
+        }
 
         // Must be after destroy imgui context.
         // And before allocation check
