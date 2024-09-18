@@ -362,4 +362,15 @@ extern "C"
         ImPlot::PlotText(text, x, y, p, flags);
     }
 
+    ZGUI_API void zguiPlot_GetPlotLimits(
+            ImAxis x_Idx,
+            ImAxis y_Idx,
+            double* retval)
+    {
+        const ImPlotRect result = ImPlot::GetPlotLimits(x_Idx, y_Idx);
+        retval[0] = result.X.Min;
+        retval[1] = result.X.Max;
+        retval[2] = result.Y.Min;
+        retval[3] = result.Y.Max;
+    }
 } /* extern "C" */

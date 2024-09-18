@@ -586,6 +586,22 @@ extern fn zguiPlot_PlotText(
 ) void;
 
 //----------------------------------------------------------------------------------------------
+pub const PlotLimits = extern struct {
+    x: [2]f64,
+    y: [2]f64,
+};
+/// getPlotLimits()
+pub fn getPlotLimits(x_axis: Axis, y_axis: Axis) PlotLimits
+{
+    var result : [4]f64 = undefined;
+    zguiPlot_GetPlotLimits(x_axis, y_axis, &result);
+    return .{
+        .x = .{ result[0], result[1] },
+        .y = .{ result[2], result[3] },
+    };
+}
+extern fn zguiPlot_GetPlotLimits(x_axis: Axis, y_axis:Axis, *[4]f64) void;
+//----------------------------------------------------------------------------------------------
 /// `pub fn showDemoWindow(popen: ?*bool) void`
 pub const showDemoWindow = zguiPlot_ShowDemoWindow;
 extern fn zguiPlot_ShowDemoWindow(popen: ?*bool) void;
