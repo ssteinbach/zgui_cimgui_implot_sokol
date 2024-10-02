@@ -112,7 +112,7 @@ pub fn build(
     const translateC = b.addTranslateC(
         .{
             .root_source_file = cimgui_h,
-            .target = b.host,
+            .target = target,
             .optimize = optimize,
         }
     );
@@ -202,27 +202,43 @@ pub const emRunStep = sokol.emRunStep;
 
 pub fn fetchEmSdk(
     dep_ziis: *std.Build.Dependency,
+    optimize: std.builtin.Mode,
+    target: std.Build.ResolvedTarget,
 )  *std.Build.Dependency
 {
     return dep_ziis.builder.dependency(
         "sokol",
-        .{}
+        .{
+            .optimize = optimize,
+            .target = target,
+        }
     ).builder.dependency("emsdk", .{});
 }
 pub fn fetchShellPath(
     dep_ziis: *std.Build.Dependency,
+    optimize: std.builtin.Mode,
+    target: std.Build.ResolvedTarget,
 )  std.Build.LazyPath
 {
     return dep_ziis.builder.dependency(
         "sokol",
-        .{}
+        .{
+            .optimize = optimize,
+            .target = target,
+        }
     ).path("src/sokol/web/shell.html");
 }
 pub fn fetchEmSdkIncludePath(
-    dep_ziis: *std.Build.Dependency
+    dep_ziis: *std.Build.Dependency,
+    optimize: std.builtin.Mode,
+    target: std.Build.ResolvedTarget,
 ) std.Build.LazyPath
 {
-    const dep_emsdk = fetchEmSdk(dep_ziis);
+    const dep_emsdk = fetchEmSdk(
+        dep_ziis,
+        optimize,
+        target,
+    );
     return dep_emsdk.path(
         "upstream/emscripten/cache/sysroot/include"
     );
