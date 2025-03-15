@@ -1055,7 +1055,7 @@ pub const Style = extern struct {
     curve_tessellation_tol: f32,
     circle_tessellation_max_error: f32,
 
-    colors: [@typeInfo(StyleCol).Enum.fields.len][4]f32,
+    colors: [@typeInfo(StyleCol).@"enum".fields.len][4]f32,
 
     hover_stationary_delay: f32,
     hover_delay_short: f32,
@@ -1720,9 +1720,17 @@ pub fn comboFromEnum(
     current_item: anytype,
 ) bool {
     const EnumType = @TypeOf(current_item.*);
-    const enum_type_info = switch (@typeInfo(EnumType)) {
-        .Enum => |enum_type_info| enum_type_info,
-        else => @compileError("Error: current_item must be a pointer-to-an-enum, not a " ++ @TypeOf(current_item)),
+    const enum_type_info = getTypeInfo: {
+        switch (@typeInfo(EnumType)) 
+        {
+            .optional => |optional_type_info| switch (@typeInfo(optional_type_info.child)) {
+                .@"enum" => |enum_type_info| break :getTypeInfo enum_type_info,
+                else => {},
+            },
+            .@"enum" => |enum_type_info| break :getTypeInfo enum_type_info,
+            else => {},
+        }
+        @compileError("Error: current_item must be a pointer-to-an-enum, not a " ++ @TypeOf(EnumType));
     };
 
     const FieldNameIndex = std.meta.Tuple(&.{ []const u8, i32 });
