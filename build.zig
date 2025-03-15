@@ -168,7 +168,7 @@ pub fn build(
     );
     lib_cimgui.step.dependOn(&dep_sokol.artifact("sokol_clib").step);
 
-    if (target.result.isWasm()) 
+    if (target.result.cpu.arch.isWasm()) 
     {
         // get the Emscripten SDK dependency from the sokol dependency
         const dep_emsdk = b.dependency(
