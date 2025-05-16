@@ -168,6 +168,19 @@ pub fn build(
     );
     lib_cimgui.step.dependOn(&dep_sokol.artifact("sokol_clib").step);
 
+    const mod_app_wrapper = b.addModule(
+        "app_wrapper", 
+        .{
+            .root_source_file = b.path("src/app_wrapper.zig"),
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+    mod_app_wrapper.addImport(
+        "zgui_cimgui_implot_sokol",
+        mod_zgui_cimgui_implot_sokol,
+    );
+
     if (target.result.cpu.arch.isWasm()) 
     {
         // get the Emscripten SDK dependency from the sokol dependency
