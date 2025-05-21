@@ -156,7 +156,7 @@ export fn event(
 const SokolApp = struct {
     title: [:0]const u8 = "Wrinkles Sokol Test",
     event: *const fn (ev: [*c]const sapp.Event) callconv(.C) void = &event,
-    draw: *const fn () error{}!void,
+    draw: *const fn () anyerror!void,
     content_dir: []const u8 = "",
     dimensions: [2]i32 = .{ 800, 800 },
 };
