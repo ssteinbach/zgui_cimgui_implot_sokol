@@ -71,7 +71,6 @@ pub fn build(
             .link_libc = true,
         }
     );
-    lib_cimgui.linkLibCpp();
     lib_cimgui.addIncludePath(root.path(b, "imgui"));
     lib_cimgui.addIncludePath(root.path(b, "implot"));
     lib_cimgui.addCSourceFiles(
@@ -167,23 +166,13 @@ pub fn build(
         dep_sokol.module("sokol"),
     );
     lib_cimgui.step.dependOn(&dep_sokol.artifact("sokol_clib").step);
-
-    const mod_app_wrapper = b.addModule(
-        "app_wrapper", 
-        .{
-            .root_source_file = b.path("src/app_wrapper.zig"),
-            .target = target,
-            .optimize = optimize,
-        },
-    );
-    mod_app_wrapper.addImport(
-        "zgui_cimgui_implot_sokol",
-        mod_zgui_cimgui_implot_sokol,
-    );
+    lib_cimgui.linkLibCpp();
 
     if (target.result.cpu.arch.isWasm()) 
     {
         // get the Emscripten SDK dependency from the sokol dependency
+        // doing this outside of this build script would be through calling
+        //
         const dep_emsdk = b.dependency(
             "sokol",
             .{
@@ -205,9 +194,111 @@ pub fn build(
             "upstream/emscripten/cache/sysroot/include"
         );
         mod_zgui_cimgui_implot_sokol.addSystemIncludePath(emsdk_incl_path);
-        lib_cimgui.addSystemIncludePath(emsdk_incl_path);
+        // lib_cimgui.addSystemIncludePath(emsdk_incl_path);
+        lib_cimgui.addIncludePath(emsdk_incl_path);
+    }
+    else 
+    {
+    }
+
+    // app wrapper demo executable
+    {
+        const exe = b.addExecutable(
+            .{
+                .name = "app_wrapper_demo",
+                .optimize = optimize,
+                .target = target,
+                .root_source_file = b.path("src/app_wrapper_demo.zig"),
+            }
+        );
+        exe.root_module.addImport(
+            "zgui_cimgui_implot_sokol",
+            mod_zgui_cimgui_implot_sokol
+        );
+
+        if (target.result.cpu.arch.isWasm()) 
+        {
+            const dep_emsdk = b.dependency(
+                "sokol",
+                .{
+                    .target = target,
+                    .optimize = optimize,
+                },
+            ).builder.dependency(
+                "emsdk",
+                .{
+                    .target = target,
+                    .optimize = optimize,
+                },
+            );
+            const emsdk_incl_path = dep_emsdk.path(
+                "upstream/emscripten/cache/sysroot/include"
+            );
+            exe.addSystemIncludePath(emsdk_incl_path);
+
+            const emsdk = dep_sokol.builder.dependency(
+                "emsdk",
+                .{
+                    .target = target,
+                    .optimize = optimize,
+                },
+            );
+
+            const shell_path_abs = dep_sokol.path("src/sokol/web/shell.html");
+
+            const link_step = try emLinkStep(
+                b,
+                .{
+                    .lib_main = exe,
+                    .target = target,
+                    .optimize = optimize,
+                    .emsdk = emsdk,
+                    // .use_webgpu = backend == .wgpu,
+                    .use_webgl2 = true,
+                    .use_emmalloc = true,
+                    .use_filesystem = true,
+                    .shell_file_path = shell_path_abs,
+                    .extra_args = &.{
+                        "-sUSE_OFFSET_CONVERTER=1",
+                        // "-sTOTAL_STACK=1024MB",
+                        "-sALLOW_MEMORY_GROWTH=1",
+                        "-sASSERTIONS=1",
+                        "-sSAFE_HEAP=0",
+                        "-g",
+                        "-gsource-map",
+                    },
+                },
+            );
+            const run = emRunStep(
+                b,
+                .{
+                    .name = "app_wrapper_demo",
+                    .emsdk = emsdk,
+                },
+            );
+            run.step.dependOn(&link_step.step);
+            b.step(
+                "run",
+                "Run app_wrapper_demo",
+            ).dependOn(&run.step);
+        }
+        else 
+        {
+            b.installArtifact(exe);
+
+            const run_demo_cmd = b.addRunArtifact(exe);
+            run_demo_cmd.step.dependOn(b.getInstallStep());
+
+            const run_demo_step = b.step(
+                "run",
+                "Run the app wrapper demo"
+            );
+            run_demo_step.dependOn(&run_demo_cmd.step);
+        }
     }
 }
+
+// code to enable emscripten builds
 
 const sokol = @import("sokol");
 pub const emLinkStep = sokol.emLinkStep;
@@ -227,6 +318,7 @@ pub fn fetchEmSdk(
         }
     ).builder.dependency("emsdk", .{});
 }
+
 pub fn fetchShellPath(
     dep_ziis: *std.Build.Dependency,
     optimize: std.builtin.Mode,
@@ -241,6 +333,7 @@ pub fn fetchShellPath(
         }
     ).path("src/sokol/web/shell.html");
 }
+
 pub fn fetchEmSdkIncludePath(
     dep_ziis: *std.Build.Dependency,
     optimize: std.builtin.Mode,
