@@ -40,22 +40,22 @@ pub fn build(
         }
     );
 
-    // create file tree for cimgui and imgui
+    // because imgui and cimgui make assupmtions about file layout and
+    // submodules (meaning they assume that imgui is in a subdirectory called
+    // "imgui", rather at the top of the structure the way the dependency is
+    // there, create file tree for cimgui and imgui
     const wf = b.addNamedWriteFiles("cimgui");
     _ = wf.addCopyDirectory(
-        // dep_cimgui.namedWriteFiles("cimgui").getDirectory(),
-    dep_cimgui.path("."),
+        dep_cimgui.path("."),
         ".",
         .{},
     );
     _ = wf.addCopyDirectory(
-        // dep_imgui.namedWriteFiles("imgui").getDirectory(),
         dep_imgui.path("."),
         "imgui",
         .{},
     );
     _ = wf.addCopyDirectory(
-        // dep_implot.namedWriteFiles("implot").getDirectory(),
         dep_implot.path("."),
         "implot",
         .{}
@@ -170,6 +170,20 @@ pub fn build(
 
     if (target.result.cpu.arch.isWasm()) 
     {
+        const exe = b.addStaticLibrary(
+            .{
+                .name = "app_wrapper_demo",
+                .optimize = optimize,
+                .target = target,
+                .root_source_file = b.path("src/app_wrapper_demo.zig"),
+            }
+        );
+
+        exe.root_module.addImport(
+            "zgui_cimgui_implot_sokol",
+            mod_zgui_cimgui_implot_sokol
+        );
+
         // get the Emscripten SDK dependency from the sokol dependency
         // doing this outside of this build script would be through calling
         //
@@ -191,18 +205,48 @@ pub fn build(
         // cimgui C library otherwise the C/C++ code won't find C stdlib
         // headers
         const emsdk_incl_path = dep_emsdk.path(
-            "upstream/emscripten/cache/sysroot/include"
+            b.pathJoin(
+                &.{
+                    "upstream", "emscripten", "cache", "sysroot", "include"
+                }
+            ),
         );
+        translateC.addSystemIncludePath(emsdk_incl_path);
+
+        exe.addSystemIncludePath(emsdk_incl_path);
+
         mod_zgui_cimgui_implot_sokol.addSystemIncludePath(emsdk_incl_path);
-        // lib_cimgui.addSystemIncludePath(emsdk_incl_path);
         lib_cimgui.addIncludePath(emsdk_incl_path);
+
+        const link_step = try sokol.emLinkStep(
+            b,
+            .{
+                .lib_main = exe,
+                .target = mod_zgui_cimgui_implot_sokol.resolved_target.?,
+                .optimize = mod_zgui_cimgui_implot_sokol.optimize.?,
+                .emsdk = dep_emsdk,
+                .use_webgl2 = true,
+                .use_emmalloc = true,
+                .use_filesystem = false,
+                .shell_file_path = dep_sokol.path("src/sokol/web/shell.html"),
+                .extra_args = &.{ "-fsanitize=undefined" },
+            }
+        );
+
+        // ...and a special run step to start the web build output via 'emrun'
+        const run = emRunStep(
+            b,
+            .{
+                .name = "app_wrapper_demo",
+                .emsdk = dep_emsdk 
+            },
+        );
+        run.step.dependOn(&link_step.step);
+        b.step("run", "Run example").dependOn(&run.step);
     }
     else 
     {
-    }
-
-    // app wrapper demo executable
-    {
+        // app wrapper demo executable
         const exe = b.addExecutable(
             .{
                 .name = "app_wrapper_demo",
@@ -215,90 +259,18 @@ pub fn build(
             "zgui_cimgui_implot_sokol",
             mod_zgui_cimgui_implot_sokol
         );
+        b.installArtifact(exe);
 
-        if (target.result.cpu.arch.isWasm()) 
-        {
-            const dep_emsdk = b.dependency(
-                "sokol",
-                .{
-                    .target = target,
-                    .optimize = optimize,
-                },
-            ).builder.dependency(
-                "emsdk",
-                .{
-                    .target = target,
-                    .optimize = optimize,
-                },
-            );
-            const emsdk_incl_path = dep_emsdk.path(
-                "upstream/emscripten/cache/sysroot/include"
-            );
-            exe.addSystemIncludePath(emsdk_incl_path);
+        const run_demo_cmd = b.addRunArtifact(exe);
+        run_demo_cmd.step.dependOn(b.getInstallStep());
 
-            const emsdk = dep_sokol.builder.dependency(
-                "emsdk",
-                .{
-                    .target = target,
-                    .optimize = optimize,
-                },
-            );
-
-            const shell_path_abs = dep_sokol.path("src/sokol/web/shell.html");
-
-            const link_step = try emLinkStep(
-                b,
-                .{
-                    .lib_main = exe,
-                    .target = target,
-                    .optimize = optimize,
-                    .emsdk = emsdk,
-                    // .use_webgpu = backend == .wgpu,
-                    .use_webgl2 = true,
-                    .use_emmalloc = true,
-                    .use_filesystem = true,
-                    .shell_file_path = shell_path_abs,
-                    .extra_args = &.{
-                        "-sUSE_OFFSET_CONVERTER=1",
-                        // "-sTOTAL_STACK=1024MB",
-                        "-sALLOW_MEMORY_GROWTH=1",
-                        "-sASSERTIONS=1",
-                        "-sSAFE_HEAP=0",
-                        "-g",
-                        "-gsource-map",
-                    },
-                },
-            );
-            const run = emRunStep(
-                b,
-                .{
-                    .name = "app_wrapper_demo",
-                    .emsdk = emsdk,
-                },
-            );
-            run.step.dependOn(&link_step.step);
-            b.step(
-                "run",
-                "Run app_wrapper_demo",
-            ).dependOn(&run.step);
-        }
-        else 
-        {
-            b.installArtifact(exe);
-
-            const run_demo_cmd = b.addRunArtifact(exe);
-            run_demo_cmd.step.dependOn(b.getInstallStep());
-
-            const run_demo_step = b.step(
-                "run",
-                "Run the app wrapper demo"
-            );
-            run_demo_step.dependOn(&run_demo_cmd.step);
-        }
+        const run_demo_step = b.step(
+            "run",
+            "Run the app wrapper demo"
+        );
+        run_demo_step.dependOn(&run_demo_cmd.step);
     }
 }
-
-// code to enable emscripten builds
 
 const sokol = @import("sokol");
 pub const emLinkStep = sokol.emLinkStep;
