@@ -1,5 +1,4 @@
 const std = @import("std");
-const ig = @import("cimgui");
 const ziis = @import("root.zig");
 const zgui = ziis.zgui;
 const zplot = ziis.zgui.plot;
