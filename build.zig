@@ -108,15 +108,15 @@ pub fn build(
     // inject the Emscripten SDK include path into the translate-C step when
     // building for WASM
     const cimgui_h = dep_cimgui.path("cimgui.h");
-    const translateC = b.addTranslateC(
+    const translate_c = b.addTranslateC(
         .{
             .root_source_file = cimgui_h,
             .target = target,
             .optimize = optimize,
         }
     );
-    translateC.defineCMacroRaw("CIMGUI_DEFINE_ENUMS_AND_STRUCTS=\"\"");
-    const entrypoint = translateC.getOutput();
+    translate_c.defineCMacroRaw("CIMGUI_DEFINE_ENUMS_AND_STRUCTS=\"\"");
+    const entrypoint = translate_c.getOutput();
 
     // build cimgui as a module with the header file as the entrypoint
     const mod_cimgui = b.addModule(
@@ -170,107 +170,146 @@ pub fn build(
 
     if (target.result.cpu.arch.isWasm()) 
     {
-        const exe = b.addStaticLibrary(
-            .{
-                .name = "app_wrapper_demo",
-                .optimize = optimize,
-                .target = target,
-                .root_source_file = b.path("src/app_wrapper_demo.zig"),
-            }
-        );
-
-        exe.root_module.addImport(
-            "zgui_cimgui_implot_sokol",
-            mod_zgui_cimgui_implot_sokol
-        );
-
-        // get the Emscripten SDK dependency from the sokol dependency
-        // doing this outside of this build script would be through calling
-        //
-        const dep_emsdk = b.dependency(
-            "sokol",
-            .{
-                .target = target,
-                .optimize = optimize,
-            },
-        ).builder.dependency(
-            "emsdk",
-            .{
-                .target = target,
-                .optimize = optimize,
-            },
-        );
-
-        // need to inject the Emscripten system header include path into the
-        // cimgui C library otherwise the C/C++ code won't find C stdlib
-        // headers
-        const emsdk_incl_path = dep_emsdk.path(
-            b.pathJoin(
-                &.{
-                    "upstream", "emscripten", "cache", "sysroot", "include"
-                }
-            ),
-        );
-        translateC.addSystemIncludePath(emsdk_incl_path);
-
-        exe.addSystemIncludePath(emsdk_incl_path);
-
-        mod_zgui_cimgui_implot_sokol.addSystemIncludePath(emsdk_incl_path);
-        lib_cimgui.addIncludePath(emsdk_incl_path);
-
-        const link_step = try sokol.emLinkStep(
+        try build_demo_wasm(
             b,
-            .{
-                .lib_main = exe,
-                .target = mod_zgui_cimgui_implot_sokol.resolved_target.?,
-                .optimize = mod_zgui_cimgui_implot_sokol.optimize.?,
-                .emsdk = dep_emsdk,
-                .use_webgl2 = true,
-                .use_emmalloc = true,
-                .use_filesystem = false,
-                .shell_file_path = dep_sokol.path("src/sokol/web/shell.html"),
-                .extra_args = &.{ "-fsanitize=undefined" },
-            }
+            target,
+            optimize,
+            mod_zgui_cimgui_implot_sokol,
+            translate_c,
+            lib_cimgui,
+            dep_sokol
         );
-
-        // ...and a special run step to start the web build output via 'emrun'
-        const run = emRunStep(
-            b,
-            .{
-                .name = "app_wrapper_demo",
-                .emsdk = dep_emsdk 
-            },
-        );
-        run.step.dependOn(&link_step.step);
-        b.step("run", "Run example").dependOn(&run.step);
     }
     else 
     {
-        // app wrapper demo executable
-        const exe = b.addExecutable(
-            .{
-                .name = "app_wrapper_demo",
-                .optimize = optimize,
-                .target = target,
-                .root_source_file = b.path("src/app_wrapper_demo.zig"),
-            }
+        try build_demo_native(
+            b,
+            target,
+            optimize,
+            mod_zgui_cimgui_implot_sokol,
         );
-        exe.root_module.addImport(
-            "zgui_cimgui_implot_sokol",
-            mod_zgui_cimgui_implot_sokol
-        );
-        b.installArtifact(exe);
-
-        const run_demo_cmd = b.addRunArtifact(exe);
-        run_demo_cmd.step.dependOn(b.getInstallStep());
-
-        const run_demo_step = b.step(
-            "run",
-            "Run the app wrapper demo"
-        );
-        run_demo_step.dependOn(&run_demo_cmd.step);
     }
 }
+
+fn build_demo_native(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    mod_zgui_cimgui_implot_sokol: *std.Build.Module,
+) !void
+{
+    // app wrapper demo executable
+    const exe = b.addExecutable(
+        .{
+            .name = "app_wrapper_demo",
+            .optimize = optimize,
+            .target = target,
+            .root_source_file = b.path("src/app_wrapper_demo.zig"),
+        }
+    );
+    exe.root_module.addImport(
+        "zgui_cimgui_implot_sokol",
+        mod_zgui_cimgui_implot_sokol
+    );
+    b.installArtifact(exe);
+
+    const run_demo_cmd = b.addRunArtifact(exe);
+    run_demo_cmd.step.dependOn(b.getInstallStep());
+
+    const run_demo_step = b.step(
+        "run",
+        "Run the app wrapper demo"
+    );
+    run_demo_step.dependOn(&run_demo_cmd.step);
+}
+
+fn build_demo_wasm(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    mod_zgui_cimgui_implot_sokol: *std.Build.Module,
+    translate_c: *std.Build.Step.TranslateC,
+    lib_cimgui: *std.Build.Step.Compile,
+    dep_sokol: *std.Build.Dependency,
+) !void
+{
+    const exe = b.addStaticLibrary(
+        .{
+            .name = "app_wrapper_demo",
+            .optimize = optimize,
+            .target = target,
+            .root_source_file = b.path("src/app_wrapper_demo.zig"),
+        }
+    );
+
+    exe.root_module.addImport(
+        "zgui_cimgui_implot_sokol",
+        mod_zgui_cimgui_implot_sokol
+    );
+
+    // get the Emscripten SDK dependency from the sokol dependency
+    // doing this outside of this build script would be through calling
+    //
+    const dep_emsdk = b.dependency(
+        "sokol",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+        ).builder.dependency(
+        "emsdk",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+        );
+
+    // need to inject the Emscripten system header include path into the
+    // cimgui C library otherwise the C/C++ code won't find C stdlib
+    // headers
+    const emsdk_incl_path = dep_emsdk.path(
+        b.pathJoin(
+            &.{
+                "upstream", "emscripten", "cache", "sysroot", "include"
+            }
+        ),
+    );
+    translate_c.addSystemIncludePath(emsdk_incl_path);
+
+    exe.addSystemIncludePath(emsdk_incl_path);
+
+    mod_zgui_cimgui_implot_sokol.addSystemIncludePath(emsdk_incl_path);
+    lib_cimgui.addIncludePath(emsdk_incl_path);
+
+    const link_step = try sokol.emLinkStep(
+        b,
+        .{
+            .lib_main = exe,
+            .target = mod_zgui_cimgui_implot_sokol.resolved_target.?,
+            .optimize = mod_zgui_cimgui_implot_sokol.optimize.?,
+            .emsdk = dep_emsdk,
+            .use_webgl2 = true,
+            .use_emmalloc = true,
+            .use_filesystem = false,
+            .shell_file_path = dep_sokol.path("src/sokol/web/shell.html"),
+            .extra_args = &.{ "-fsanitize=undefined" },
+        }
+    );
+
+    // ...and a special run step to start the web build output via 'emrun'
+    const run = emRunStep(
+        b,
+        .{
+            .name = "app_wrapper_demo",
+            .emsdk = dep_emsdk 
+        },
+        );
+    run.step.dependOn(&link_step.step);
+    b.step("run", "Run example").dependOn(&run.step);
+}
+
+// UTILITIES FOR DOWNSTREAM PROJECTS
+///////////////////////////////////////////////////////////////////////////////
 
 const sokol = @import("sokol");
 pub const emLinkStep = sokol.emLinkStep;
