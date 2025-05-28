@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// encapsulation of a state change, with a do and undo
-const Command = struct {
+pub const Command = struct {
     context: *void,
     _do: *const fn (ctx: *void) void,
     _undo: *const fn (ctx: *void) void,
@@ -9,14 +9,14 @@ const Command = struct {
 
     pub fn do(
         self: @This(),
-    ) void 
+    ) !void 
     {
         self._do(self.context);
     }
 
     pub fn undo(
         self: @This(),
-    ) void 
+    ) !void 
     {
         self._undo(self.context);
     }
@@ -106,10 +106,10 @@ test "Set Value f64"
     );
     defer cmd.destroy(std.testing.allocator);
 
-    cmd.do();
+    try cmd.do();
     try std.testing.expectEqual(12, test_parameter);
 
-    cmd.undo();
+    try cmd.undo();
     try std.testing.expectEqual(3.14, test_parameter);
 }
 
@@ -124,10 +124,10 @@ test "Set Value i32"
     );
     defer cmd.destroy(std.testing.allocator);
 
-    cmd.do();
+    try cmd.do();
     try std.testing.expectEqual(12, test_parameter);
 
-    cmd.undo();
+    try cmd.undo();
     try std.testing.expectEqual(314, test_parameter);
 }
 
