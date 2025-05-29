@@ -2,10 +2,10 @@ const std = @import("std");
 
 /// encapsulation of a state change, with a do and undo
 pub const Command = struct {
-    context: *void,
-    _do: *const fn (ctx: *void) void,
-    _undo: *const fn (ctx: *void) void,
-    _destroy: *const fn (ctx: *void, std.mem.Allocator) void,
+    context: *anyopaque,
+    _do: *const fn (ctx: *anyopaque) void,
+    _undo: *const fn (ctx: *anyopaque) void,
+    _destroy: *const fn (ctx: *anyopaque, std.mem.Allocator) void,
 
     pub fn do(
         self: @This(),
@@ -64,7 +64,7 @@ pub fn SetValue(
         }
 
         pub fn do(
-            blind_ctx: *void
+            blind_ctx: *anyopaque
         ) void
         {
             const ctx: *Context = @alignCast(@ptrCast(blind_ctx));
@@ -73,7 +73,7 @@ pub fn SetValue(
         }
 
         pub fn undo(
-            blind_ctx: *void
+            blind_ctx: *anyopaque
         ) void
         {
             const ctx: *Context = @alignCast(@ptrCast(blind_ctx));
@@ -82,7 +82,7 @@ pub fn SetValue(
         }
 
         pub fn destroy(
-            blind_ctx: *void,
+            blind_ctx: *anyopaque,
             allocator: std.mem.Allocator,
         ) void
         {
