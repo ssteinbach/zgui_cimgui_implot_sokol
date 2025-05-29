@@ -16,6 +16,9 @@
             .url = "git+https://github.com/floooh/sokol-zig.git#6f7630d14981a9c7f1e53bf5372c80bdd19b687d",
             .hash = "sokol-0.1.0-pb1HK8eOOQDLJmFo5VGGCVo2GxDm27dSsTHX8rsVb2bJ",
         },
+        .zig_do_undo_journal = .{
+            .path = "../zig-do-undo-journal",
+        },
     },
 
     .paths = .{
