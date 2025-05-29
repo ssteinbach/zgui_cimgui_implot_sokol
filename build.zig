@@ -40,6 +40,14 @@ pub fn build(
         }
     );
 
+    const dep_undo_journal = b.dependency(
+        "zig_do_undo_journal",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+
     // because imgui and cimgui make assupmtions about file layout and
     // submodules (meaning they assume that imgui is in a subdirectory called
     // "imgui", rather at the top of the structure the way the dependency is
@@ -165,6 +173,12 @@ pub fn build(
         "sokol",
         dep_sokol.module("sokol"),
     );
+    mod_zgui_cimgui_implot_sokol.addImport(
+        "undo",
+        dep_undo_journal.module("do_undo_journal")
+
+    );
+
     lib_cimgui.step.dependOn(&dep_sokol.artifact("sokol_clib").step);
     lib_cimgui.linkLibCpp();
 

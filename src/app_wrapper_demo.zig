@@ -9,6 +9,11 @@ const app_wrapper = ziis.app_wrapper;
 const build_options = @import("build_options");
 
 var f: f32 = 0;
+var backup_f: f32 = 0;
+var demo_window_gui = false;
+var demo_window_plot = false;
+
+var journal : ?ziis.undo.Journal = null;
 
 /// draw the UI
 fn draw(
@@ -43,8 +48,49 @@ fn draw(
     {
         defer zgui.end();
 
-        if (zgui.dragFloat("test float", .{ .v = &f })) {}
-        zgui.bulletText("pasta, potato: {d}\n", .{ 12 });
+        var new = f;
+        if (zgui.dragFloat("test float", .{ .v = &new })) {}
+        if (zgui.isItemActivated()) {
+            backup_f = f;
+        }
+        f = new;
+
+        if (zgui.isItemDeactivatedAfterEdit())
+        {
+            f = backup_f;
+            const cmd = try ziis.undo.SetValue(f32).init(
+                    std.heap.page_allocator,
+                    &f,
+                    new,
+                    "test float"
+                );
+            try cmd.do();
+            try journal.?.add(cmd);
+        }
+
+        for (journal.?.entries.items, 0..)
+            |cmd, ind|
+        {
+            zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
+        }
+
+        if (zgui.button("show gui demo", .{}) )
+        { 
+            demo_window_gui = ! demo_window_gui; 
+        }
+        if (zgui.button("show plot demo", .{}))
+        {
+            demo_window_gui = ! demo_window_plot; 
+        }
+
+        if (demo_window_gui) 
+        {
+            zgui.showDemoWindow(&demo_window_gui);
+        }
+        if (demo_window_plot) 
+        {
+            zplot.showDemoWindow(&demo_window_plot);
+        }
 
         if (
             zgui.beginChild(
@@ -107,6 +153,10 @@ fn draw(
 pub fn main(
 ) void 
 {
+    journal = ziis.undo.Journal.init(
+        std.heap.page_allocator,
+        5
+    ) catch null;
     app_wrapper.sokol_main(
         .{
             .draw = draw, 
