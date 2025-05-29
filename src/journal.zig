@@ -60,6 +60,12 @@ const Journal = struct {
         self: *@This(),
     ) void
     {
+        while (self.entries.items.len > 0)
+        {
+            const cmd = self.entries.pop();
+            cmd.?.destroy(self.allocator);
+        }
+
         self.entries.deinit();
         self.max_depth = 0;
     }
@@ -138,4 +144,51 @@ test "Journal Test"
     try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.max_depth);
     try std.testing.expectEqual(0, journal.entries.items.len);
 
+}
+
+test "Journal Test (undo/redo)"
+{
+    const TEST_TYPE = i32;
+    const TEST_JOURNAL_LIMIT:usize = 3;
+
+    var journal = try Journal.init(
+        std.testing.allocator,
+        TEST_JOURNAL_LIMIT, 
+    );
+    defer journal.deinit();
+
+    var value: TEST_TYPE = 12;
+
+    var i:TEST_TYPE = 1;
+    while (i <= 5)
+        : (i+=1)
+    {
+        const cmd = try command.SetValue(TEST_TYPE).init(
+            std.testing.allocator,
+            &value,
+            i,
+        );
+
+        try cmd.do();
+        try std.testing.expectEqual(i, value);
+
+        try journal.add(cmd);
+    }
+
+    // should have been 1,2,3,4,5, with the resulting journal being 3,4,5
+    try std.testing.expectEqual(5, value);
+
+    try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.max_depth);
+    try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.entries.items.len);
+
+    // undo twice, leaving one action in the journal
+    try journal.undo();
+    try journal.undo();
+
+    try std.testing.expectEqual(3, value);
+
+    try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.max_depth);
+    try std.testing.expectEqual(1, journal.entries.items.len);
+
+    try journal.redo();
 }
