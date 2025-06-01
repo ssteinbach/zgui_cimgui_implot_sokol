@@ -49,23 +49,15 @@ fn draw(
         defer zgui.end();
 
         var new = f;
-        if (zgui.dragFloat("test float", .{ .v = &new })) {}
-        if (zgui.isItemActivated()) {
-            backup_f = f;
-        }
-        f = new;
-
-        if (zgui.isItemDeactivatedAfterEdit())
-        {
-            f = backup_f;
+        if (zgui.dragFloat("test float", .{ .v = &new })) {
             const cmd = try ziis.undo.SetValue(f32).init(
                     std.heap.page_allocator,
                     &f,
                     new,
                     "test float"
-                );
+            );
             try cmd.do();
-            try journal.?.add(cmd);
+            try journal.?.update_if_new_or_add(cmd);
         }
 
         for (journal.?.entries.items, 0..)
@@ -157,6 +149,7 @@ pub fn main(
         std.heap.page_allocator,
         5
     ) catch null;
+    journal.?.update_window_ms = 1000;
     app_wrapper.sokol_main(
         .{
             .draw = draw, 
