@@ -66,6 +66,20 @@ fn draw(
             zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
         }
 
+        zgui.bulletText("Head Entry in Journal: {?d}", .{ journal.?.maybe_head_entry });
+
+        if (zgui.button("undo", .{}))
+        {
+            try journal.?.undo();
+        }
+
+        zgui.sameLine(.{});
+
+        if (zgui.button("redo", .{}))
+        {
+            try journal.?.redo();
+        }
+
         if (zgui.button("show gui demo", .{}) )
         { 
             demo_window_gui = ! demo_window_gui; 
@@ -149,7 +163,6 @@ pub fn main(
         std.heap.page_allocator,
         5
     ) catch null;
-    journal.?.update_window_ms = 1000;
     app_wrapper.sokol_main(
         .{
             .draw = draw, 
