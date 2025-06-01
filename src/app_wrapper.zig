@@ -128,6 +128,12 @@ export fn frame(
 export fn cleanup(
 ) void 
 {
+    if (app.cleanup)
+        |clean_fn|
+    {
+        clean_fn();
+    }
+
     simgui.shutdown();
     zgui.deinit();
     zplot.deinit();
@@ -158,6 +164,8 @@ const SokolApp = struct {
     draw: *const fn () anyerror!void,
     content_dir: []const u8 = "",
     dimensions: [2]i32 = .{ 800, 800 },
+    /// a function that gets called during cleanup (free a GPA, etc)
+    cleanup: ?*const fn() void = null,
 };
 var app : SokolApp = undefined;
 
