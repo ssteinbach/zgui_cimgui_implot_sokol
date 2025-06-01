@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const ziis = @import("root.zig");
 const zgui = ziis.zgui;
 const zplot = ziis.zgui.plot;
@@ -13,17 +14,9 @@ const state = struct {
     var pass_action: sg.PassAction = .{};
 };
 
-var content_dir : []const u8 = undefined;
-
 const font_data = @embedFile("content/Roboto-Medium.ttf");
 
 const allocator = std.heap.c_allocator;
-
-// var raw = std.heap.GeneralPurposeAllocator(.{}){};
-// const allocator = raw.allocator();
-
-// var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-// const allocator = arena.allocator();
 
 export fn init(
 ) void 
@@ -159,10 +152,14 @@ export fn event(
 }
 
 const SokolApp = struct {
-    title: [:0]const u8 = "Wrinkles Sokol Test",
+    /// window title
+    title: [:0]const u8 = "ZIIS Demo App",
+    /// event handler - for keyboard shortcuts.  Default only catches the
+    /// escape key which quits the app
     event: *const fn (ev: [*c]const sapp.Event) callconv(.C) void = &event,
+    /// where all your ui code should go
     draw: *const fn () anyerror!void,
-    content_dir: []const u8 = "",
+    /// initial window dimensions
     dimensions: [2]i32 = .{ 800, 800 },
     /// a function that gets called during cleanup (free a GPA, etc)
     cleanup: ?*const fn() void = null,
@@ -174,7 +171,6 @@ pub fn sokol_main(
 ) void 
 {
     app = app_in;
-    content_dir = app.content_dir;
 
     sapp.run(
         .{
