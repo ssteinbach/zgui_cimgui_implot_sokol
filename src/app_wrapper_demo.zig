@@ -1,6 +1,8 @@
 //! example app using teh app wrapper
 
 const std = @import("std");
+const builtin = @import("builtin");
+
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
 const zplot = zgui.plot;
@@ -14,6 +16,18 @@ var demo_window_gui = false;
 var demo_window_plot = false;
 
 var journal : ?ziis.undo.Journal = null;
+
+const IS_WASM = builtin.target.cpu.arch.isWasm();
+
+/// the GPA - useful for detecting leaks, but ONLY works in non EMCC builds
+var gpa = (
+    if (IS_WASM) null 
+    else std.heap.GeneralPurposeAllocator(.{}){}
+);
+const allocator = (
+    if (IS_WASM) std.heap.c_allocator 
+    else gpa.allocator()
+);
 
 /// draw the UI
 fn draw(
@@ -51,7 +65,7 @@ fn draw(
         var new = f;
         if (zgui.dragFloat("test float", .{ .v = &new })) {
             const cmd = try ziis.undo.SetValue(f32).init(
-                    std.heap.page_allocator,
+                    allocator,
                     &f,
                     new,
                     "test float"
@@ -156,16 +170,36 @@ fn draw(
     }
 }
 
+fn cleanup () void
+{
+    if (journal)
+        |*definitely_journal|
+    {
+        definitely_journal.deinit();
+    }
+
+    if (IS_WASM == false)
+    {
+        const result = gpa.deinit();
+        if (result == .leak) 
+        {
+            std.debug.print("leak!", .{});
+        }
+    }
+}
+
 pub fn main(
 ) void 
 {
     journal = ziis.undo.Journal.init(
-        std.heap.page_allocator,
+       allocator,
         5
     ) catch null;
+
     app_wrapper.sokol_main(
         .{
             .draw = draw, 
+            .cleanup = cleanup,
         },
     );
 }
