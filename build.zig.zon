@@ -16,8 +16,9 @@
             .url = "git+https://github.com/floooh/sokol-zig.git#6f7630d14981a9c7f1e53bf5372c80bdd19b687d",
             .hash = "sokol-0.1.0-pb1HK8eOOQDLJmFo5VGGCVo2GxDm27dSsTHX8rsVb2bJ",
         },
-        .zig_do_undo_journal = .{
-            .path = "../zig-do-undo-journal",
+        .do_undo_journal = .{
+            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#99c2b83b66d43acebd4e3093bb4bd30abc3860d4",
+            .hash = "do_undo_journal-0.1.0-1UllCyhjAAC1vJutzzZp2kdz2cIiU7vvV04ghzIvjkIi",
         },
     },
 

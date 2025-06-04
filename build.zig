@@ -41,7 +41,7 @@ pub fn build(
     );
 
     const dep_undo_journal = b.dependency(
-        "zig_do_undo_journal",
+        "do_undo_journal",
         .{
             .target = target,
             .optimize = optimize,
