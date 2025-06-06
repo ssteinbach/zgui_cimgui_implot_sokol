@@ -1,4 +1,4 @@
-//! example app using teh app wrapper
+//! example app using the app wrapper
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -26,9 +26,8 @@ const STATE = struct {
             [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8 
         )
     );
+    var journal : ?ziis.undo.Journal = null;
 };
-
-var journal : ?ziis.undo.Journal = null;
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
 
@@ -127,27 +126,27 @@ fn draw(
                     "texture offset"
             );
             try cmd.do();
-            try journal.?.update_if_new_or_add(cmd);
+            try STATE.journal.?.update_if_new_or_add(cmd);
         }
 
-        for (journal.?.entries.items, 0..)
+        for (STATE.journal.?.entries.items, 0..)
             |cmd, ind|
         {
             zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
         }
 
-        zgui.bulletText("Head Entry in Journal: {?d}", .{ journal.?.maybe_head_entry });
+        zgui.bulletText("Head Entry in STATE.Journal: {?d}", .{ STATE.journal.?.maybe_head_entry });
 
         if (zgui.button("undo", .{}))
         {
-            try journal.?.undo();
+            try STATE.journal.?.undo();
         }
 
         zgui.sameLine(.{});
 
         if (zgui.button("redo", .{}))
         {
-            try journal.?.redo();
+            try STATE.journal.?.redo();
         }
 
         if (zgui.button("show gui demo", .{}) )
@@ -256,7 +255,7 @@ fn draw(
 
 fn cleanup () void
 {
-    if (journal)
+    if (STATE.journal)
         |*definitely_journal|
     {
         definitely_journal.deinit();
@@ -290,7 +289,7 @@ pub fn init(
 pub fn main(
 ) void 
 {
-    journal = ziis.undo.Journal.init(
+    STATE.journal = ziis.undo.Journal.init(
        allocator,
         5
     ) catch null;
