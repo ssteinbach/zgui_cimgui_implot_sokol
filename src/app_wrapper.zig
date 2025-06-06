@@ -89,6 +89,12 @@ export fn init(
             plot_style.marker_size = 5.0;
         }
     }
+
+    if (app.maybe_post_zgui_init)
+        |init_fn|
+    {
+        init_fn();
+    }
 }
 
 export fn frame(
@@ -121,7 +127,7 @@ export fn frame(
 export fn cleanup(
 ) void 
 {
-    if (app.cleanup)
+    if (app.maybe_pre_zgui_shutdown_cleanup)
         |clean_fn|
     {
         clean_fn();
@@ -152,17 +158,30 @@ export fn event(
 }
 
 const SokolApp = struct {
-    /// window title
+    /// where all your ui code should go (required)
+    draw: *const fn () anyerror!void,
+
+    // optional fields
+
+    /// initial window title
     title: [:0]const u8 = "ZIIS Demo App",
+
+    /// initial window dimensions
+    dimensions: [2]i32 = .{ 800, 800 },
+
+    // optional function pointers
+
+    /// a function that gets called during cleanup (free a GPA, etc) before
+    /// shutting down the graphics system
+    maybe_pre_zgui_shutdown_cleanup: ?*const fn() void = null,
+
+    /// optional function that is called once after zgui setup
+    maybe_post_zgui_init: ?*const fn() void = null,
+
     /// event handler - for keyboard shortcuts.  Default only catches the
     /// escape key which quits the app
     event: *const fn (ev: [*c]const sapp.Event) callconv(.C) void = &event,
-    /// where all your ui code should go
-    draw: *const fn () anyerror!void,
-    /// initial window dimensions
-    dimensions: [2]i32 = .{ 800, 800 },
-    /// a function that gets called during cleanup (free a GPA, etc)
-    cleanup: ?*const fn() void = null,
+
 };
 var app : SokolApp = undefined;
 
