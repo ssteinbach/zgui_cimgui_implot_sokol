@@ -6,14 +6,27 @@ const builtin = @import("builtin");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
 const zplot = zgui.plot;
+const sg = ziis.sokol.gfx;
 const app_wrapper = ziis.app_wrapper;
 
 const build_options = @import("build_options");
 
-var f: f32 = 0;
-var backup_f: f32 = 0;
-var demo_window_gui = false;
-var demo_window_plot = false;
+const STATE = struct {
+    var f: f32 = 0;
+    var backup_f: f32 = 0;
+    var demo_window_gui = false;
+    var demo_window_plot = false;
+    const TEX_DIM : [2]i32 = .{ 256, 256 };
+    const COLOR_CHANNELS:usize = 4;
+    var tex: sg.Image = .{};
+    var texid: u64 = 0;
+    var frame_number: usize = 0;
+    var buffer = (
+        std.mem.zeroes(
+            [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8 
+        )
+    );
+};
 
 var journal : ?ziis.undo.Journal = null;
 
@@ -35,6 +48,49 @@ fn draw(
 {
     const vp = zgui.getMainViewport();
     const size = vp.getSize();
+
+    STATE.frame_number = @intFromFloat(@abs(STATE.f));
+
+    sg.updateImage(
+        STATE.tex,
+        init: {
+            var data = ziis.sokol.gfx.ImageData{};
+
+            // initialize the image STATE.buffer
+            var x:usize = 0;
+            const iw_m_one: f64 = @floatFromInt(STATE.TEX_DIM[0] - 1);
+            const ih_m_one: f64 = @floatFromInt(STATE.TEX_DIM[1] - 1);
+            while (x < STATE.TEX_DIM[0])
+                : (x += 1)
+            {
+                const fx: f64 = @floatFromInt(
+                    @mod(x + STATE.frame_number, STATE.TEX_DIM[0])
+                );
+                var y:usize = 0;
+                while (y < STATE.TEX_DIM[1])
+                    : (y += 1)
+                {
+                    const fy: f64 = @floatFromInt(
+                        @mod(y + STATE.frame_number, STATE.TEX_DIM[1])
+                    );
+
+                    const r = fx / iw_m_one;
+                    const g = fy / ih_m_one;
+                    const b:f64 = 0.0;
+
+                    STATE.buffer[x][y][0] = @intFromFloat(255.999 * r);
+                    STATE.buffer[x][y][1] = @intFromFloat(255.999 * g);
+                    STATE.buffer[x][y][2] = @intFromFloat(255.999 * b);
+                    STATE.buffer[x][y][3] = 255;
+                }
+            }
+
+            data.subimage[0][0] = ziis.sokol.gfx.asRange(
+                &STATE.buffer
+            );
+            break :init data;
+        },
+    );
 
     zgui.setNextWindowPos(.{ .x = 0, .y = 0 });
     zgui.setNextWindowSize(
@@ -62,13 +118,13 @@ fn draw(
     {
         defer zgui.end();
 
-        var new = f;
-        if (zgui.dragFloat("test float", .{ .v = &new })) {
+        var new = STATE.f;
+        if (zgui.dragFloat("texture offset", .{ .v = &new })) {
             const cmd = try ziis.undo.SetValue(f32).init(
                     allocator,
-                    &f,
+                    &STATE.f,
                     new,
-                    "test float"
+                    "texture offset"
             );
             try cmd.do();
             try journal.?.update_if_new_or_add(cmd);
@@ -96,77 +152,105 @@ fn draw(
 
         if (zgui.button("show gui demo", .{}) )
         { 
-            demo_window_gui = ! demo_window_gui; 
+            STATE.demo_window_gui = ! STATE.demo_window_gui; 
         }
         if (zgui.button("show plot demo", .{}))
         {
-            demo_window_gui = ! demo_window_plot; 
+            STATE.demo_window_gui = ! STATE.demo_window_plot; 
         }
 
-        if (demo_window_gui) 
+        if (STATE.demo_window_gui) 
         {
-            zgui.showDemoWindow(&demo_window_gui);
+            zgui.showDemoWindow(&STATE.demo_window_gui);
         }
-        if (demo_window_plot) 
+        if (STATE.demo_window_plot) 
         {
-            zplot.showDemoWindow(&demo_window_plot);
+            zplot.showDemoWindow(&STATE.demo_window_plot);
         }
 
-        if (
-            zgui.beginChild(
-                "Plot", 
-                .{
-                    .w = -1,
-                    .h = -1,
-                }
-            )
-        )
+        if (zgui.beginTabBar("Panes", .{}))
         {
-            defer zgui.endChild();
+            defer zgui.endTabBar();
 
-            if (
-                zgui.plot.beginPlot(
-                    "Test ZPlot Plot",
-                    .{ 
-                        .w = -1.0,
-                        .h = -1.0,
-                        .flags = .{ .equal = true },
-                    }
-                )
-            ) 
+            if (zgui.beginTabItem("PlotTab", .{}))
             {
-                defer zgui.plot.endPlot();
+                defer zgui.endTabItem();
 
-                zgui.plot.setupAxis(
-                    .x1,
-                    .{ .label = "input" }
-                );
-                zgui.plot.setupAxis(
-                    .y1,
-                    .{ .label = "output" }
-                );
-                zgui.plot.setupLegend(
-                    .{ 
-                        .south = true,
-                        .west = true 
-                    },
-                    .{}
-                );
-                zgui.plot.setupFinish();
+                if (
+                    zgui.beginChild(
+                        "Plot", 
+                        .{
+                            .w = -1,
+                            .h = -1,
+                        }
+                    )
+                )
+                {
+                    defer zgui.endChild();
 
-                const xs= [_]f32{0, 1, 2, 3, 4};
-                const ys= [_]f32{0, 1, 2, 3, 6};
+                    if (
+                        zgui.plot.beginPlot(
+                            "Test ZPlot Plot",
+                            .{ 
+                                .w = -1.0,
+                                .h = -1.0,
+                                .flags = .{ .equal = true },
+                            }
+                        )
+                    ) 
+                    {
+                        defer zgui.plot.endPlot();
 
-                zplot.plotLine(
-                    "test plot",
-                    f32, 
-                    .{
-                        .xv = &xs,
-                        .yv = &ys 
-                    },
+                        zgui.plot.setupAxis(
+                            .x1,
+                            .{ .label = "input" }
+                        );
+                        zgui.plot.setupAxis(
+                            .y1,
+                            .{ .label = "output" }
+                        );
+                        zgui.plot.setupLegend(
+                            .{ 
+                                .south = true,
+                                .west = true 
+                            },
+                            .{}
+                        );
+                        zgui.plot.setupFinish();
+
+                        const xs= [_]f32{0, 1, 2, 3, 4};
+                        const ys= [_]f32{0, 1, 2, 3, 6};
+
+                        zplot.plotLine(
+                            "test plot",
+                            f32, 
+                            .{
+                                .xv = &xs,
+                                .yv = &ys 
+                            },
+                        );
+                    }
+                }
+            }
+
+            if (zgui.beginTabItem("Texture Example", .{}))
+            {
+                defer zgui.endTabItem();
+
+                const wsize = zgui.getWindowSize();
+
+                ziis.cimgui.igImage(
+                    STATE.texid,
+                    .{ .x = wsize[0], .y = wsize[1]},
+                    .{ .x = 0, .y = 0 },
+                    .{ .x = 1, .y = 1 },
+                    .{ .x = 1, .y = 1, .z = 1, .w = 1 },
+                    .{ .x = 0, .y = 0, .z = 0, .w = 0 },
                 );
+
             }
         }
+
     }
 }
 
@@ -188,6 +272,21 @@ fn cleanup () void
     }
 }
 
+pub fn init(
+) void
+{ 
+    STATE.tex = sg.makeImage(
+        .{
+            .width = STATE.TEX_DIM[0],
+            .height = STATE.TEX_DIM[1],
+            .usage = .STREAM,
+            .pixel_format = .RGBA8,
+        }
+    );
+
+    STATE.texid = ziis.sokol.imgui.imtextureid(STATE.tex);
+}
+
 pub fn main(
 ) void 
 {
@@ -199,7 +298,8 @@ pub fn main(
     app_wrapper.sokol_main(
         .{
             .draw = draw, 
-            .cleanup = cleanup,
+            .maybe_pre_zgui_shutdown_cleanup = cleanup,
+            .maybe_post_zgui_init = init,
         },
     );
 }
