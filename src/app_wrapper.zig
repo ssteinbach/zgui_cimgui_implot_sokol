@@ -68,26 +68,26 @@ export fn init(
         const style = zgui.getStyle();
 
         style.window_min_size = .{ 320.0, 240.0 };
-        style.window_border_size = 8.0;
-        style.scrollbar_size = 6.0;
+        // style.window_border_size = 8.0;
+        // style.scrollbar_size = 6.0;
 
-        {
-            var color = style.getColor(.scrollbar_grab);
-            color[1] = 0.8;
-            style.setColor(.scrollbar_grab, color);
-        }
+        // {
+        //     var color = style.getColor(.scrollbar_grab);
+        //     color[1] = 0.8;
+        //     style.setColor(.scrollbar_grab, color);
+        // }
 
         style.scaleAllSizes(scale_factor);
 
         // To reset zgui.Style with default values:
         //zgui.getStyle().* = zgui.Style.init();
 
-        {
-            zgui.plot.getStyle().line_weight = 3.0;
-            const plot_style = zgui.plot.getStyle();
-            plot_style.marker = .circle;
-            plot_style.marker_size = 5.0;
-        }
+        // {
+        //     zgui.plot.getStyle().line_weight = 3.0;
+        //     const plot_style = zgui.plot.getStyle();
+        //     plot_style.marker = .circle;
+        //     plot_style.marker_size = 5.0;
+        // }
     }
 
     if (app.maybe_post_zgui_init)
