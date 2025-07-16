@@ -135,7 +135,11 @@ fn draw(
             zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
         }
 
-        zgui.bulletText("Head Entry in STATE.Journal: {?d}", .{ STATE.journal.?.maybe_head_entry });
+        zgui.bulletText("Head Entry in Journal: {?d}", .{ STATE.journal.?.maybe_head_entry });
+        if (zgui.beginItemTooltip()) {
+            zgui.text("Hi, this is a tooltip", .{});
+            zgui.endTooltip();
+        }
 
         if (zgui.button("undo", .{}))
         {
@@ -220,6 +224,24 @@ fn draw(
                         const xs= [_]f32{0, 1, 2, 3, 4};
                         const ys= [_]f32{0, 1, 2, 3, 6};
 
+                        zplot.pushStyleColor4f(
+                            .{
+                                .idx = .fill,
+                                .c = .{ 0.1, 0.1, 0.4, 0.4 },
+                            },
+                        );
+                        zplot.plotShaded(
+                            "test plot (shaded)",
+                            f32, 
+                            .{
+                                .xv = &xs,
+                                .yv = &ys,
+                                .flags = .{
+                                },
+                            },
+                        );
+                        zplot.popStyleColor(.{});
+
                         zplot.plotLine(
                             "test plot",
                             f32, 
@@ -228,6 +250,7 @@ fn draw(
                                 .yv = &ys 
                             },
                         );
+
                     }
                 }
             }
@@ -246,10 +269,8 @@ fn draw(
                     .{ .x = 1, .y = 1, .z = 1, .w = 1 },
                     .{ .x = 0, .y = 0, .z = 0, .w = 0 },
                 );
-
             }
         }
-
     }
 }
 
