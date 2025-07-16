@@ -3484,8 +3484,10 @@ extern fn zguiMenuItemPtr(label: [*:0]const u8, shortcut: ?[*:0]const u8, select
 pub const beginTooltip = zguiBeginTooltip;
 /// `pub fn endTooltip() void`
 pub const endTooltip = zguiEndTooltip;
+pub const beginItemTooltip = zguiBeginItemTooltip;
 extern fn zguiBeginTooltip() bool;
 extern fn zguiEndTooltip() void;
+extern fn zguiBeginItemTooltip() bool;
 
 /// `pub fn beginPopupContextWindow() bool`
 pub const beginPopupContextWindow = zguiBeginPopupContextWindow;

@@ -1797,6 +1797,11 @@ extern "C"
         ImGui::EndTooltip();
     }
 
+    ZGUI_API bool zguiBeginItemTooltip(void)
+    {
+        return ImGui::BeginItemTooltip();
+    }
+
     ZGUI_API bool zguiBeginPopup(const char *str_id, ImGuiWindowFlags flags)
     {
         return ImGui::BeginPopup(str_id, flags);
