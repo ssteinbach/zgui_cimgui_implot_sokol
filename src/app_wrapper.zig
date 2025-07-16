@@ -68,9 +68,10 @@ export fn init(
         const style = zgui.getStyle();
 
         style.window_min_size = .{ 320.0, 240.0 };
+
+        // example of setting the scrollbar parameters
         // style.window_border_size = 8.0;
         // style.scrollbar_size = 6.0;
-
         // {
         //     var color = style.getColor(.scrollbar_grab);
         //     color[1] = 0.8;
