@@ -11,6 +11,7 @@ const app_wrapper = ziis.app_wrapper;
 
 const build_options = @import("build_options");
 
+/// State container
 const STATE = struct {
     var f: f32 = 0;
     var backup_f: f32 = 0;
@@ -21,12 +22,10 @@ const STATE = struct {
     var tex: sg.Image = .{};
     var texid: u64 = 0;
     var frame_number: usize = 0;
-    var buffer = (
-        std.mem.zeroes(
-            [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8 
-        )
+    var buffer = std.mem.zeroes(
+        [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8
     );
-    var journal : ?ziis.undo.Journal = null;
+    var maybe_journal : ?ziis.undo.Journal = null;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -96,7 +95,7 @@ fn draw(
         .{ 
             .w = size[0],
             .h = size[1],
-        }
+        },
     );
 
     if (
@@ -111,7 +110,7 @@ fn draw(
                     .no_collapse = true,
                     .no_title_bar = true,
                 },
-            }
+            },
         )
     )
     {
@@ -126,16 +125,16 @@ fn draw(
                     "texture offset"
             );
             try cmd.do();
-            try STATE.journal.?.update_if_new_or_add(cmd);
+            try STATE.maybe_journal.?.update_if_new_or_add(cmd);
         }
 
-        for (STATE.journal.?.entries.items, 0..)
+        for (STATE.maybe_journal.?.entries.items, 0..)
             |cmd, ind|
         {
             zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
         }
 
-        zgui.bulletText("Head Entry in Journal: {?d}", .{ STATE.journal.?.maybe_head_entry });
+        zgui.bulletText("Head Entry in Journal: {?d}", .{ STATE.maybe_journal.?.maybe_head_entry });
         if (zgui.beginItemTooltip()) {
             zgui.text("Hi, this is a tooltip", .{});
             zgui.endTooltip();
@@ -143,14 +142,14 @@ fn draw(
 
         if (zgui.button("undo", .{}))
         {
-            try STATE.journal.?.undo();
+            try STATE.maybe_journal.?.undo();
         }
 
         zgui.sameLine(.{});
 
         if (zgui.button("redo", .{}))
         {
-            try STATE.journal.?.redo();
+            try STATE.maybe_journal.?.redo();
         }
 
         if (zgui.button("show gui demo", .{}) )
@@ -182,10 +181,7 @@ fn draw(
                 if (
                     zgui.beginChild(
                         "Plot", 
-                        .{
-                            .w = -1,
-                            .h = -1,
-                        }
+                        .{ .w = -1, .h = -1, },
                     )
                 )
                 {
@@ -198,7 +194,7 @@ fn draw(
                                 .w = -1.0,
                                 .h = -1.0,
                                 .flags = .{ .equal = true },
-                            }
+                            },
                         )
                     ) 
                     {
@@ -206,18 +202,18 @@ fn draw(
 
                         zgui.plot.setupAxis(
                             .x1,
-                            .{ .label = "input" }
+                            .{ .label = "input" },
                         );
                         zgui.plot.setupAxis(
                             .y1,
-                            .{ .label = "output" }
+                            .{ .label = "output" },
                         );
                         zgui.plot.setupLegend(
                             .{ 
                                 .south = true,
                                 .west = true 
                             },
-                            .{}
+                            .{},
                         );
                         zgui.plot.setupFinish();
 
@@ -240,7 +236,7 @@ fn draw(
                                 },
                             },
                         );
-                        zplot.popStyleColor(.{});
+                        zplot.popStyleColor(.{.count = 1});
 
                         zplot.plotLine(
                             "test plot",
@@ -274,9 +270,10 @@ fn draw(
     }
 }
 
-fn cleanup () void
+fn cleanup (
+) void
 {
-    if (STATE.journal)
+    if (STATE.maybe_journal)
         |*definitely_journal|
     {
         definitely_journal.deinit();
@@ -301,7 +298,7 @@ pub fn init(
             .height = STATE.TEX_DIM[1],
             .usage = .STREAM,
             .pixel_format = .RGBA8,
-        }
+        },
     );
 
     STATE.texid = ziis.sokol.imgui.imtextureid(STATE.tex);
@@ -310,9 +307,9 @@ pub fn init(
 pub fn main(
 ) void 
 {
-    STATE.journal = ziis.undo.Journal.init(
-       allocator,
-        5
+    STATE.maybe_journal = ziis.undo.Journal.init(
+        allocator,
+        5,
     ) catch null;
 
     app_wrapper.sokol_main(
