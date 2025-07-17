@@ -84,7 +84,7 @@ fn draw(
             }
 
             data.subimage[0][0] = ziis.sokol.gfx.asRange(
-                &STATE.buffer
+                &STATE.buffer,
             );
             break :init data;
         },
@@ -117,7 +117,8 @@ fn draw(
         defer zgui.end();
 
         var new = STATE.f;
-        if (zgui.dragFloat("texture offset", .{ .v = &new })) {
+        if (zgui.dragFloat("texture offset", .{.v = &new})) 
+        {
             const cmd = try ziis.undo.SetValue(f32).init(
                     allocator,
                     &STATE.f,
@@ -134,7 +135,11 @@ fn draw(
             zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
         }
 
-        zgui.bulletText("Head Entry in Journal: {?d}", .{ STATE.maybe_journal.?.maybe_head_entry });
+        zgui.bulletText(
+            "Head Entry in Journal: {?d}",
+            .{ STATE.maybe_journal.?.maybe_head_entry }
+        );
+
         if (zgui.beginItemTooltip()) {
             zgui.text("Hi, this is a tooltip", .{});
             zgui.endTooltip();
@@ -243,10 +248,9 @@ fn draw(
                             f32, 
                             .{
                                 .xv = &xs,
-                                .yv = &ys 
+                                .yv = &ys,
                             },
                         );
-
                     }
                 }
             }
