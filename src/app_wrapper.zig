@@ -1,22 +1,29 @@
+//! Wrapper for an app using ZIIS - see app_wrapper_demo for an example
+
 const std = @import("std");
 
 const ziis = @import("root.zig");
 const zgui = ziis.zgui;
 const zplot = ziis.zgui.plot;
 const sokol = ziis.sokol;
-const slog = sokol.log;
 const sg = sokol.gfx;
 const sapp = sokol.app;
 const sglue = sokol.glue;
 const simgui = sokol.imgui;
 
-const state = struct {
+/// State container
+const STATE = struct {
     var pass_action: sg.PassAction = .{};
+
+    /// gets configured by sokol_main
+    var app: SokolApp = undefined;
+
+    /// default font
+    const font_data = @embedFile("content/Roboto-Medium.ttf");
+
+    /// allocator for configuring imgui/sokol/etc.
+    const allocator = std.heap.c_allocator;
 };
-
-const font_data = @embedFile("content/Roboto-Medium.ttf");
-
-const allocator = std.heap.c_allocator;
 
 export fn init(
 ) void 
@@ -25,20 +32,24 @@ export fn init(
     sg.setup(
         .{
             .environment = sglue.environment(),
-            .logger = .{ .func = slog.func },
-        }
+            .logger = .{ .func = sokol.log.func },
+        },
     );
 
     // initialize sokol-imgui
-    simgui.setup( .{ .logger = .{ .func = slog.func }, });
+    simgui.setup(
+        .{
+            .logger = .{ .func = sokol.log.func }, 
+        },
+    );
 
     // initial clear color
-    state.pass_action.colors[0] = .{
+    STATE.pass_action.colors[0] = .{
         .load_action = .CLEAR,
         .clear_value = .{ .r = 0.0, .g = 0.5, .b = 1.0, .a = 1.0 },
     };
 
-    zgui.init(allocator);
+    zgui.init(STATE.allocator);
     zgui.plot.init();
 
     // set up style and load the font
@@ -48,15 +59,15 @@ export fn init(
         const font_size = 16.0 * scale_factor;
 
         const font_large = zgui.io.addFontFromMemory(
-            font_data,
-            font_size * 1.1
+            STATE.font_data,
+            font_size * 1.1,
         );
         _ = font_large;
         // std.debug.assert(zgui.io.getFont(0) == font_large);
 
         const font_normal = zgui.io.addFontFromMemory(
-            font_data,
-            font_size
+            STATE.font_data,
+            font_size,
         );
         // std.debug.assert(zgui.io.getFont(1) == font_normal);
         zgui.io.setDefaultFont(font_normal);
@@ -91,7 +102,7 @@ export fn init(
         // }
     }
 
-    if (app.maybe_post_zgui_init)
+    if (STATE.app.maybe_post_zgui_init)
         |init_fn|
     {
         init_fn();
@@ -102,21 +113,23 @@ export fn frame(
 ) void 
 {
     // call simgui.newFrame() before any ImGui calls
-    simgui.newFrame(.{
-        .width = sapp.width(),
-        .height = sapp.height(),
-        .delta_time = sapp.frameDuration(),
-        .dpi_scale = sapp.dpiScale(),
-    });
+    simgui.newFrame(
+        .{
+            .width = sapp.width(),
+            .height = sapp.height(),
+            .delta_time = sapp.frameDuration(),
+            .dpi_scale = sapp.dpiScale(),
+        },
+    );
 
-    app.draw() catch |err| {
+    STATE.app.draw() catch |err| {
         std.debug.print(">>> ERROR: {any}\n", .{err});
         std.process.exit(1);
     };
 
     sg.beginPass(
         .{
-            .action = state.pass_action,
+            .action = STATE.pass_action,
             .swapchain = sglue.swapchain()
         }
     );
@@ -128,7 +141,7 @@ export fn frame(
 export fn cleanup(
 ) void 
 {
-    if (app.maybe_pre_zgui_shutdown_cleanup)
+    if (STATE.app.maybe_pre_zgui_shutdown_cleanup)
         |clean_fn|
     {
         clean_fn();
@@ -148,10 +161,7 @@ export fn event(
     _ = simgui.handleEvent(ev.*);
 
     // Check if the key event is a key press, and if it is the Escape key 
-    if (
-        ev.*.type == .KEY_DOWN
-        and ev.*.key_code == .ESCAPE
-    ) 
+    if (ev.*.type == .KEY_DOWN and ev.*.key_code == .ESCAPE) 
     { 
         // Quit the application 
         sapp.quit();
@@ -184,26 +194,25 @@ const SokolApp = struct {
     event: *const fn (ev: [*c]const sapp.Event) callconv(.C) void = &event,
 
 };
-var app : SokolApp = undefined;
 
 pub fn sokol_main(
     comptime app_in: SokolApp,
 ) void 
 {
-    app = app_in;
+    STATE.app = app_in;
 
     sapp.run(
         .{
             .init_cb = init,
             .frame_cb = frame,
             .cleanup_cb = cleanup,
-            .event_cb = app.event,
-            .width = app.dimensions[0],
-            .height = app.dimensions[1],
+            .event_cb = STATE.app.event,
+            .width = STATE.app.dimensions[0],
+            .height = STATE.app.dimensions[1],
             .icon = .{ .sokol_default = true },
-            .window_title = app.title,
-            .logger = .{ .func = slog.func },
+            .window_title = STATE.app.title,
+            .logger = .{ .func = sokol.log.func },
             .win32_console_attach = true,
-        }
+        },
     );
 }
