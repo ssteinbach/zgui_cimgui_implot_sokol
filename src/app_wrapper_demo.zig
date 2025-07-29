@@ -309,7 +309,7 @@ pub fn init(
 }
 
 pub fn main(
-) void 
+) !void 
 {
     STATE.maybe_journal = ziis.undo.Journal.init(
         allocator,
