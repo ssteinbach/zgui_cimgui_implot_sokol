@@ -10,7 +10,10 @@
             .url = "git+https://github.com/cimgui/cimgui.git?ref=1.91.8dock#10a7a9f3f3a907cb4091f4bf550019050b5cb63f",
             .hash = "N-V-__8AAEr_MwAWAh7PIiSfjJ2W0fmVlLhDYPwqazVi-L2S",
         },
-        .imgui = .{ .url = "git+https://github.com/ocornut/imgui.git?ref=v1.91.8-docking#11b3a7c8ca23201294464c7f368614a9106af2a1", .hash = "N-V-__8AAMIWcwCoTPfwnXeTa4tEcb_6NpVHTOcMVlmOP9q6", },
+        .imgui = .{
+            .url = "git+https://github.com/ocornut/imgui.git?ref=v1.91.8-docking#11b3a7c8ca23201294464c7f368614a9106af2a1",
+            .hash = "N-V-__8AAMIWcwCoTPfwnXeTa4tEcb_6NpVHTOcMVlmOP9q6", 
+        },
         .implot = .{
             .url = "git+https://github.com/epezent/implot.git#v0.16", 
             .hash = "N-V-__8AAGwxCgBW6bfOTzT8aeaXN5K0b5YGH1VGoT3LWf_o",
