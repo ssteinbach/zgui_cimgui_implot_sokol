@@ -3274,6 +3274,9 @@ extern fn zguiTableSetBgColor(target: TableBgTarget, color: c_uint, column_n: c_
 pub fn isItemHovered(flags: HoveredFlags) bool {
     return zguiIsItemHovered(flags);
 }
+pub fn tableGetHoveredRow() u32 {
+    return zguiTableGetHoveredRow();
+}
 /// `pub fn isItemActive() bool`
 pub const isItemActive = zguiIsItemActive;
 /// `pub fn isItemFocused() bool`
@@ -3323,6 +3326,7 @@ extern fn zguiIsMouseDoubleClicked(mouse_button: MouseButton) bool;
 extern fn zguiGetMouseClickedCount(mouse_button: MouseButton) u32;
 extern fn zguiIsMouseDragging(mouse_button: MouseButton, lock_threshold: f32) bool;
 extern fn zguiIsItemHovered(flags: HoveredFlags) bool;
+extern fn zguiTableGetHoveredRow() i32;
 extern fn zguiIsItemActive() bool;
 extern fn zguiIsItemFocused() bool;
 extern fn zguiIsItemClicked(mouse_button: MouseButton) bool;
