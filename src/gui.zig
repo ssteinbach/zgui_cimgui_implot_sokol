@@ -3271,7 +3271,7 @@ extern fn zguiTableSetBgColor(target: TableBgTarget, color: c_uint, column_n: c_
 pub fn isItemHovered(flags: HoveredFlags) bool {
     return zguiIsItemHovered(flags);
 }
-pub fn tableGetHoveredRow() u32 {
+pub fn tableGetHoveredRow() i32 {
     return zguiTableGetHoveredRow();
 }
 /// `pub fn isItemActive() bool`
