@@ -1586,6 +1586,11 @@ extern "C"
         return ImGui::IsItemHovered(flags);
     }
 
+    ZGUI_API int zguiTableGetHoveredRow()
+    {
+        return ImGui::TableGetHoveredRow();
+    }
+
     ZGUI_API bool zguiIsItemActive(void)
     {
         return ImGui::IsItemActive();
