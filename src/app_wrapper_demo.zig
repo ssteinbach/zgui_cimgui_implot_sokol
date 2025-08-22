@@ -9,8 +9,6 @@ const zplot = zgui.plot;
 const sg = ziis.sokol.gfx;
 const app_wrapper = ziis.app_wrapper;
 
-const build_options = @import("build_options");
-
 /// State container
 const STATE = struct {
     var f: f32 = 0;
@@ -288,7 +286,7 @@ fn cleanup (
         const result = gpa.deinit();
         if (result == .leak) 
         {
-            std.debug.print("leak!", .{});
+            std.log.debug("leak!", .{});
         }
     }
 }
