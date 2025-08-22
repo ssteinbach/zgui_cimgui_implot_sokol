@@ -16,6 +16,7 @@ const STATE = struct {
     var pass_action: sg.PassAction = .{};
 
     /// gets configured by sokol_main
+    // SAFETY: gets configured by the main, which requires it as an argument
     var app: SokolApp = undefined;
 
     /// default font
@@ -123,7 +124,7 @@ export fn frame(
     );
 
     STATE.app.draw() catch |err| {
-        std.debug.print(">>> ERROR: {any}\n", .{err});
+        std.log.err(">>> ERROR: {any}\n", .{err});
         std.process.exit(1);
     };
 
