@@ -4,27 +4,27 @@
     // tracks the imgui version
     .version = "1.91.8",
     .fingerprint = 0x541167ec5e9db4d7, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .cimgui = .{
-            .url = "git+https://github.com/cimgui/cimgui.git?ref=1.91.8dock#10a7a9f3f3a907cb4091f4bf550019050b5cb63f",
-            .hash = "N-V-__8AAEr_MwAWAh7PIiSfjJ2W0fmVlLhDYPwqazVi-L2S",
+            .url = "git+https://github.com/floooh/dcimgui.git#581c2e909c899c21923c779d4c41ea56ab93bbb4",
+            .hash = "cimgui-0.1.0-44ClkQ14kwAiwcr3ioDjxvPuiWQctWrt-tIFtsfP6xmU",
+        },
+        .implot = .{
+            .url = "git+https://github.com/epezent/implot.git#3da8bd34299965d3b0ab124df743fe3e076fa222",
+            .hash = "N-V-__8AAEp-CgAgvyx1wqLjwzz_RQC5EwY-tJLdzjp6ITbN",
+        },
+        .sokol = .{
+            .url = "git+https://github.com/floooh/sokol-zig.git#3713675b6f80d485d66d3a8f13ce0c8b36f1847e",
+            .hash = "sokol-0.1.0-pb1HKwzULQCgDYLyHiIkb5cBPbMUbBGVBF34gHMRVvh5",
+        },
+        .do_undo_journal = .{
+            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#1dbc411ff56ba14181b640714e77b7297d850919",
+            .hash = "do_undo_journal-1.0.0-1UllC4VrAACW9W1bVNXnDJPJqrQax5a02ubMqNpgESvd",
         },
         .imgui = .{
             .url = "git+https://github.com/ocornut/imgui.git?ref=v1.91.8-docking#11b3a7c8ca23201294464c7f368614a9106af2a1",
-            .hash = "N-V-__8AAMIWcwCoTPfwnXeTa4tEcb_6NpVHTOcMVlmOP9q6", 
-        },
-        .implot = .{
-            .url = "git+https://github.com/epezent/implot.git#v0.16", 
-            .hash = "N-V-__8AAGwxCgBW6bfOTzT8aeaXN5K0b5YGH1VGoT3LWf_o",
-        },
-        .sokol = .{
-            .url = "git+https://github.com/floooh/sokol-zig.git#6f7630d14981a9c7f1e53bf5372c80bdd19b687d",
-            .hash = "sokol-0.1.0-pb1HK8eOOQDLJmFo5VGGCVo2GxDm27dSsTHX8rsVb2bJ",
-        },
-        .do_undo_journal = .{
-            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#99c2b83b66d43acebd4e3093bb4bd30abc3860d4",
-            .hash = "do_undo_journal-0.1.0-1UllCyhjAAC1vJutzzZp2kdz2cIiU7vvV04ghzIvjkIi",
+            .hash = "N-V-__8AAMIWcwCoTPfwnXeTa4tEcb_6NpVHTOcMVlmOP9q6",
         },
     },
 
