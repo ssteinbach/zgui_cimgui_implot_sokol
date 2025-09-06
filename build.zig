@@ -52,7 +52,8 @@ pub fn build(
         dep_cimgui.path(cimgui_conf.include_dir)
     );
 
-    const mod_ziis = b.createModule(
+    const mod_ziis = b.addModule(
+        "zgui_cimgui_implot_sokol",
         .{
             .root_source_file = b.path("src/root.zig"),
             .target = target,
