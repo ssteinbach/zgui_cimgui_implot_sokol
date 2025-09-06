@@ -74,14 +74,6 @@ pub fn build(
         },
     );
 
-    // const dep_imgui = b.dependency(
-    //     "imgui",
-    //     .{
-    //         .target = target,
-    //         .optimize = optimize,
-    //     }
-    // );
-
     const lib_imgui = b.addLibrary(
         .{ 
             .linkage = .static,
@@ -92,7 +84,7 @@ pub fn build(
                     .optimize = optimize,
                     .link_libcpp = true,
                     .link_libc = true,
-                }
+                },
             ),
         }
     );
@@ -101,8 +93,8 @@ pub fn build(
         .{
             .root = b.path("src"),
             .files = &.{
-                b.pathJoin(&.{ "zgui.cpp" }),
-                b.pathJoin(&.{ "zplot.cpp" }),
+                 "zgui.cpp",
+                 "zplot.cpp",
             },
             .flags = &.{
                 "-fno-sanitize=undefined",
@@ -127,7 +119,6 @@ pub fn build(
     lib_imgui.addIncludePath(
         dep_implot.path("implot.h").dirname(),
     );
-    b.installArtifact(lib_imgui);
     mod_ziis.linkLibrary(dep_cimgui.artifact(cimgui_conf.clib_name));
     mod_ziis.linkLibrary(lib_imgui);
 
@@ -144,11 +135,6 @@ pub fn build(
                 },
             },
         },
-    );
-    const mod_options = b.addOptions();
-    mod_app_wrapper.addOptions(
-        "build_options",
-        mod_options
     );
 
     // from here on different handling for native vs wasm builds
