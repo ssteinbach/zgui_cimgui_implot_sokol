@@ -59,13 +59,6 @@ export fn init(
          
         const font_size = 16.0 * scale_factor;
 
-        const font_large = zgui.io.addFontFromMemory(
-            STATE.font_data,
-            font_size * 1.1,
-        );
-        _ = font_large;
-        // std.debug.assert(zgui.io.getFont(0) == font_large);
-
         const font_normal = zgui.io.addFontFromMemory(
             STATE.font_data,
             font_size,
@@ -78,6 +71,7 @@ export fn init(
         // zgui.pushStyleColor*()/zgui.pushStyleVar*() functions.
 
         const style = zgui.getStyle();
+        style.window_rounding = 0;
 
         style.window_min_size = .{ 320.0, 240.0 };
 
@@ -192,7 +186,7 @@ const SokolApp = struct {
 
     /// event handler - for keyboard shortcuts.  Default only catches the
     /// escape key which quits the app
-    event: *const fn (ev: [*c]const sapp.Event) callconv(.C) void = &event,
+    event: *const fn (ev: [*c]const sapp.Event) callconv(.c) void = &event,
 
 };
 

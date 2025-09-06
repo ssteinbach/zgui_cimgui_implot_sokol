@@ -12,7 +12,6 @@ const app_wrapper = ziis.app_wrapper;
 /// State container
 const STATE = struct {
     var f: f32 = 0;
-    var backup_f: f32 = 0;
     var demo_window_gui = false;
     var demo_window_plot = false;
     const TEX_DIM : [2]i32 = .{ 256, 256 };
@@ -138,7 +137,8 @@ fn draw(
             .{ STATE.maybe_journal.?.maybe_head_entry }
         );
 
-        if (zgui.beginItemTooltip()) {
+        if (zgui.beginItemTooltip()) 
+        {
             zgui.text("Hi, this is a tooltip", .{});
             zgui.endTooltip();
         }
@@ -260,12 +260,8 @@ fn draw(
                 const wsize = zgui.getWindowSize();
 
                 ziis.cimgui.igImage(
-                    STATE.texid,
+                    .{ ._TexID = STATE.tex.id },
                     .{ .x = wsize[0], .y = wsize[1]},
-                    .{ .x = 0, .y = 0 },
-                    .{ .x = 1, .y = 1 },
-                    .{ .x = 1, .y = 1, .z = 1, .w = 1 },
-                    .{ .x = 0, .y = 0, .z = 0, .w = 0 },
                 );
             }
         }
@@ -298,12 +294,15 @@ pub fn init(
         .{
             .width = STATE.TEX_DIM[0],
             .height = STATE.TEX_DIM[1],
-            .usage = .STREAM,
+            .usage = .{ .stream_update = true },
             .pixel_format = .RGBA8,
         },
     );
 
-    STATE.texid = ziis.sokol.imgui.imtextureid(STATE.tex);
+    // blah
+    STATE.texid = ziis.sokol.imgui.imtextureid(
+        ziis.sokol.imgui.textureViewFromImtextureid(STATE.tex.id)
+    );
 }
 
 pub fn main(

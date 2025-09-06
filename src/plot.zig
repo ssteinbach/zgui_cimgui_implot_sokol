@@ -213,6 +213,13 @@ extern fn zguiPlot_PushStyleVar1f(idx: StyleVar, v: f32) void;
 extern fn zguiPlot_PushStyleVar2f(idx: StyleVar, v: *const [2]f32) void;
 extern fn zguiPlot_PopStyleVar(count: i32) void;
 //--------------------------------------------------------------------------------------------------
+pub fn getLastItemColor() [4]f32 {
+    var color: [4]f32 = undefined;
+    zguiPlot_GetLastItemColor(&color);
+    return color;
+}
+extern fn zguiPlot_GetLastItemColor(color: *[4]f32) void;
+//----------------------------------------------------------------------------------------------
 pub const PlotLocation = packed struct(u32) {
     north: bool = false,
     south: bool = false,
@@ -282,6 +289,10 @@ pub fn setupAxis(axis: Axis, args: SetupAxis) void {
     zguiPlot_SetupAxis(axis, if (args.label) |l| l else null, args.flags);
 }
 extern fn zguiPlot_SetupAxis(axis: Axis, label: ?[*:0]const u8, flags: AxisFlags) void;
+pub fn setAxis(axis: Axis) void {
+    zguiPlot_SetAxis(axis);
+}
+extern fn zguiPlot_SetAxis(axis: Axis) void;
 //----------------------------------------------------------------------------------------------
 pub const Condition = enum(u32) {
     none = @intFromEnum(gui.Condition.none),
@@ -309,11 +320,10 @@ pub const Flags = packed struct(u32) {
     no_inputs: bool = false,
     no_menus: bool = false,
     no_box_select: bool = false,
-    no_child: bool = false,
     no_frame: bool = false,
     equal: bool = false,
     crosshairs: bool = false,
-    _padding: u22 = 0,
+    _padding: u23 = 0,
 
     pub const canvas_only = Flags{
         .no_title = true,
@@ -540,6 +550,91 @@ extern fn zguiPlot_PlotShaded(
     stride: i32,
 ) void;
 //----------------------------------------------------------------------------------------------
+pub const BarsFlags = packed struct(u32) {
+    _reserved0: bool = false,
+    _reserved1: bool = false,
+    _reserved2: bool = false,
+    _reserved3: bool = false,
+    _reserved4: bool = false,
+    _reserved5: bool = false,
+    _reserved6: bool = false,
+    _reserved7: bool = false,
+    _reserved8: bool = false,
+    _reserved9: bool = false,
+    horizontal: bool = false,
+    _padding: u21 = 0,
+};
+fn PlotBarsGen(comptime T: type) type {
+    return struct {
+        xv: []const T,
+        yv: []const T,
+        bar_size: f64 = 0.67,
+        flags: BarsFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotBars(label_id: [:0]const u8, comptime T: type, args: PlotBarsGen(T)) void {
+    assert(args.xv.len == args.yv.len);
+    zguiPlot_PlotBars(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.xv.ptr,
+        args.yv.ptr,
+        @as(i32, @intCast(args.xv.len)),
+        args.bar_size,
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotBars(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    xv: *const anyopaque,
+    yv: *const anyopaque,
+    count: i32,
+    bar_size: f64,
+    flags: BarsFlags,
+    offset: i32,
+    stride: i32,
+) void;
+
+fn PlotBarsValuesGen(comptime T: type) type {
+    return struct {
+        v: []const T,
+        bar_size: f64 = 0.0,
+        shift: f64 = 0.0,
+        flags: BarsFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotBarsValues(label_id: [:0]const u8, comptime T: type, args: PlotBarsValuesGen(T)) void {
+    zguiPlot_PlotBarsValues(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.v.ptr,
+        @as(i32, @intCast(args.v.len)),
+        args.bar_size,
+        args.shift,
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotBarsValues(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    values: *const anyopaque,
+    count: i32,
+    bar_size: f64,
+    shift: f64,
+    flags: BarsFlags,
+    offset: i32,
+    stride: i32,
+) void;
+//----------------------------------------------------------------------------------------------
 pub const DragToolFlags = packed struct(u32) {
     no_cursors: bool = false,
     no_fit: bool = false,
@@ -566,6 +661,30 @@ pub fn dragPoint(id: i32, args: DragPoint) bool {
 }
 extern fn zguiPlot_DragPoint(id: i32, x: *f64, y: *f64, *const [4]f32, size: f32, flags: DragToolFlags) bool;
 //----------------------------------------------------------------------------------------------
+pub const Tag = struct {
+    round: bool = false,
+};
+
+pub fn tagX(x: f64, col: [4]f32, args: Tag) void {
+    zguiPlot_TagX(x, &col, args.round);
+}
+extern fn zguiPlot_TagX(x: f64, col: *const [4]f32, round: bool) void;
+
+pub fn tagXText(x: f64, col: [4]f32, comptime fmt: []const u8, fmt_args: anytype) void {
+    zguiPlot_TagXText(x, &col, "%s", gui.formatZ(fmt, fmt_args).ptr);
+}
+extern fn zguiPlot_TagXText(x: f64, col: *const [4]f32, fmt: [*:0]const u8, ...) void;
+
+pub fn tagY(y: f64, col: [4]f32, args: Tag) void {
+    zguiPlot_TagY(y, &col, args.round);
+}
+extern fn zguiPlot_TagY(y: f64, col: *const [4]f32, round: bool) void;
+
+pub fn tagYText(y: f64, col: [4]f32, comptime fmt: []const u8, fmt_args: anytype) void {
+    zguiPlot_TagYText(y, &col, "%s", gui.formatZ(fmt, fmt_args).ptr);
+}
+extern fn zguiPlot_TagYText(y: f64, col: *const [4]f32, fmt: [*:0]const u8, ...) void;
+//----------------------------------------------------------------------------------------------
 // PlotText
 const PlotTextFlags = packed struct(u32) {
     vertical: bool = false,
@@ -589,21 +708,10 @@ extern fn zguiPlot_PlotText(
 ) void;
 
 //----------------------------------------------------------------------------------------------
-pub const PlotLimits = extern struct {
-    x: [2]f64,
-    y: [2]f64,
-};
-/// getPlotLimits()
-pub fn getPlotLimits(x_axis: Axis, y_axis: Axis) PlotLimits
-{
-    var result : [4]f64 = undefined;
-    zguiPlot_GetPlotLimits(x_axis, y_axis, &result);
-    return .{
-        .x = .{ result[0], result[1] },
-        .y = .{ result[2], result[3] },
-    };
+pub fn isPlotHovered() bool {
+    return zguiPlot_IsPlotHovered();
 }
-extern fn zguiPlot_GetPlotLimits(x_axis: Axis, y_axis:Axis, *[4]f64) void;
+extern fn zguiPlot_IsPlotHovered() bool;
 //----------------------------------------------------------------------------------------------
 /// `pub fn showDemoWindow(popen: ?*bool) void`
 pub const showDemoWindow = zguiPlot_ShowDemoWindow;
