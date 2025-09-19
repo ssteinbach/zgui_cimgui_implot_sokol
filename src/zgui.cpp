@@ -37,10 +37,10 @@ extern "C"
         ImGui::SetAllocatorFunctions(alloc_func, free_func, nullptr);
     }
 
-    ZGUI_API void zguiSetNextWindowViewport(ImGuiID viewport_id)
-    {
-        ImGui::SetNextWindowViewport(viewport_id);
-    }
+    // ZGUI_API void zguiSetNextWindowViewport(ImGuiID viewport_id)
+    // {
+    //     ImGui::SetNextWindowViewport(viewport_id);
+    // }
 
     ZGUI_API void zguiSetNextWindowPos(float x, float y, ImGuiCond cond, float pivot_x, float pivot_y)
     {
@@ -2230,11 +2230,11 @@ extern "C"
         return ImGui::GetWindowDrawList();
     }
 
-    ZGUI_API float zguiGetWindowDpiScale(void)
-    {
-        return ImGui::GetWindowDpiScale();
-    }
-
+    // ZGUI_API float zguiGetWindowDpiScale(void)
+    // {
+    //     return ImGui::GetWindowDpiScale();
+    // }
+    //
     ZGUI_API ImDrawList *zguiGetBackgroundDrawList(void)
     {
         return ImGui::GetBackgroundDrawList();
@@ -2869,91 +2869,91 @@ extern "C"
         p[1] = sz.y;
     }
 
-    ZGUI_API void zguiUpdatePlatformWindows() {
-        ImGui::UpdatePlatformWindows();
-    }
-
-    ZGUI_API void zguiRenderPlatformWindowsDefault() {
-        ImGui::RenderPlatformWindowsDefault();
-    }
+    // ZGUI_API void zguiUpdatePlatformWindows() {
+    //     ImGui::UpdatePlatformWindows();
+    // }
+    //
+    // ZGUI_API void zguiRenderPlatformWindowsDefault() {
+    //     ImGui::RenderPlatformWindowsDefault();
+    // }
 
     //--------------------------------------------------------------------------------------------------
     //
     // Docking
     //
     //--------------------------------------------------------------------------------------------------
-    ZGUI_API ImGuiID zguiDockSpace(const char *str_id, float size[2], ImGuiDockNodeFlags flags)
-    {
-        return ImGui::DockSpace(ImGui::GetID(str_id), {size[0], size[1]}, flags);
-    }
-
-    ZGUI_API ImGuiID zguiDockSpaceOverViewport(ImGuiID dockspace_id, const ImGuiViewport *viewport, ImGuiDockNodeFlags dockspace_flags)
-    {
-        return ImGui::DockSpaceOverViewport(dockspace_id, viewport, dockspace_flags);
-    }
+    // ZGUI_API ImGuiID zguiDockSpace(const char *str_id, float size[2], ImGuiDockNodeFlags flags)
+    // {
+    //     return ImGui::DockSpace(ImGui::GetID(str_id), {size[0], size[1]}, flags);
+    // }
+    //
+    // ZGUI_API ImGuiID zguiDockSpaceOverViewport(ImGuiID dockspace_id, const ImGuiViewport *viewport, ImGuiDockNodeFlags dockspace_flags)
+    // {
+    //     return ImGui::DockSpaceOverViewport(dockspace_id, viewport, dockspace_flags);
+    // }
 
     //--------------------------------------------------------------------------------------------------
     //
     // DockBuilder (Unstable internal imgui API, subject to change, use at own risk)
     //
     //--------------------------------------------------------------------------------------------------
-    ZGUI_API void zguiDockNodeRect(const ImGuiDockNode* node, ImRect* out_rect)
-    {
-        *out_rect = node->Rect();
-    }
-
-    ZGUI_API void zguiDockBuilderDockWindow(const char *window_name, ImGuiID node_id)
-    {
-        ImGui::DockBuilderDockWindow(window_name, node_id);
-    }
-
-    ZGUI_API ImGuiDockNode* zguiDockBuilderGetNode(ImGuiID node_id)
-    {
-        return ImGui::DockBuilderGetNode(node_id);
-    }
-
-    ZGUI_API ImGuiDockNode* zguiDockBuilderGetCentralNode(ImGuiID node_id)
-    {
-        return ImGui::DockBuilderGetCentralNode(node_id);
-    }
-
-    ZGUI_API ImGuiID zguiDockBuilderAddNode(ImGuiID node_id, ImGuiDockNodeFlags flags)
-    {
-        return ImGui::DockBuilderAddNode(node_id, flags);
-    }
-
-    ZGUI_API void zguiDockBuilderRemoveNode(ImGuiID node_id)
-    {
-        ImGui::DockBuilderRemoveNode(node_id);
-    }
-
-    ZGUI_API void zguiDockBuilderSetNodePos(ImGuiID node_id, float pos[2])
-    {
-        ImGui::DockBuilderSetNodePos(node_id, {pos[0], pos[1]});
-    }
-
-    ZGUI_API void zguiDockBuilderSetNodeSize(ImGuiID node_id, float size[2])
-    {
-        ImGui::DockBuilderSetNodeSize(node_id, {size[0], size[1]});
-    }
-
-    ZGUI_API ImGuiID zguiDockBuilderSplitNode(
-        ImGuiID node_id,
-        ImGuiDir split_dir,
-        float size_ratio_for_node_at_dir,
-        ImGuiID *out_id_at_dir,
-        ImGuiID *out_id_at_opposite_dir)
-    {
-        return ImGui::DockBuilderSplitNode(
-            node_id,
-            split_dir,
-            size_ratio_for_node_at_dir,
-            out_id_at_dir,
-            out_id_at_opposite_dir);
-    }
-
-    ZGUI_API void zguiDockBuilderFinish(ImGuiID node_id)
-    {
-        ImGui::DockBuilderFinish(node_id);
-    }
+    // ZGUI_API void zguiDockNodeRect(const ImGuiDockNode* node, ImRect* out_rect)
+    // {
+    //     *out_rect = node->Rect();
+    // }
+    //
+    // ZGUI_API void zguiDockBuilderDockWindow(const char *window_name, ImGuiID node_id)
+    // {
+    //     ImGui::DockBuilderDockWindow(window_name, node_id);
+    // }
+    //
+    // ZGUI_API ImGuiDockNode* zguiDockBuilderGetNode(ImGuiID node_id)
+    // {
+    //     return ImGui::DockBuilderGetNode(node_id);
+    // }
+    //
+    // ZGUI_API ImGuiDockNode* zguiDockBuilderGetCentralNode(ImGuiID node_id)
+    // {
+    //     return ImGui::DockBuilderGetCentralNode(node_id);
+    // }
+    //
+    // ZGUI_API ImGuiID zguiDockBuilderAddNode(ImGuiID node_id, ImGuiDockNodeFlags flags)
+    // {
+    //     return ImGui::DockBuilderAddNode(node_id, flags);
+    // }
+    //
+    // ZGUI_API void zguiDockBuilderRemoveNode(ImGuiID node_id)
+    // {
+    //     ImGui::DockBuilderRemoveNode(node_id);
+    // }
+    //
+    // ZGUI_API void zguiDockBuilderSetNodePos(ImGuiID node_id, float pos[2])
+    // {
+    //     ImGui::DockBuilderSetNodePos(node_id, {pos[0], pos[1]});
+    // }
+    //
+    // ZGUI_API void zguiDockBuilderSetNodeSize(ImGuiID node_id, float size[2])
+    // {
+    //     ImGui::DockBuilderSetNodeSize(node_id, {size[0], size[1]});
+    // }
+    //
+    // ZGUI_API ImGuiID zguiDockBuilderSplitNode(
+    //     ImGuiID node_id,
+    //     ImGuiDir split_dir,
+    //     float size_ratio_for_node_at_dir,
+    //     ImGuiID *out_id_at_dir,
+    //     ImGuiID *out_id_at_opposite_dir)
+    // {
+    //     return ImGui::DockBuilderSplitNode(
+    //         node_id,
+    //         split_dir,
+    //         size_ratio_for_node_at_dir,
+    //         out_id_at_dir,
+    //         out_id_at_opposite_dir);
+    // }
+    //
+    // ZGUI_API void zguiDockBuilderFinish(ImGuiID node_id)
+    // {
+    //     ImGui::DockBuilderFinish(node_id);
+    // }
 } /* extern "C" */

@@ -15,8 +15,8 @@
             .hash = "N-V-__8AAEp-CgAgvyx1wqLjwzz_RQC5EwY-tJLdzjp6ITbN",
         },
         .sokol = .{
-            .url = "git+https://github.com/floooh/sokol-zig.git#3713675b6f80d485d66d3a8f13ce0c8b36f1847e",
-            .hash = "sokol-0.1.0-pb1HKwzULQCgDYLyHiIkb5cBPbMUbBGVBF34gHMRVvh5",
+            .url = "git+https://github.com/floooh/sokol-zig.git#f54f1b00aa2b2421f06422bd35a0930ff0b17197",
+            .hash = "sokol-0.1.0-pb1HKxdSLgC1cy3VKT18XqI35Yg_V5z7g090GkYtfBoV",
         },
         .do_undo_journal = .{
             .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#1dbc411ff56ba14181b640714e77b7297d850919",

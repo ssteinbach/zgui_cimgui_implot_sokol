@@ -9,6 +9,8 @@ const zplot = zgui.plot;
 const sg = ziis.sokol.gfx;
 const app_wrapper = ziis.app_wrapper;
 
+const cimgui = ziis.cimgui;
+
 /// State container
 const STATE = struct {
     var f: f32 = 0;
@@ -80,7 +82,7 @@ fn draw(
                 }
             }
 
-            data.subimage[0][0] = ziis.sokol.gfx.asRange(
+            data.mip_levels[0] = ziis.sokol.gfx.asRange(
                 &STATE.buffer,
             );
             break :init data;
@@ -112,6 +114,17 @@ fn draw(
     )
     {
         defer zgui.end();
+
+        // zgui.pushStyleVar1f( .{ .idx = .child_border_size, .v = 0});
+        // zgui.pushStyleVar1f( .{ .idx = .docking_separator_size, .v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .child_rounding, .v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .popup_rounding, .v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .tab_rounding,   .v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .window_rounding,.v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .grab_rounding,  .v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .frame_rounding, .v = 0});
+        zgui.pushStyleVar1f(.{ .idx = .scrollbar_rounding, .v = 0});
+        defer zgui.popStyleVar(.{ .count = 7});
 
         var new = STATE.f;
         if (zgui.dragFloat("texture offset", .{.v = &new})) 
