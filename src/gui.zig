@@ -31,17 +31,12 @@ pub fn init(allocator: std.mem.Allocator) void {
     if (zgui_initialized == false) {
         zgui_initialized = true;
 
-        // mem_allocator = allocator;
-        // mem_allocations = std.AutoHashMap(usize, usize).init(allocator);
-        // mem_allocations.?.ensureTotalCapacity(32) catch @panic("zgui: out of memory");
-        // zguiSetAllocatorFunctions(zguiMemAlloc, zguiMemFree);
-
         if (zguiGetCurrentContext() == null) {
             _ = zguiCreateContext(null);
         }
 
-        temp_buffer = std.array_list.Managed(u8).init(allocator);
-        temp_buffer.?.resize(3 * 1024 + 1) catch unreachable;
+        temp_buffer = std.ArrayList(u8){};
+        temp_buffer.?.resize(allocator, 3 * 1024 + 1) catch unreachable;
 
         // if (te_enabled) {
         //     te.init();
@@ -59,8 +54,8 @@ pub fn initWithExistingContext(allocator: std.mem.Allocator, ctx: Context) void 
 
     zguiSetCurrentContext(ctx);
 
-    temp_buffer = std.ArrayList(u8).init(allocator);
-    temp_buffer.?.resize(3 * 1024 + 1) catch unreachable;
+    temp_buffer = std.ArrayList(u8){};
+    temp_buffer.?.resize(allocator, 3 * 1024 + 1) catch unreachable;
 
     // if (te_enabled) {
     //     te.init();
@@ -71,7 +66,7 @@ pub fn getCurrentContext() ?Context {
 }
 pub fn deinit() void {
     if (zguiGetCurrentContext() != null) {
-        temp_buffer.?.deinit();
+        temp_buffer.?.deinit(mem_allocator.?);
         zguiDestroyContext(null);
 
         // Must be after destroy imgui context.
@@ -102,8 +97,8 @@ pub fn deinit() void {
 }
 pub fn initNoContext(allocator: std.mem.Allocator) void {
     if (temp_buffer == null) {
-        temp_buffer = std.ArrayList(u8).init(allocator);
-        temp_buffer.?.resize(3 * 1024 + 1) catch unreachable;
+        temp_buffer = std.ArrayList(u8){};
+        temp_buffer.?.resize(allocator, 3 * 1024 + 1) catch unreachable;
     }
 }
 pub fn deinitNoContext() void {
@@ -119,7 +114,7 @@ extern fn zguiSetCurrentContext(ctx: ?Context) void;
 var mem_allocator: ?std.mem.Allocator = null;
 var mem_allocations: ?std.AutoHashMap(usize, usize) = null;
 var mem_mutex: std.Thread.Mutex = .{};
-const mem_alignment = std.mem.Alignment.@"16";
+const mem_alignment: std.mem.Alignment = .@"16";
 
 fn zguiMemAlloc(size: usize, _: ?*anyopaque) callconv(.c) ?*anyopaque {
     mem_mutex.lock();
@@ -144,7 +139,7 @@ fn zguiMemFree(maybe_ptr: ?*anyopaque, _: ?*anyopaque) callconv(.c) void {
         if (mem_allocations != null) {
             if (mem_allocations.?.fetchRemove(@intFromPtr(ptr))) |kv| {
                 const size = kv.value;
-                const mem = @as([*]align(16) u8, @ptrCast(@alignCast(ptr)))[0..size];
+                const mem = @as([*]align(mem_alignment.toByteUnits()) u8, @ptrCast(@alignCast(ptr)))[0..size];
                 mem_allocator.?.free(mem);
             }
         }
@@ -165,9 +160,9 @@ pub const ConfigFlags = packed struct(c_int) {
     no_mouse_cursor_change: bool = false,
     no_keyboard: bool = false,
     dock_enable: bool = false,
-    _pading0: u2 = 0,
+    _padding0: u2 = 0,
     viewport_enable: bool = false,
-    _pading1: u3 = 0,
+    _padding1: u3 = 0,
     dpi_enable_scale_viewport: bool = false,
     dpi_enable_scale_fonts: bool = false,
     user_storage: u4 = 0,
@@ -3671,16 +3666,16 @@ extern fn zguiSetNextFrameWantCaptureKeyboard(want_capture_keyboard: bool) void;
 // Helpers
 //
 //--------------------------------------------------------------------------------------------------
-var temp_buffer: ?std.array_list.Managed(u8) = null;
+var temp_buffer: ?std.ArrayList(u8) = null;
 
 pub fn format(comptime fmt: []const u8, args: anytype) []const u8 {
     const len = std.fmt.count(fmt, args);
-    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(@intCast(len + 64)) catch unreachable;
+    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(mem_allocator.?,@intCast(len + 64)) catch unreachable;
     return std.fmt.bufPrint(temp_buffer.?.items, fmt, args) catch unreachable;
 }
 pub fn formatZ(comptime fmt: []const u8, args: anytype) [:0]const u8 {
     const len = std.fmt.count(fmt ++ "\x00", args);
-    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(@intCast(len + 64)) catch unreachable;
+    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(mem_allocator.?,@intCast(len + 64)) catch unreachable;
     return std.fmt.bufPrintZ(temp_buffer.?.items, fmt, args) catch unreachable;
 }
 //--------------------------------------------------------------------------------------------------
