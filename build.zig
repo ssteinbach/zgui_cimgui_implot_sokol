@@ -13,7 +13,8 @@ pub fn build(
 
     // Get the matching Zig module name, C header search path and C library for
     // vanilla imgui vs the imgui docking branch.
-    const cimgui_conf = cimgui.getConfig(true);
+    // const cimgui_conf = cimgui.getConfig(true);
+    const cimgui_conf = cimgui.getConfig(false);
 
     const dep_implot = b.dependency(
         "implot",
@@ -115,7 +116,7 @@ pub fn build(
         },
     );
     lib_imgui.addIncludePath(
-        dep_cimgui.path("src-docking"),
+        dep_cimgui.path("src"),
     );
     lib_imgui.addIncludePath(
         dep_implot.path("implot.h").dirname(),
@@ -138,6 +139,12 @@ pub fn build(
         },
     );
 
+    // for zls -- "check" step
+    const check_step = b.step(
+        "check",
+        "Check if everything compiles",
+    );
+
     // from here on different handling for native vs wasm builds
     if (target.result.cpu.arch.isWasm()) 
     {
@@ -153,13 +160,14 @@ pub fn build(
     } 
     else 
     {
-        try build_native(b, mod_app_wrapper);
+        try build_native(b, mod_app_wrapper, check_step);
     }
 }
 
 fn build_native(
     b: *std.Build,
     mod: *std.Build.Module,
+    check_step: *std.Build.Step,
 ) !void 
 {
     const exe = b.addExecutable(
@@ -168,11 +176,14 @@ fn build_native(
             .root_module = mod,
         },
     );
+    check_step.dependOn(&exe.step);
     b.installArtifact(exe);
-    b.step(
+    var run_step = b.step(
         "run",
         "Run demo"
-    ).dependOn(&b.addRunArtifact(exe).step);
+    );
+
+    run_step.dependOn(&b.addRunArtifact(exe).step);
 }
 
 const BuildWasmOptions = struct {
