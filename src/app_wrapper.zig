@@ -16,7 +16,6 @@ const STATE = struct {
     var pass_action: sg.PassAction = .{};
 
     /// gets configured by sokol_main
-    // SAFETY: gets configured by the main, which requires it as an argument
     var app: SokolApp = undefined;
 
     /// default font
