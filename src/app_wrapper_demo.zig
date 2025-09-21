@@ -19,12 +19,14 @@ const STATE = struct {
     const TEX_DIM : [2]i32 = .{ 256, 256 };
     const COLOR_CHANNELS:usize = 4;
     var tex: sg.Image = .{};
+    var view: sg.View = .{};
     var texid: u64 = 0;
     var frame_number: usize = 0;
     var buffer = std.mem.zeroes(
         [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8
     );
     var maybe_journal : ?ziis.undo.Journal = null;
+    var image_data = ziis.sokol.gfx.ImageData{};
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -51,8 +53,6 @@ fn draw(
     sg.updateImage(
         STATE.tex,
         init: {
-            var data = ziis.sokol.gfx.ImageData{};
-
             // initialize the image STATE.buffer
             var x:usize = 0;
             const iw_m_one: f64 = @floatFromInt(STATE.TEX_DIM[0] - 1);
@@ -82,10 +82,11 @@ fn draw(
                 }
             }
 
-            data.mip_levels[0] = ziis.sokol.gfx.asRange(
+            STATE.image_data.mip_levels[0] = ziis.sokol.gfx.asRange(
                 &STATE.buffer,
             );
-            break :init data;
+
+            break :init STATE.image_data;
         },
     );
 
@@ -273,7 +274,7 @@ fn draw(
                 const wsize = zgui.getWindowSize();
 
                 ziis.cimgui.igImage(
-                    .{ ._TexID = STATE.tex.id },
+                    .{ ._TexID = STATE.texid },
                     .{ .x = wsize[0], .y = wsize[1]},
                 );
             }
@@ -312,10 +313,15 @@ pub fn init(
         },
     );
 
-    // blah
-    STATE.texid = ziis.sokol.imgui.imtextureid(
-        ziis.sokol.imgui.textureViewFromImtextureid(STATE.tex.id)
+    STATE.view = sg.makeView(
+        .{
+            .texture = .{
+                .image = STATE.tex,
+            },
+        },
     );
+
+    STATE.texid = ziis.sokol.imgui.imtextureid(STATE.view);
 }
 
 pub fn main(
