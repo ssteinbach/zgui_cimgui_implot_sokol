@@ -703,7 +703,22 @@ extern fn zguiPlot_PlotText(
     pix_offset: *const [2]f32,
     flags: PlotTextFlags,
 ) void;
-
+//----------------------------------------------------------------------------------------------
+pub const PlotLimits = extern struct {
+    x: [2]f64,
+    y: [2]f64,
+};
+/// Fetch the limits of the plot as currently drawn
+pub fn getPlotLimits(x_axis: Axis, y_axis: Axis) PlotLimits
+{
+    var result : [4]f64 = undefined;
+    zguiPlot_GetPlotLimits(x_axis, y_axis, &result);
+    return .{
+        .x = .{ result[0], result[1] },
+        .y = .{ result[2], result[3] },
+    };
+}
+extern fn zguiPlot_GetPlotLimits(x_axis: Axis, y_axis:Axis, *[4]f64) void;
 //----------------------------------------------------------------------------------------------
 pub fn isPlotHovered() bool {
     return zguiPlot_IsPlotHovered();
