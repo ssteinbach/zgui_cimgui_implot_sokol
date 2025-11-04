@@ -2113,6 +2113,11 @@ extern "C"
         return ImGui::TableGetHoveredColumn();
     }
 
+    ZGUI_API int zguiTableGetHoveredRow()
+    {
+        return ImGui::TableGetHoveredRow();
+    }
+
     ZGUI_API void zguiTableSetBgColor(ImGuiTableBgTarget target, ImU32 color, int column_n)
     {
         ImGui::TableSetBgColor(target, color, column_n);
