@@ -13,7 +13,6 @@ pub fn build(
 
     // Get the matching Zig module name, C header search path and C library for
     // vanilla imgui vs the imgui docking branch.
-    // const cimgui_conf = cimgui.getConfig(true);
     const cimgui_conf = cimgui.getConfig(false);
 
     const dep_implot = b.dependency(
@@ -222,7 +221,7 @@ fn build_wasm(
         "upstream/emscripten/cache/sysroot/include",
     );
     opts.dep_cimgui.artifact(
-        opts.cimgui_clib_name
+        opts.cimgui_clib_name,
     ).addSystemIncludePath(emsdk_incl_path);
 
     // all C libraries need to depend on the sokol library, when building for
@@ -244,13 +243,21 @@ fn build_wasm(
             .use_webgl2 = true,
             .use_emmalloc = true,
             .use_filesystem = false,
-            .shell_file_path = opts.dep_sokol.path("src/sokol/web/shell.html"),
+            .shell_file_path = opts.dep_sokol.path(
+                "src/sokol/web/shell.html",
+            ),
         },
     );
     // attach to default target
     b.getInstallStep().dependOn(&link_step.step);
     // ...and a special run step to start the web build output via 'emrun'
-    const run = sokol.emRunStep(b, .{ .name = "demo", .emsdk = dep_emsdk });
+    const run = sokol.emRunStep(
+        b,
+        .{
+            .name = "demo",
+            .emsdk = dep_emsdk,
+        },
+    );
     run.step.dependOn(&link_step.step);
     b.step("run", "Run demo").dependOn(&run.step);
 }
