@@ -1,6 +1,7 @@
-#include "imgui.h"
+#include "sokol_gfx.h"
+#include "sokol_app.h"
+#include "sokol_imgui.h"
 #include "implot.h"
-#include "imgui_internal.h"
 
 #ifndef ZGUI_API
 #define ZGUI_API
