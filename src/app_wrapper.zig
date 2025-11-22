@@ -60,7 +60,12 @@ export fn init(
     // initial clear color
     STATE.pass_action.colors[0] = .{
         .load_action = .CLEAR,
-        .clear_value = .{ .r = 0.0, .g = 0.5, .b = 1.0, .a = 1.0 },
+        .clear_value = .{
+            .r = 0.0,
+            .g = 0.5,
+            .b = 1.0,
+            .a = 1.0,
+        },
     };
 
     zgui.init(STATE.allocator);
@@ -68,15 +73,10 @@ export fn init(
 
     // set up style and load the font
     {
-        // const scale_factor = sokol.app.dpiScale();
-        //
-        // const font_size = 16.0 * scale_factor;
-
         const font_normal = zgui.io.addFontFromMemory(
             STATE.font_data,
             16,
         );
-        // std.debug.assert(zgui.io.getFont(1) == font_normal);
         zgui.io.setDefaultFont(font_normal);
 
         // You can directly manipulate zgui.Style *before* `newFrame()` call.
@@ -84,15 +84,6 @@ export fn init(
         // zgui.pushStyleColor*()/zgui.pushStyleVar*() functions.
 
         const style = zgui.getStyle();
-        // style.child_border_size = 0;
-        // style.docking_separator_size = 0;
-        // style.child_rounding = 0;
-        // style.popup_rounding = 0;
-        // style.tab_rounding = 0;
-        // style.window_rounding = 0;
-        // style.grab_rounding = 0;
-        // style.frame_rounding = 0;
-        // style.scrollbar_rounding = 0;
 
         style.window_min_size = .{ 320.0, 240.0 };
 
@@ -106,9 +97,6 @@ export fn init(
         // }
 
         // style.scaleAllSizes(scale_factor);
-
-        // To reset zgui.Style with default values:
-        //zgui.getStyle().* = zgui.Style.init();
 
         // {
         //     zgui.plot.getStyle().line_weight = 3.0;
