@@ -175,7 +175,7 @@ fn draw(
         }
         if (zgui.button("show plot demo", .{}))
         {
-            STATE.demo_window_gui = ! STATE.demo_window_plot; 
+            STATE.demo_window_plot = ! STATE.demo_window_plot; 
         }
 
         if (STATE.demo_window_gui) 
