@@ -1,6 +1,7 @@
 //! Wrapper for an app using ZIIS - see app_wrapper_demo for an example
 
 const std = @import("std");
+const builtin= @import("builtin");
 
 const ziis = @import("root.zig");
 const zgui = ziis.zgui;
@@ -10,6 +11,19 @@ const sg = sokol.gfx;
 const sapp = sokol.app;
 const sglue = sokol.glue;
 const simgui = sokol.imgui;
+
+/// building with wasm?
+const IS_WASM = builtin.target.cpu.arch.isWasm();
+
+var debug_allocator = (
+    if (IS_WASM) null 
+    else std.heap.DebugAllocator(.{}){}
+);
+const backing_allocator = (
+    // @TODO: try the smp_allocator
+    if (IS_WASM) std.heap.c_allocator 
+    else debug_allocator.allocator()
+);
 
 /// State container
 const STATE = struct {
@@ -22,7 +36,7 @@ const STATE = struct {
     const font_data = @embedFile("content/Roboto-Medium.ttf");
 
     /// allocator for configuring imgui/sokol/etc.
-    const allocator = std.heap.c_allocator;
+    const allocator = backing_allocator;
 };
 
 export fn init(
