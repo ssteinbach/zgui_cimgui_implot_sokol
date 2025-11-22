@@ -91,6 +91,8 @@ pub fn build(
         }
     );
 
+    lib_imgui.addIncludePath(dep_sokol.path("src/sokol/c"));
+
     lib_imgui.addCSourceFiles(
         .{
             .root = b.path("src"),

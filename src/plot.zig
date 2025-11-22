@@ -429,6 +429,27 @@ extern fn zguiPlot_PlotLine(
     stride: i32,
 ) void;
 //----------------------------------------------------------------------------------------------
+// fn PlotInfLinesGen(comptime T: type) type {
+//     return struct {
+//         xv: []const T,
+//         flags: LineFlags = .{},
+//         // offset: i32 = 0,
+//         // stride: i32 = @sizeOf(T),
+//     };
+// }
+// pub fn plotInfLines(label_id: [:0]const u8, comptime T: type, args: PlotInfLinesGen(T)) void {
+//     assert(args.xv.len == args.yv.len);
+//     zguiPlot_PlotInfLines(
+//         label_id,
+//         gui.typeToDataTypeEnum(T),
+//         args.xv.ptr,
+//         @as(i32, @intCast(args.xv.len)),
+//         args.flags,
+//         // args.offset,
+//         // args.stride,
+//     );
+// }
+//----------------------------------------------------------------------------------------------
 pub const ScatterFlags = packed struct(u32) {
     _reserved0: bool = false,
     _reserved1: bool = false,
