@@ -32,13 +32,14 @@ const STATE = struct {
 const IS_WASM = builtin.target.cpu.arch.isWasm();
 
 /// the GPA - useful for detecting leaks, but ONLY works in non EMCC builds
-var gpa = (
+var debug_allocator = (
     if (IS_WASM) null 
-    else std.heap.GeneralPurposeAllocator(.{}){}
+    else std.heap.DebugAllocator(.{}){}
 );
 const allocator = (
+    // @TODO: try the smp_allocator
     if (IS_WASM) std.heap.c_allocator 
-    else gpa.allocator()
+    else debug_allocator.allocator()
 );
 
 /// draw the UI
@@ -115,17 +116,6 @@ fn draw(
     )
     {
         defer zgui.end();
-
-        // zgui.pushStyleVar1f( .{ .idx = .child_border_size, .v = 0});
-        // zgui.pushStyleVar1f( .{ .idx = .docking_separator_size, .v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .child_rounding, .v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .popup_rounding, .v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .tab_rounding,   .v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .window_rounding,.v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .grab_rounding,  .v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .frame_rounding, .v = 0});
-        zgui.pushStyleVar1f(.{ .idx = .scrollbar_rounding, .v = 0});
-        defer zgui.popStyleVar(.{ .count = 7});
 
         var new = STATE.f;
         if (zgui.dragFloat("texture offset", .{.v = &new})) 
@@ -237,30 +227,38 @@ fn draw(
                         const xs= [_]f32{0, 1, 2, 3, 4};
                         const ys= [_]f32{0, 1, 2, 3, 6};
 
-                        zplot.pushStyleColor4f(
+                        zplot.pushStyleVar1f(
                             .{
-                                .idx = .fill,
-                                .c = .{ 0.1, 0.1, 0.4, 0.4 },
-                            },
+                                .idx = .fill_alpha,
+                                .v = 0.1,
+                            }
                         );
-                        zplot.plotShaded(
-                            "test plot (shaded)",
-                            f32, 
+                        defer zplot.popStyleVar(.{ .count = 1, });
+
+                        zplot.plotText(
+                            "start",
                             .{
-                                .xv = &xs,
-                                .yv = &ys,
-                                .flags = .{
-                                },
-                            },
+                                .x = xs[0],
+                                .y = ys[0],
+                                .pix_offset = .{ -15, -10 },
+                            }
                         );
-                        zplot.popStyleColor(.{.count = 1});
+                        zplot.plotText(
+                            "end",
+                            .{
+                                .x = xs[xs.len-1],
+                                .y = ys[ys.len-1],
+                                .pix_offset = .{ 15, 0 },
+                            }
+                        );
 
                         zplot.plotLine(
-                            "test plot",
+                            "example function",
                             f32, 
                             .{
                                 .xv = &xs,
                                 .yv = &ys,
+                                .flags = .{ .shaded = true }
                             },
                         );
                     }
@@ -293,7 +291,7 @@ fn cleanup (
 
     if (IS_WASM == false)
     {
-        const result = gpa.deinit();
+        const result = debug_allocator.deinit();
         if (result == .leak) 
         {
             std.log.debug("leak!", .{});
