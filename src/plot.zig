@@ -746,6 +746,102 @@ pub fn isPlotHovered() bool {
 }
 extern fn zguiPlot_IsPlotHovered() bool;
 //----------------------------------------------------------------------------------------------
+pub const InfLinesFlags = packed struct(u32) {
+    _reserved0: bool = false,
+    _reserved1: bool = false,
+    _reserved2: bool = false,
+    _reserved3: bool = false,
+    _reserved4: bool = false,
+    _reserved5: bool = false,
+    _reserved6: bool = false,
+    _reserved7: bool = false,
+    _reserved8: bool = false,
+    _reserved9: bool = false,
+    horizontal: bool = false,
+    _padding: u21 = 0,
+};
+fn PlotInfLinesGen(comptime T: type) type {
+    return struct {
+        v: []const T,
+        flags: InfLinesFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotInfLines(label_id: [:0]const u8, comptime T: type, args: PlotInfLinesGen(T)) void {
+    zguiPlot_PlotInfLines(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.v.ptr,
+        @as(i32, @intCast(args.v.len)),
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotInfLines(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    values: *const anyopaque,
+    count: i32,
+    flags: InfLinesFlags,
+    offset: i32,
+    stride: i32,
+) void;
+//----------------------------------------------------------------------------------------------
+pub const PieChartFlags = packed struct(u32) {
+    _reserved0: bool = false,
+    _reserved1: bool = false,
+    _reserved2: bool = false,
+    _reserved3: bool = false,
+    _reserved4: bool = false,
+    _reserved5: bool = false,
+    _reserved6: bool = false,
+    _reserved7: bool = false,
+    _reserved8: bool = false,
+    _reserved9: bool = false,
+    normalize: bool = false,
+    ignore_hidden: bool = false,
+    _padding: u20 = 0,
+};
+const PlotPieChartGen = struct {
+    label_ids: []const [*:0]const u8,
+    values: []const f64,
+    x: f64 = 0,
+    y: f64 = 0,
+    radius: f64 = 0.5,
+    label_fmt: ?[*:0]const u8 = null,
+    angle0: f64 = 90.0,
+    flags: PieChartFlags = .{},
+};
+pub fn plotPieChart(comptime T: type, args: PlotPieChartGen) void {
+    assert(args.label_ids.len == args.values.len);
+    zguiPlot_PlotPieChart(
+        args.label_ids.ptr,
+        gui.typeToDataTypeEnum(T),
+        args.values.ptr,
+        @as(i32, @intCast(args.values.len)),
+        args.x,
+        args.y,
+        args.radius,
+        if (args.label_fmt) |fmt| fmt else "%.1f",
+        args.angle0,
+        args.flags,
+    );
+}
+extern fn zguiPlot_PlotPieChart(
+    label_ids: [*]const [*:0]const u8,
+    data_type: gui.DataType,
+    values: *const anyopaque,
+    count: i32,
+    x: f64,
+    y: f64,
+    radius: f64,
+    label_fmt: ?[*:0]const u8,
+    angle0: f64,
+    flags: PieChartFlags,
+) void;
+//----------------------------------------------------------------------------------------------
 /// `pub fn showDemoWindow(popen: ?*bool) void`
 pub const showDemoWindow = zguiPlot_ShowDemoWindow;
 extern fn zguiPlot_ShowDemoWindow(popen: ?*bool) void;
