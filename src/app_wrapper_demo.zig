@@ -265,6 +265,112 @@ fn draw(
                 }
             }
 
+            if (
+                zgui.beginTabItem(
+                    "InfLines & PieChart Example",
+                    .{},
+                )
+            )
+            {
+                defer zgui.endTabItem();
+
+                if (
+                    zgui.beginChild(
+                        "InfLinesPieChartDemo",
+                        .{ .w = -1, .h = -1, },
+                    )
+                )
+                {
+                    defer zgui.endChild();
+
+                    if (
+                        zgui.plot.beginPlot(
+                            "Infinite Lines Demo",
+                            .{
+                                .w = -1.0,
+                                .h = 300.0,
+                            },
+                        )
+                    )
+                    {
+                        defer zgui.plot.endPlot();
+
+                        zgui.plot.setupAxis(
+                            .x1,
+                            .{ .label = "X Axis" }
+                        );
+                        zgui.plot.setupAxis(
+                            .y1,
+                            .{ .label = "Y Axis" }
+                        );
+                        zgui.plot.setupAxisLimits(
+                            .x1,
+                            .{ .min = -1, .max = 10 }
+                        );
+                        zgui.plot.setupAxisLimits(
+                            .y1,
+                            .{ .min = -1, .max = 10 }
+                        );
+                        zgui.plot.setupFinish();
+
+                        // Vertical infinite lines at x positions
+                        const v_lines = [_]f64{1.0, 3.0, 5.0, 7.0};
+                        zplot.plotInfLines(
+                            "Vertical Lines",
+                            f64,
+                            .{ .v = &v_lines }
+                        );
+
+                        // Horizontal infinite lines at y positions
+                        const h_lines = [_]f64{2.0, 4.0, 6.0};
+                        zplot.plotInfLines(
+                            "Horizontal Lines",
+                            f64, .{
+                                .v = &h_lines,
+                                .flags = .{
+                                    .horizontal = true,
+                                },
+                            }
+                        );
+                    }
+
+                    if (
+                        zgui.plot.beginPlot(
+                            "Pie Chart Demo",
+                            .{
+                                .w = -1.0,
+                                .h = -1.0,
+                                .flags = .{ .equal = true },
+                            },
+                        )
+                    )
+                    {
+                        defer zgui.plot.endPlot();
+
+                        const pie_labels = [_][*:0]const u8{
+                            "Apples",
+                            "Bananas",
+                            "Cherries",
+                            "Dates"
+                        };
+                        const pie_values = (
+                            [_]f64{ 30.0, 25.0, 20.0, 15.0 }
+                        );
+
+                        zplot.plotPieChart(
+                            f64,
+                            .{
+                                .label_ids = &pie_labels,
+                                .values = &pie_values,
+                                // default value:
+                                // .label_fmt = "%.1f",
+                                .flags = .{ .normalize = true },
+                            }
+                        );
+                    }
+                }
+            }
+
             if (zgui.beginTabItem("Texture Example", .{}))
             {
                 defer zgui.endTabItem();

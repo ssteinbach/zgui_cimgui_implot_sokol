@@ -408,4 +408,65 @@ extern "C"
         retval[2] = result.Y.Min;
         retval[3] = result.Y.Max;
     }
+
+    ZGUI_API void zguiPlot_PlotInfLines(
+        const char *label_id,
+        ImGuiDataType data_type,
+        const void *values,
+        int count,
+        ImPlotInfLinesFlags flags,
+        int offset,
+        int stride)
+    {
+        if (data_type == ImGuiDataType_S8)
+            ImPlot::PlotInfLines(label_id, (const ImS8 *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_U8)
+            ImPlot::PlotInfLines(label_id, (const ImU8 *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_S16)
+            ImPlot::PlotInfLines(label_id, (const ImS16 *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_U16)
+            ImPlot::PlotInfLines(label_id, (const ImU16 *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_S32)
+            ImPlot::PlotInfLines(label_id, (const ImS32 *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_U32)
+            ImPlot::PlotInfLines(label_id, (const ImU32 *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_Float)
+            ImPlot::PlotInfLines(label_id, (const float *)values, count, flags, offset, stride);
+        else if (data_type == ImGuiDataType_Double)
+            ImPlot::PlotInfLines(label_id, (const double *)values, count, flags, offset, stride);
+        else
+            assert(false);
+    }
+
+    ZGUI_API void zguiPlot_PlotPieChart(
+        const char **label_ids,
+        ImGuiDataType data_type,
+        const void *values,
+        int count,
+        double x,
+        double y,
+        double radius,
+        const char *label_fmt,
+        double angle0,
+        ImPlotPieChartFlags flags)
+    {
+        if (data_type == ImGuiDataType_S8)
+            ImPlot::PlotPieChart(label_ids, (const ImS8 *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_U8)
+            ImPlot::PlotPieChart(label_ids, (const ImU8 *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_S16)
+            ImPlot::PlotPieChart(label_ids, (const ImS16 *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_U16)
+            ImPlot::PlotPieChart(label_ids, (const ImU16 *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_S32)
+            ImPlot::PlotPieChart(label_ids, (const ImS32 *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_U32)
+            ImPlot::PlotPieChart(label_ids, (const ImU32 *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_Float)
+            ImPlot::PlotPieChart(label_ids, (const float *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else if (data_type == ImGuiDataType_Double)
+            ImPlot::PlotPieChart(label_ids, (const double *)values, count, x, y, radius, label_fmt, angle0, flags);
+        else
+            assert(false);
+    }
 } /* extern "C" */
