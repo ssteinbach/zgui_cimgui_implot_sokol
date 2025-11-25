@@ -27,6 +27,8 @@ const STATE = struct {
     );
     var maybe_journal : ?ziis.undo.Journal = null;
     var image_data = ziis.sokol.gfx.ImageData{};
+
+    var point_buffers: std.MultiArrayList(struct{ x: f32, y: f32 }) = .empty;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -265,6 +267,73 @@ fn draw(
                 }
             }
 
+            if (zgui.beginTabItem("Plot with LOTS of items", .{}))
+            {
+                defer zgui.endTabItem();
+
+                if (
+                    zgui.beginChild(
+                        "Big Plot", 
+                        .{ .w = -1, .h = -1, },
+                    )
+                )
+                {
+                    defer zgui.endChild();
+
+                    if (
+                        zgui.plot.beginPlot(
+                            "Lots of items in plot test",
+                            .{ 
+                                .w = -1.0,
+                                .h = -1.0,
+                                .flags = .{ .equal = true },
+                            },
+                        )
+                    ) 
+                    {
+                        defer zgui.plot.endPlot();
+
+                        zgui.plot.setupAxis(
+                            .x1,
+                            .{ .label = "input" },
+                        );
+                        zgui.plot.setupAxis(
+                            .y1,
+                            .{ .label = "output" },
+                        );
+                        zgui.plot.setupLegend(
+                            .{ 
+                                .south = true,
+                                .west = true 
+                            },
+                            .{},
+                        );
+                        zgui.plot.setupFinish();
+
+                        const xs= STATE.point_buffers.items(.x);
+                        const ys= STATE.point_buffers.items(.y);
+
+                        zplot.pushStyleVar1f(
+                            .{
+                                .idx = .fill_alpha,
+                                .v = 0.1,
+                            }
+                        );
+                        defer zplot.popStyleVar(.{ .count = 1, });
+
+                        zplot.plotLine(
+                            "Sine wave with lots of samples",
+                            f32, 
+                            .{
+                                .xv = xs,
+                                .yv = ys,
+                                .flags = .{ .shaded = true }
+                            },
+                        );
+                    }
+                }
+            }
+
             if (
                 zgui.beginTabItem(
                     "InfLines & PieChart Example",
@@ -389,6 +458,8 @@ fn draw(
 fn cleanup (
 ) void
 {
+    STATE.point_buffers.deinit(allocator);
+
     if (STATE.maybe_journal)
         |*definitely_journal|
     {
@@ -403,11 +474,34 @@ fn cleanup (
             std.log.debug("leak!", .{});
         }
     }
+
 }
 
 pub fn init(
 ) void
 { 
+    // right around the minimum number of points to make the plot disapear
+    const BIGCOUNT = 7750;
+    STATE.point_buffers.ensureUnusedCapacity(
+        allocator,
+        BIGCOUNT,
+    ) catch {};
+
+    const inc = 0.01;
+    var cur:f32 = -10.0;
+    for (0..(BIGCOUNT-1))
+        |_|
+    {
+        STATE.point_buffers.appendAssumeCapacity(
+            .{
+                .x = cur,
+                .y = std.math.sin(cur),
+            }
+        );
+
+        cur += inc;
+    }
+
     STATE.tex = sg.makeImage(
         .{
             .width = STATE.TEX_DIM[0],
