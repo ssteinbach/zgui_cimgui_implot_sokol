@@ -134,9 +134,10 @@ export fn frame(
     sg.beginPass(
         .{
             .action = STATE.pass_action,
-            .swapchain = sglue.swapchain()
+            .swapchain = sglue.swapchain(),
         }
     );
+
     simgui.render();
     sg.endPass();
     sg.commit();
