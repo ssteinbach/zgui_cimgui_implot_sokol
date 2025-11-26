@@ -2,9 +2,23 @@
 
 ## Overview
 
-Bundles a set of tools for building user interfaces on desktop and WASM.
+Bundles a set of tools for building user interfaces on desktop and WASM using
+Zig, sokol, imgui and implot.
 
-Usage:
+## Demo
+
+* build and run the demo app: `zig build run` 
+* builds the demo in wasm mode: `zig build run -Dtarget=wasm32-emscripten` 
+
+## Usage
+
+To build on top of it:
+
+```bash
+zig fetch --save git+https://github.com/ssteinbach/zgui_cimgui_implot_sokol
+```
+
+Then, in your `build.zig`:
 
 ```zig
 // build.zig
