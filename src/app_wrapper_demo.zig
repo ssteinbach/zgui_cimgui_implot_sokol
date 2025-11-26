@@ -535,6 +535,7 @@ pub fn main(
             .draw = draw, 
             .maybe_pre_zgui_shutdown_cleanup = cleanup,
             .maybe_post_zgui_init = init,
+            .title = "ZIIS Demo App",
         },
     );
 }
