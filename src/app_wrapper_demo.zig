@@ -40,7 +40,7 @@ var debug_allocator = (
 );
 const allocator = (
     // @TODO: try the smp_allocator
-    if (IS_WASM) std.heap.c_allocator 
+    if (IS_WASM) std.heap.c_allocator
     else debug_allocator.allocator()
 );
 
