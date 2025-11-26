@@ -11,9 +11,8 @@ pub fn build(
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Get the matching Zig module name, C header search path and C library for
-    // vanilla imgui vs the imgui docking branch.
-    const cimgui_conf = cimgui.getConfig(false);
+    // Fetch Dependencies
+    ///////////////////////////////////////////////////////////////////////////
 
     const dep_implot = b.dependency(
         "implot",
@@ -32,6 +31,7 @@ pub fn build(
             .with_sokol_imgui = true,
         }
     );
+
     const dep_cimgui = b.dependency(
         "cimgui",
         .{
@@ -39,6 +39,15 @@ pub fn build(
             .optimize = optimize,
         },
     );
+    // Get the matching Zig module name, C header search path and C library for
+    // vanilla imgui vs the imgui docking branch.
+    const cimgui_conf = cimgui.getConfig(
+        // Currently *not* using the docking version, although not for any big
+        // reason.
+        false
+    );
+    const lib_cimgui = dep_cimgui.artifact(cimgui_conf.clib_name);
+
     const dep_undo_journal = b.dependency(
         "do_undo_journal",
         .{
@@ -51,6 +60,9 @@ pub fn build(
     dep_sokol.artifact("sokol_clib").addIncludePath(
         dep_cimgui.path(cimgui_conf.include_dir)
     );
+
+    // Assemble Module
+    ///////////////////////////////////////////////////////////////////////////
 
     const mod_ziis = b.addModule(
         "zgui_cimgui_implot_sokol",
@@ -92,6 +104,12 @@ pub fn build(
 
     lib_imgui.addIncludePath(dep_sokol.path("src/sokol/c"));
 
+    const cflags = [_][]const u8 {
+        "-fno-sanitize=undefined",
+        "-Wno-elaborated-enum-base",
+        "-Wno-error=date-time",
+    };
+
     lib_imgui.addCSourceFiles(
         .{
             .root = b.path("src"),
@@ -99,11 +117,7 @@ pub fn build(
                  "zgui.cpp",
                  "zplot.cpp",
             },
-            .flags = &.{
-                "-fno-sanitize=undefined",
-                "-Wno-elaborated-enum-base",
-                "-Wno-error=date-time",
-            },
+            .flags = &cflags,
         },
     );
     lib_imgui.addCSourceFiles(
@@ -114,6 +128,7 @@ pub fn build(
                 "implot_items.cpp",
                 "implot_demo.cpp",
             },
+            .flags = &cflags,
         },
     );
     lib_imgui.addIncludePath(
@@ -122,7 +137,8 @@ pub fn build(
     lib_imgui.addIncludePath(
         dep_implot.path("implot.h").dirname(),
     );
-    mod_ziis.linkLibrary(dep_cimgui.artifact(cimgui_conf.clib_name));
+
+    mod_ziis.linkLibrary(lib_cimgui);
     mod_ziis.linkLibrary(lib_imgui);
 
     // main module with sokol and cimgui imports
@@ -146,8 +162,11 @@ pub fn build(
         "Check if everything compiles",
     );
 
+    // Dispatch to build function based on target
+    ///////////////////////////////////////////////////////////////////////////
+
     // from here on different handling for native vs wasm builds
-    if (target.result.cpu.arch.isWasm()) 
+    if (target.result.cpu.arch.isWasm())
     {
         try build_wasm(
             b,
@@ -155,16 +174,24 @@ pub fn build(
                 .mod_main = mod_app_wrapper,
                 .dep_sokol = dep_sokol,
                 .dep_cimgui = dep_cimgui,
-                .cimgui_clib_name = cimgui_conf.clib_name,
+                .dep_libs = &.{
+                    lib_cimgui,
+                    lib_imgui,
+                },
             },
         );
-    } 
-    else 
+    }
+    else
     {
-        try build_native(b, mod_app_wrapper, check_step);
+        try build_native(
+            b,
+            mod_app_wrapper,
+            check_step,
+        );
     }
 }
 
+/// Build for native (non-wasm) target
 fn build_native(
     b: *std.Build,
     mod: *std.Build.Module,
@@ -187,16 +214,15 @@ fn build_native(
     run_step.dependOn(&b.addRunArtifact(exe).step);
 }
 
-const BuildWasmOptions = struct {
-    mod_main: *std.Build.Module,
-    dep_sokol: *std.Build.Dependency,
-    dep_cimgui: *std.Build.Dependency,
-    cimgui_clib_name: []const u8,
-};
-
+/// Build for WASM
 fn build_wasm(
     b: *std.Build,
-    opts: BuildWasmOptions,
+    opts: struct {
+        mod_main: *std.Build.Module,
+        dep_sokol: *std.Build.Dependency,
+        dep_cimgui: *std.Build.Dependency,
+        dep_libs: []const *std.Build.Step.Compile,
+    },
 ) !void 
 {
     // build the main file into a library, this is because the WASM 'exe'
@@ -220,17 +246,21 @@ fn build_wasm(
     const emsdk_incl_path = dep_emsdk.path(
         "upstream/emscripten/cache/sysroot/include",
     );
-    opts.dep_cimgui.artifact(
-        opts.cimgui_clib_name,
-    ).addSystemIncludePath(emsdk_incl_path);
+
+    // Ensure that dependent C libraries also get the emsdk header path and
+    // that emcc is set up when they are compiled
+    for (opts.dep_libs)
+        |lib|
+    {
+        lib.addSystemIncludePath(emsdk_incl_path);
+        lib.step.dependOn(&opts.dep_sokol.artifact("sokol_clib").step);
+    }
 
     // all C libraries need to depend on the sokol library, when building for
     // WASM this makes sure that the Emscripten SDK has been setup before
     // C compilation is attempted (since the sokol C library depends on the
     // Emscripten SDK setup step)
-    opts.dep_cimgui.artifact(
-        opts.cimgui_clib_name,
-    ).step.dependOn(&opts.dep_sokol.artifact("sokol_clib").step);
+    // opts.lib_cimgui.step.dependOn(&opts.dep_sokol.artifact("sokol_clib").step);
 
     // create a build step which invokes the Emscripten linker
     const link_step = try sokol.emLinkStep(
