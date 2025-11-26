@@ -466,4 +466,35 @@ extern "C"
         else
             assert(false);
     }
+
+    ZGUI_API bool zguiPlot_BeginLegendPopup(const char *label_id, int mouse_button)
+    {
+        return ImPlot::BeginLegendPopup(label_id, mouse_button);
+    }
+
+    ZGUI_API void zguiPlot_EndLegendPopup()
+    {
+        ImPlot::EndLegendPopup();
+    }
+
+    ZGUI_API void zguiPlot_GetPlotMousePos(double *x, double *y, int x_axis, int y_axis)
+    {
+        ImPlotPoint pos = ImPlot::GetPlotMousePos(x_axis, y_axis);
+        *x = pos.x;
+        *y = pos.y;
+    }
+
+    ZGUI_API void zguiPlot_PlotToPixels(double x, double y, float *out_x, float *out_y, int x_axis, int y_axis)
+    {
+        ImVec2 pixel = ImPlot::PlotToPixels(x, y, x_axis, y_axis);
+        *out_x = pixel.x;
+        *out_y = pixel.y;
+    }
+
+    ZGUI_API void zguiPlot_PixelsToPlot(float x, float y, double *out_x, double *out_y, int x_axis, int y_axis)
+    {
+        ImPlotPoint plot = ImPlot::PixelsToPlot(x, y, x_axis, y_axis);
+        *out_x = plot.x;
+        *out_y = plot.y;
+    }
 } /* extern "C" */

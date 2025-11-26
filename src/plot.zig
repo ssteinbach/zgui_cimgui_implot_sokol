@@ -746,6 +746,14 @@ pub fn isPlotHovered() bool {
 }
 extern fn zguiPlot_IsPlotHovered() bool;
 //----------------------------------------------------------------------------------------------
+pub const PlotItemHoveredFlags = packed struct(u32) {
+    _padding: u32 = 0,
+};
+pub fn getPlotItemHovered(label_id: [:0]const u8) bool {
+    return zguiPlot_GetPlotItemHovered(label_id);
+}
+extern fn zguiPlot_GetPlotItemHovered(label_id: [*:0]const u8) bool;
+//----------------------------------------------------------------------------------------------
 pub const InfLinesFlags = packed struct(u32) {
     _reserved0: bool = false,
     _reserved1: bool = false,
@@ -849,4 +857,34 @@ extern fn zguiPlot_ShowDemoWindow(popen: ?*bool) void;
 /// `pub fn endPlot() void`
 pub const endPlot = zguiPlot_EndPlot;
 extern fn zguiPlot_EndPlot() void;
+//----------------------------------------------------------------------------------------------
+pub fn beginLegendPopup(label_id: [:0]const u8, mouse_button: gui.MouseButton) bool {
+    return zguiPlot_BeginLegendPopup(label_id, @as(c_int, @intCast(@intFromEnum(mouse_button))));
+}
+extern fn zguiPlot_BeginLegendPopup(label_id: [*:0]const u8, mouse_button: c_int) bool;
+//----------------------------------------------------------------------------------------------
+/// `pub fn endLegendPopup() void`
+pub const endLegendPopup = zguiPlot_EndLegendPopup;
+extern fn zguiPlot_EndLegendPopup() void;
+//----------------------------------------------------------------------------------------------
+pub fn getPlotMousePos(x_axis: Axis, y_axis: Axis) [2]f64 {
+    var pos: [2]f64 = undefined;
+    zguiPlot_GetPlotMousePos(&pos[0], &pos[1], @intCast(@intFromEnum(x_axis)), @intCast(@intFromEnum(y_axis)));
+    return pos;
+}
+extern fn zguiPlot_GetPlotMousePos(x: *f64, y: *f64, x_axis: c_int, y_axis: c_int) void;
+//----------------------------------------------------------------------------------------------
+pub fn plotToPixels(x: f64, y: f64, x_axis: Axis, y_axis: Axis) [2]f32 {
+    var pixel: [2]f32 = undefined;
+    zguiPlot_PlotToPixels(x, y, &pixel[0], &pixel[1], @intCast(@intFromEnum(x_axis)), @intCast(@intFromEnum(y_axis)));
+    return pixel;
+}
+extern fn zguiPlot_PlotToPixels(x: f64, y: f64, out_x: *f32, out_y: *f32, x_axis: c_int, y_axis: c_int) void;
+//----------------------------------------------------------------------------------------------
+pub fn pixelsToPlot(x: f32, y: f32, x_axis: Axis, y_axis: Axis) [2]f64 {
+    var plot: [2]f64 = undefined;
+    zguiPlot_PixelsToPlot(x, y, &plot[0], &plot[1], @intCast(@intFromEnum(x_axis)), @intCast(@intFromEnum(y_axis)));
+    return plot;
+}
+extern fn zguiPlot_PixelsToPlot(x: f32, y: f32, out_x: *f64, out_y: *f64, x_axis: c_int, y_axis: c_int) void;
 //----------------------------------------------------------------------------------------------
