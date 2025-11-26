@@ -247,20 +247,16 @@ fn build_wasm(
         "upstream/emscripten/cache/sysroot/include",
     );
 
-    // Ensure that dependent C libraries also get the emsdk header path and
-    // that emcc is set up when they are compiled
+    // all C libraries need to depend on the sokol library, when building for
+    // WASM this makes sure that the Emscripten SDK has been setup before
+    // C compilation is attempted (since the sokol C library depends on the
+    // Emscripten SDK setup step)
     for (opts.dep_libs)
         |lib|
     {
         lib.addSystemIncludePath(emsdk_incl_path);
         lib.step.dependOn(&opts.dep_sokol.artifact("sokol_clib").step);
     }
-
-    // all C libraries need to depend on the sokol library, when building for
-    // WASM this makes sure that the Emscripten SDK has been setup before
-    // C compilation is attempted (since the sokol C library depends on the
-    // Emscripten SDK setup step)
-    // opts.lib_cimgui.step.dependOn(&opts.dep_sokol.artifact("sokol_clib").step);
 
     // create a build step which invokes the Emscripten linker
     const link_step = try sokol.emLinkStep(
