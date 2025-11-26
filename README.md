@@ -10,7 +10,7 @@ Zig, sokol, imgui and implot.
 * build and run the demo app: `zig build run` 
 * builds the demo in wasm mode: `zig build run -Dtarget=wasm32-emscripten` 
 
-Demo App:
+### Demo App
 
 ![Screenshot of demo app showing plot and demo buttons](app.png)
 
