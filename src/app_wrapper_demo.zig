@@ -44,6 +44,73 @@ const allocator = (
     else debug_allocator.allocator()
 );
 
+/// detect clicks on pie chart slices
+fn detectPieChartClick(
+    comptime T: type,
+    labels: []const [*:0]const u8,
+    values: []const T,
+) ?[*:0]const u8
+{
+    if (
+        !zplot.isPlotHovered()
+        or !zgui.isMouseClicked(.left)
+    )
+    {
+        return null;
+    }
+
+    const mouse_pos = zplot.getPlotMousePos(.x1, .y1);
+    const plot_limits = zplot.getPlotLimits(.x1, .y1);
+
+    const plot_width = plot_limits.x[1] - plot_limits.x[0];
+    const plot_height = plot_limits.y[1] - plot_limits.y[0];
+    const center_x = plot_limits.x[0] + plot_width / 2.0;
+    const center_y = plot_limits.y[0] + plot_height / 2.0;
+
+    const dx = mouse_pos[0] - center_x;
+    const dy = mouse_pos[1] - center_y;
+    const dist = @sqrt(dx * dx + dy * dy);
+
+    // pie chart uses half the smaller plot dimension
+    const radius = @min(plot_width, plot_height) / 2.0;
+
+    if (dist > radius)
+    {
+        return null;
+    }
+
+    // calculate angle (atan2 from right, CCW)
+    // rotate -90° to start from top
+    const angle_raw = std.math.radiansToDegrees(
+        std.math.atan2(dy, dx)
+    );
+    const angle = @mod(angle_raw - 90.0, 360.0);
+
+    var total: f64 = 0;
+    for (values)
+        |v|
+    {
+        total += @as(f64, @floatCast(v));
+    }
+
+    var cumulative_angle: f64 = 0;
+    for (labels, values)
+        |label, value|
+    {
+        const slice_angle = (@as(f64, @floatCast(value)) / total) * 360.0;
+        if (
+            angle >= cumulative_angle
+            and angle < cumulative_angle + slice_angle
+        )
+        {
+            return label;
+        }
+        cumulative_angle += slice_angle;
+    }
+
+    return null;
+}
+
 /// draw the UI
 fn draw(
 ) !void 
@@ -417,10 +484,10 @@ fn draw(
                         defer zgui.plot.endPlot();
 
                         const pie_labels = [_][*:0]const u8{
-                            "Apples",
-                            "Bananas",
-                            "Cherries",
-                            "Dates"
+                            "Tacos",
+                            "Pizza",
+                            "Pasta",
+                            "Sushi"
                         };
                         const pie_values = (
                             [_]f64{ 30.0, 25.0, 20.0, 15.0 }
@@ -431,11 +498,24 @@ fn draw(
                             .{
                                 .label_ids = &pie_labels,
                                 .values = &pie_values,
-                                // default value:
-                                // .label_fmt = "%.1f",
                                 .flags = .{ .normalize = true },
                             }
                         );
+
+                        // detect clicks on pie slices
+                        if (
+                            detectPieChartClick(
+                                f64,
+                                &pie_labels,
+                                &pie_values
+                            )
+                        ) |clicked_label|
+                        {
+                            std.debug.print(
+                                "Clicked on {s} slice!\n",
+                                .{std.mem.span(clicked_label)}
+                            );
+                        }
                     }
                 }
             }
