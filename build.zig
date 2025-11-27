@@ -1,6 +1,7 @@
 //! Build Script for ZIIS / Zig cImgui Implot Sokol Bundle
 
 const std = @import("std");
+
 const sokol = @import("sokol");
 const cimgui = @import("cimgui");
 
@@ -171,6 +172,8 @@ pub fn build(
         try build_wasm(
             b,
             .{
+                .target = target,
+                .optimize = optimize,
                 .mod_main = mod_app_wrapper,
                 .dep_sokol = dep_sokol,
                 .dep_cimgui = dep_cimgui,
@@ -218,6 +221,8 @@ fn build_native(
 fn build_wasm(
     b: *std.Build,
     opts: struct {
+        target: std.Build.ResolvedTarget,
+        optimize: std.builtin.OptimizeMode,
         mod_main: *std.Build.Module,
         dep_sokol: *std.Build.Dependency,
         dep_cimgui: *std.Build.Dependency,
@@ -235,9 +240,10 @@ fn build_wasm(
     );
 
     // get the Emscripten SDK dependency from the sokol dependency
-    const dep_emsdk = opts.dep_sokol.builder.dependency(
-        "emsdk",
-        .{},
+    const dep_emsdk = fetchEmSdk(
+        b,
+        opts.target,
+        opts.optimize,
     );
 
     // need to inject the Emscripten system header include path into
@@ -286,4 +292,28 @@ fn build_wasm(
     );
     run.step.dependOn(&link_step.step);
     b.step("run", "Run demo").dependOn(&run.step);
+}
+
+// Functions for exposing the Emscripten SDK to Clients
+///////////////////////////////////////////////////////////////////////////////
+
+pub fn fetchEmSdk(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Dependency
+{
+    const dep_sokol = b.dependency(
+        "sokol",
+        .{
+            .target = target,
+            .optimize = optimize,
+            .with_sokol_imgui = true,
+        }
+    );
+
+    return dep_sokol.builder.dependency(
+        "emsdk",
+        .{},
+    );
 }
