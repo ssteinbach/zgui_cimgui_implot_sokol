@@ -172,12 +172,12 @@ pub fn build(
         try build_wasm(
             b,
             .{
+                .app_name = "demo",
+                .mod_main = mod_app_wrapper,
+                .dep_ziis_builder = b,
                 .target = target,
                 .optimize = optimize,
-                .mod_main = mod_app_wrapper,
-                .dep_sokol = dep_sokol,
-                .dep_cimgui = dep_cimgui,
-                .dep_libs = &.{
+                .dep_c_libs = &.{
                     lib_cimgui,
                     lib_imgui,
                 },
@@ -218,32 +218,41 @@ fn build_native(
 }
 
 /// Build for WASM
-fn build_wasm(
-    b: *std.Build,
+pub fn build_wasm(
+    outer_builder: *std.Build,
     opts: struct {
+        mod_main: *std.Build.Module,
+        app_name: []const u8,
+        /// call dep_ziis.builder and pass that here
+        dep_ziis_builder: *std.Build,
         target: std.Build.ResolvedTarget,
         optimize: std.builtin.OptimizeMode,
-        mod_main: *std.Build.Module,
-        dep_sokol: *std.Build.Dependency,
-        dep_cimgui: *std.Build.Dependency,
-        dep_libs: []const *std.Build.Step.Compile,
+        dep_c_libs: []const *std.Build.Step.Compile,
     },
 ) !void 
 {
     // build the main file into a library, this is because the WASM 'exe'
     // needs to be linked in a separate build step with the Emscripten linker
-    const demo = b.addLibrary(
+    const main_app = outer_builder.addLibrary(
         .{
-            .name = "demo",
+            .name = opts.app_name,
             .root_module = opts.mod_main,
         },
     );
 
+    const dep_sokol = opts.dep_ziis_builder.dependency(
+        "sokol",
+        .{
+            .target = opts.target,
+            .optimize = opts.optimize,
+            .with_sokol_imgui = true,
+        }
+    );
+
     // get the Emscripten SDK dependency from the sokol dependency
-    const dep_emsdk = fetchEmSdk(
-        b,
-        opts.target,
-        opts.optimize,
+    const dep_emsdk = dep_sokol.builder.dependency(
+        "emsdk",
+        .{},
     );
 
     // need to inject the Emscripten system header include path into
@@ -257,63 +266,39 @@ fn build_wasm(
     // WASM this makes sure that the Emscripten SDK has been setup before
     // C compilation is attempted (since the sokol C library depends on the
     // Emscripten SDK setup step)
-    for (opts.dep_libs)
+    for (opts.dep_c_libs)
         |lib|
     {
         lib.addSystemIncludePath(emsdk_incl_path);
-        lib.step.dependOn(&opts.dep_sokol.artifact("sokol_clib").step);
+        lib.step.dependOn(&dep_sokol.artifact("sokol_clib").step);
     }
 
     // create a build step which invokes the Emscripten linker
     const link_step = try sokol.emLinkStep(
-        b,
+        outer_builder,
         .{
-            .lib_main = demo,
-            .target = opts.mod_main.resolved_target.?,
-            .optimize = opts.mod_main.optimize.?,
+            .lib_main = main_app,
+            .target = opts.target,
+            .optimize = opts.optimize,
             .emsdk = dep_emsdk,
             .use_webgl2 = true,
             .use_emmalloc = true,
             .use_filesystem = false,
-            .shell_file_path = opts.dep_sokol.path(
+            .shell_file_path = dep_sokol.path(
                 "src/sokol/web/shell.html",
             ),
         },
     );
     // attach to default target
-    b.getInstallStep().dependOn(&link_step.step);
+    outer_builder.getInstallStep().dependOn(&link_step.step);
     // ...and a special run step to start the web build output via 'emrun'
     const run = sokol.emRunStep(
-        b,
+        outer_builder,
         .{
             .name = "demo",
             .emsdk = dep_emsdk,
         },
     );
     run.step.dependOn(&link_step.step);
-    b.step("run", "Run demo").dependOn(&run.step);
-}
-
-// Functions for exposing the Emscripten SDK to Clients
-///////////////////////////////////////////////////////////////////////////////
-
-pub fn fetchEmSdk(
-    b: *std.Build,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-) *std.Build.Dependency
-{
-    const dep_sokol = b.dependency(
-        "sokol",
-        .{
-            .target = target,
-            .optimize = optimize,
-            .with_sokol_imgui = true,
-        }
-    );
-
-    return dep_sokol.builder.dependency(
-        "emsdk",
-        .{},
-    );
+    outer_builder.step("run", "Run demo").dependOn(&run.step);
 }
