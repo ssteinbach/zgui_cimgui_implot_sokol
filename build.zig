@@ -300,5 +300,21 @@ pub fn build_wasm(
         },
     );
     run.step.dependOn(&link_step.step);
-    outer_builder.step("run", "Run demo").dependOn(&run.step);
+
+    var buf:[1024]u8 = undefined;
+    const name = try std.fmt.bufPrint(
+        &buf,
+        "run-{s}",
+        .{opts.app_name}
+    );
+    const desc = try std.fmt.bufPrint(
+        buf[name.len..],
+        "Run {s} as a wasm build.",
+        .{opts.app_name}
+    );
+
+    outer_builder.step(
+        name,
+        desc,
+    ).dependOn(&run.step);
 }
