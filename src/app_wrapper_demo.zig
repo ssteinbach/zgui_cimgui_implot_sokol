@@ -44,17 +44,30 @@ const allocator = (
     else debug_allocator.allocator()
 );
 
-/// detect clicks on pie chart slices
-fn detectPieChartClick(
+/// Returns the hovered label, value pair if the mouse is over the plot,
+/// otherwise returns null.
+///
+/// Recomputes the angles and proportions of each slice.  If this is a scaling
+/// issue, those could be precomputed and passed in.
+fn which_pie_slice_under_mouse(
+    /// type of the values in the pie chart
     comptime T: type,
     labels: []const [*:0]const u8,
     values: []const T,
-) ?[*:0]const u8
+) ?struct{
+    label: [*:0]const u8,
+    value: T,
+}
 {
-    if (
-        !zplot.isPlotHovered()
-        or !zgui.isMouseClicked(.left)
-    )
+    switch (@typeInfo(T))
+    {
+        .@"float", .@"int" => {},
+        inline else => @compileError(
+            "Only supports pie charts of numeric values"
+        ),
+    }
+
+    if (zplot.isPlotHovered() == false)
     {
         return null;
     }
@@ -103,7 +116,7 @@ fn detectPieChartClick(
             and angle < cumulative_angle + slice_angle
         )
         {
-            return label;
+            return .{ .label = label, .value = value };
         }
         cumulative_angle += slice_angle;
     }
@@ -179,6 +192,7 @@ fn draw(
                     .no_move = true,
                     .no_collapse = true,
                     .no_title_bar = true,
+                    .no_bring_to_front_on_focus = true,
                 },
             },
         )
@@ -470,6 +484,16 @@ fn draw(
                         );
                     }
 
+                    const pie_labels = [_][*:0]const u8{
+                        "Tacos",
+                        "Pizza",
+                        "Pasta",
+                        "Sushi"
+                    };
+                    const pie_values = (
+                        [_]f64{ 30.0, 25.0, 20.0, 15.0 }
+                    );
+
                     if (
                         zgui.plot.beginPlot(
                             "Pie Chart Demo",
@@ -483,16 +507,6 @@ fn draw(
                     {
                         defer zgui.plot.endPlot();
 
-                        const pie_labels = [_][*:0]const u8{
-                            "Tacos",
-                            "Pizza",
-                            "Pasta",
-                            "Sushi"
-                        };
-                        const pie_values = (
-                            [_]f64{ 30.0, 25.0, 20.0, 15.0 }
-                        );
-
                         zplot.plotPieChart(
                             f64,
                             .{
@@ -502,19 +516,57 @@ fn draw(
                             }
                         );
 
-                        // detect clicks on pie slices
+                        // tooltip on hover/click
                         if (
-                            detectPieChartClick(
+                            which_pie_slice_under_mouse(
                                 f64,
                                 &pie_labels,
                                 &pie_values
                             )
-                        ) |clicked_label|
+                        ) |hovered|
                         {
-                            std.debug.print(
-                                "Clicked on {s} slice!\n",
-                                .{std.mem.span(clicked_label)}
+                            const mouse_screen_pos = zgui.getMousePos();
+                            zgui.setNextWindowPos(
+                                .{
+                                    .x = mouse_screen_pos[0] + 15,
+                                    .y = mouse_screen_pos[1] + 15,
+                                }
                             );
+                            zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
+
+                            if (
+                                zgui.begin(
+                                    "###PieChartTooltip",
+                                    .{
+                                        .flags = .{
+                                            .no_title_bar = true,
+                                            .no_resize = true,
+                                            .no_move = true,
+                                            .always_auto_resize = true,
+                                            .no_saved_settings = true,
+                                            .no_focus_on_appearing = true,
+                                            .no_nav_inputs = true,
+                                            .no_nav_focus = true,
+                                        },
+                                    },
+                                )
+                            )
+                            {
+                                defer zgui.end();
+
+                                zgui.text(
+                                    "Hovered\n  slice: {s}\n  value: {d}",
+                                    .{hovered.label, hovered.value});
+                            }
+
+                            // print on click as well
+                            if (zgui.isMouseClicked(.left))
+                            {
+                                std.debug.print(
+                                    "Clicked on {s} slice!\n",
+                                    .{hovered.label}
+                                );
+                            }
                         }
                     }
                 }
