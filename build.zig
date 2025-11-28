@@ -283,7 +283,7 @@ pub fn build_wasm(
             .emsdk = dep_emsdk,
             .use_webgl2 = true,
             .use_emmalloc = true,
-            .use_filesystem = false,
+            .use_filesystem = true,
             .shell_file_path = dep_sokol.path(
                 "src/sokol/web/shell.html",
             ),
@@ -295,7 +295,7 @@ pub fn build_wasm(
     const run = sokol.emRunStep(
         outer_builder,
         .{
-            .name = "demo",
+            .name = opts.app_name,
             .emsdk = dep_emsdk,
         },
     );
