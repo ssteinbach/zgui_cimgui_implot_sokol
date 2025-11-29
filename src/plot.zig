@@ -464,6 +464,21 @@ pub const ScatterFlags = packed struct(u32) {
     no_clip: bool = false,
     _padding: u21 = 0,
 };
+pub const StairsFlags = packed struct(u32) {
+    _reserved0: bool = false,
+    _reserved1: bool = false,
+    _reserved2: bool = false,
+    _reserved3: bool = false,
+    _reserved4: bool = false,
+    _reserved5: bool = false,
+    _reserved6: bool = false,
+    _reserved7: bool = false,
+    _reserved8: bool = false,
+    _reserved9: bool = false,
+    pre_step: bool = false,
+    shaded: bool = false,
+    _padding: u20 = 0,
+};
 fn PlotScatterValuesGen(comptime T: type) type {
     return struct {
         v: []const T,
@@ -531,7 +546,75 @@ extern fn zguiPlot_PlotScatter(
     offset: i32,
     stride: i32,
 ) void;
-
+//----------------------------------------------------------------------------------------------
+fn PlotStairsValuesGen(comptime T: type) type {
+    return struct {
+        v: []const T,
+        xscale: f64 = 1.0,
+        xstart: f64 = 0.0,
+        flags: StairsFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotStairsValues(label_id: [:0]const u8, comptime T: type, args: PlotStairsValuesGen(T)) void {
+    zguiPlot_PlotStairsValues(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.v.ptr,
+        @as(i32, @intCast(args.v.len)),
+        args.xscale,
+        args.xstart,
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotStairsValues(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    values: *const anyopaque,
+    count: i32,
+    xscale: f64,
+    xstart: f64,
+    flags: StairsFlags,
+    offset: i32,
+    stride: i32,
+) void;
+//----------------------------------------------------------------------------------------------
+fn PlotStairsGen(comptime T: type) type {
+    return struct {
+        xv: []const T,
+        yv: []const T,
+        flags: StairsFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotStairs(label_id: [:0]const u8, comptime T: type, args: PlotStairsGen(T)) void {
+    assert(args.xv.len == args.yv.len);
+    zguiPlot_PlotStairs(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.xv.ptr,
+        args.yv.ptr,
+        @as(i32, @intCast(args.xv.len)),
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotStairs(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    xv: *const anyopaque,
+    yv: *const anyopaque,
+    count: i32,
+    flags: StairsFlags,
+    offset: i32,
+    stride: i32,
+) void;
+//----------------------------------------------------------------------------------------------
 pub const ShadedFlags = packed struct(u32) {
     _padding: u32 = 0,
 };
