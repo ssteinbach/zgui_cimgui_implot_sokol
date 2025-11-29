@@ -53,6 +53,8 @@ export fn init(
     // initialize sokol-imgui
     simgui.setup(
         .{
+            // max out the vertex buffer... might be overkill
+            .max_vertices = 1024 * 1024,
             .logger = .{ .func = sokol.log.func }, 
         },
     );
