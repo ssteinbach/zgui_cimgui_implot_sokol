@@ -1,3 +1,6 @@
+// This file was originally was licensed under the zgui license, see LICENSE.md
+// All modifications and additions are copyright (c) 2025 Stephan Steinbach
+
 //--------------------------------------------------------------------------------------------------
 const assert = @import("std").debug.assert;
 const gui = @import("gui.zig");
