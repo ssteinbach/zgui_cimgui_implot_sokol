@@ -1,3 +1,6 @@
+// This file was originally was licensed under the zgui license, see LICENSE.md
+// All modifications and additions are copyright (c) 2025 Stephan Steinbach
+
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_imgui.h"

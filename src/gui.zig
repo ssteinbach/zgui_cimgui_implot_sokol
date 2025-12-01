@@ -1,3 +1,6 @@
+// This file was originally was licensed under the zgui license, see LICENSE.md
+// All modifications and additions are copyright (c) 2025 Stephan Steinbach
+
 //--------------------------------------------------------------------------------------------------
 //
 // Zig bindings for 'dear imgui' library. Easy to use, hand-crafted API with default arguments,
