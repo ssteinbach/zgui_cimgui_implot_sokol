@@ -5,6 +5,16 @@
 Bundles a set of tools for building user interfaces on desktop and WASM using
 Zig, sokol, imgui and implot.
 
+## Motivation
+
+The zgui/zplot bindings from zig-gamedev:
+[https://github.com/zig-gamedev/zig-gamedev](https://github.com/zig-gamedev/zig-gamedev)
+are nicely ergonomic in zig, but the backend packaging in sokol is lighter
+weight and more portable.  This combines bindings that are based on zgui/zplot
+(with some additions) from zgui backed by sokol/dcimgui with a do-undo library,
+a simple app framework, and a build system to make it easy to stand up small
+applications built with imgui and implot in zig.
+
 ## Demo
 
 * build and run the demo app: `zig build run` 
