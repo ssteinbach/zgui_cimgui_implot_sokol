@@ -15,6 +15,14 @@ weight and more portable.  This combines bindings that are based on zgui/zplot
 a simple app framework, and a build system to make it easy to stand up small
 applications built with imgui and implot in zig.
 
+### Links:
+
+* [https://github.com/zig-gamedev/zgui](https://github.com/zig-gamedev/zgui)
+* [https://github.com/floooh/sokol-zig](https://github.com/floooh/sokol-zig)
+* [https://github.com/floooh/dcimgui](https://github.com/floooh/dcimgui)
+* [https://github.com/ocornut/imgui](https://github.com/ocornut/imgui)
+* [https://github.com/epezent/implot](https://github.com/epezent/implot)
+
 ## Demo
 
 * build and run the demo app: `zig build run` 
