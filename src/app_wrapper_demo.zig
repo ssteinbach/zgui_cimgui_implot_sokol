@@ -11,6 +11,19 @@ const app_wrapper = ziis.app_wrapper;
 
 const cimgui = ziis.cimgui;
 
+/// JSON data structure for dynamic key-value pairs
+const JsonData = struct {
+    items: std.StringHashMapUnmanaged(i32) = .empty,
+
+    pub const empty: JsonData = .{
+        .items = .empty,
+    };
+
+    pub fn deinit(self: *JsonData, alloc: std.mem.Allocator) void {
+        self.items.deinit(alloc);
+    }
+};
+
 /// State container
 const STATE = struct {
     var f: f32 = 0;
@@ -29,9 +42,15 @@ const STATE = struct {
     var image_data = ziis.sokol.gfx.ImageData{};
 
     var point_buffers: std.MultiArrayList(struct{ x: f32, y: f32 }) = .empty;
+
+    // JSON data storage
+    var json_data: JsonData = .empty;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
+
+// Emscripten extern function for fetching data via JavaScript
+extern fn emscripten_run_script_string(script: [*:0]const u8) ?[*:0]const u8;
 
 /// the GPA - useful for detecting leaks, but ONLY works in non EMCC builds
 var debug_allocator = (
@@ -785,6 +804,138 @@ fn draw(
 
                 zgui.endGroup();
             }
+
+            if (zgui.beginTabItem("JSON Pie Chart", .{}))
+            {
+                defer zgui.endTabItem();
+
+                if (
+                    zgui.beginChild(
+                        "JSON Pie Chart",
+                        .{ .w = -1, .h = -1, },
+                    )
+                )
+                {
+                    defer zgui.endChild();
+
+                    if (STATE.json_data.items.count() == 0)
+                    {
+                        zgui.text("No data loaded from example.json", .{});
+                    }
+                    else
+                    {
+                        // Build arrays for pie chart
+                        var labels: std.ArrayListUnmanaged([*:0]const u8) = .empty;
+                        defer labels.deinit(allocator);
+                        var values: std.ArrayListUnmanaged(f64) = .empty;
+                        defer values.deinit(allocator);
+
+                        var iter = STATE.json_data.items.iterator();
+                        while (iter.next())
+                            |entry|
+                        {
+                            const label_buf = (
+                                allocator.alloc(u8, entry.key_ptr.len + 1)
+                                catch continue
+                            );
+                            const label = std.fmt.bufPrintZ(
+                                label_buf,
+                                "{s}",
+                                .{entry.key_ptr.*}
+                            ) catch {
+                                allocator.free(label_buf);
+                                continue;
+                            };
+
+                            labels.append(allocator, label.ptr) catch {
+                                allocator.free(label_buf);
+                                continue;
+                            };
+                            values.append(
+                                allocator,
+                                @floatFromInt(entry.value_ptr.*)
+                            ) catch continue;
+                        }
+
+                        defer for (labels.items)
+                            |label|
+                        {
+                            const ptr = @as([*]u8, @ptrFromInt(@intFromPtr(label)));
+                            allocator.free(ptr[0..std.mem.len(label) + 1]);
+                        };
+
+                        if (
+                            zgui.plot.beginPlot(
+                                "Data from example.json",
+                                .{
+                                    .w = -1.0,
+                                    .h = -1.0,
+                                    .flags = .{ .equal = true },
+                                },
+                            )
+                        )
+                        {
+                            defer zgui.plot.endPlot();
+
+                            if (labels.items.len > 0) {
+                                zplot.plotPieChart(
+                                    f64,
+                                    .{
+                                        .label_ids = labels.items,
+                                        .values = values.items,
+                                        .flags = .{ .normalize = true },
+                                    }
+                                );
+
+                                // Add tooltip on hover
+                                if (
+                                    which_pie_slice_under_mouse(
+                                        f64,
+                                        labels.items,
+                                        values.items
+                                    )
+                                ) |hovered|
+                                {
+                                    const mouse_screen_pos = zgui.getMousePos();
+                                    zgui.setNextWindowPos(
+                                        .{
+                                            .x = mouse_screen_pos[0] + 15,
+                                            .y = mouse_screen_pos[1] + 15,
+                                        }
+                                    );
+                                    zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
+
+                                    if (
+                                        zgui.begin(
+                                            "###JSONPieChartTooltip",
+                                            .{
+                                                .flags = .{
+                                                    .no_title_bar = true,
+                                                    .no_resize = true,
+                                                    .no_move = true,
+                                                    .always_auto_resize = true,
+                                                    .no_saved_settings = true,
+                                                    .no_focus_on_appearing = true,
+                                                    .no_nav_inputs = true,
+                                                    .no_nav_focus = true,
+                                                },
+                                            },
+                                        )
+                                    )
+                                    {
+                                        defer zgui.end();
+
+                                        zgui.text(
+                                            "Item: {s}\nValue: {d}",
+                                            .{hovered.label, hovered.value}
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -793,6 +944,15 @@ fn cleanup (
 ) void
 {
     STATE.point_buffers.deinit(allocator);
+
+    // Clean up JSON data
+    var iter = STATE.json_data.items.keyIterator();
+    while (iter.next())
+        |key|
+    {
+        allocator.free(key.*);
+    }
+    STATE.json_data.deinit(allocator);
 
     if (STATE.maybe_journal)
         |*definitely_journal|
@@ -803,7 +963,7 @@ fn cleanup (
     if (IS_WASM == false)
     {
         const result = debug_allocator.deinit();
-        if (result == .leak) 
+        if (result == .leak)
         {
             std.log.debug("leak!", .{});
         }
@@ -854,6 +1014,88 @@ pub fn init(
     );
 
     STATE.texid = ziis.sokol.imgui.imtextureid(STATE.view);
+
+    // Load JSON data
+    const json_content = load_content:
+    {
+        if (IS_WASM)
+        {
+            const js_code =
+                \\(function() {
+                \\  try {
+                \\    var xhr = new XMLHttpRequest();
+                \\    xhr.open('GET', 'example.json', false);
+                \\    xhr.send();
+                \\    if (xhr.status === 200) {
+                \\      return xhr.responseText;
+                \\    }
+                \\  } catch (e) {
+                \\    console.error('Failed to fetch example.json: ' + e);
+                \\  }
+                \\  return null;
+                \\})()
+            ;
+
+            const result_ptr = emscripten_run_script_string(js_code);
+
+            if (result_ptr == null)
+            {
+                std.debug.print("Failed to fetch example.json via HTTP\n", .{});
+                return;
+            }
+
+            const ptr: [*:0]const u8 = result_ptr.?;
+            const len = std.mem.len(ptr);
+
+            const content = allocator.dupe(u8, ptr[0..len]) catch return;
+
+            break :load_content content;
+        }
+        else
+        {
+            const file = std.fs.cwd().openFile(
+                "example.json",
+                .{}
+            ) catch |err|
+            {
+                std.debug.print("Failed to open example.json: {}\n", .{err});
+                return;
+            };
+            defer file.close();
+
+            break :load_content (
+                file.readToEndAlloc(allocator, 1024 * 1024)
+                catch |err|
+                {
+                    std.debug.print("Failed to read example.json: {}\n", .{err});
+                    return;
+                }
+            );
+        }
+    };
+    defer allocator.free(json_content);
+
+    const parsed = std.json.parseFromSlice(
+        std.json.Value,
+        allocator,
+        json_content,
+        .{}
+    ) catch |err|
+    {
+        std.debug.print("Failed to parse JSON: {}\n", .{err});
+        return;
+    };
+    defer parsed.deinit();
+
+    const obj = parsed.value.object;
+    var iter = obj.iterator();
+    while (iter.next())
+        |entry|
+    {
+        const key_copy = allocator.dupe(u8, entry.key_ptr.*) catch continue;
+        const value = @as(i32, @intCast(entry.value_ptr.integer));
+        STATE.json_data.items.put(allocator, key_copy, value) catch continue;
+    }
 }
 
 pub fn main(
