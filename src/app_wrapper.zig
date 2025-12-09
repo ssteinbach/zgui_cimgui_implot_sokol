@@ -54,7 +54,7 @@ export fn init(
     simgui.setup(
         .{
             // max out the vertex buffer... might be overkill
-            .max_vertices = 1024 * 1024,
+            .max_vertices = if (IS_WASM) 64 * 1024 else 1024 * 1024,
             .logger = .{ .func = sokol.log.func }, 
         },
     );
