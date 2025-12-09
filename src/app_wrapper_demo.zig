@@ -24,6 +24,22 @@ const JsonData = struct {
     }
 };
 
+// belongs in your main.zig
+
+pub const std_options: std.Options = .{ .wasiCwd = if (builtin.os.tag == .wasi) defaultWasiCwd else std.fs.defaultWasiCwd };
+var default_wasi_dir = if (builtin.os.tag == .wasi) std.fs.defaultWasiCwd() else void;
+pub fn defaultWasiCwd() std.os.wasi.fd_t {
+    // Expect the first preopen to be current working directory.
+    return default_wasi_dir;
+}
+
+// pub fn main() !void {
+//     if (builtin.os.tag == .wasi) {
+//         const dir = try std.fs.cwd().openDir("/wasm_data", .{});
+//         default_wasi_dir = dir.fd;
+//     }
+// }
+
 /// State container
 const STATE = struct {
     var f: f32 = 0;
@@ -824,6 +840,26 @@ fn draw(
                     }
                     else
                     {
+                        {
+                            // Claude: replace this block with one that uses
+                            // ziis.sokol.fetch to retrieve example.json both
+                            // locally and in -Dtarget=wasm32-emscripten builds
+                            const dir = (
+                                if (builtin.os.tag == .wasi) (try std.fs.cwd().openDir("/wasm_data", .{})).fd
+                                else std.fs.cwd()
+                            );
+
+                            const fi = try dir.openFile("example.json", .{});
+
+                            const content = try fi.readToEndAlloc(
+                                allocator,
+                                1024 * 1024,
+                            );
+                            defer allocator.free(content);
+
+                            zgui.text("{s}", .{content});
+                        }
+
                         // Build arrays for pie chart
                         var labels: std.ArrayListUnmanaged([*:0]const u8) = .empty;
                         defer labels.deinit(allocator);
