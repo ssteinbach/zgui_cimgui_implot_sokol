@@ -227,12 +227,9 @@ fn unpack_callback(
             fetch_query.state = .failed;
             return;
         };
-
-        fetch_query.state = .loaded;
-        return;
     }
 
-    fetch_query.state = .failed;
+    fetch_query.state = .loaded;
 }
 
 /// Fetch resources from the webserver or from elsewhere.  returns a pointer to
@@ -257,9 +254,7 @@ pub fn fetch_resource_from_path(
     new_query.*.handle = sfetch.send(
         .{
             .path = @ptrCast(path),
-            .callback = (
-                if (maybe_callback != null) unpack_callback else null
-            ),
+            .callback = unpack_callback,
             .buffer = .{
                 .ptr = &new_query.buffer,
                 .size = new_query.buffer.len,
