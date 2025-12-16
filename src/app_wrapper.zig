@@ -162,14 +162,14 @@ pub const FetchQuery = struct {
     state: FetchState,
 
     /// Optional callback to call when fetch is complete.
-    maybe_callback: CallbackFn,
+    maybe_callback: ?CallbackFn,
 
     /// Data read from the target.
     data: []const u8,
 
     /// Alias for query callback functions
     pub const CallbackFn = (
-        ?*const fn (*FetchQuery) error{CallbackError}!void
+        *const fn (*FetchQuery) error{CallbackError}!void
     );
 
     /// State of the fetch operation, loading, failed, etc.
@@ -242,7 +242,7 @@ pub fn fetch_resource_from_path(
     /// Path to the resource to load.
     path: []const u8,
     /// optional callback that is called when fetch is done
-    maybe_callback: FetchQuery.CallbackFn,
+    maybe_callback: ?FetchQuery.CallbackFn,
 ) !*FetchQuery
 {
     const new_query = try allocator.create(FetchQuery);
