@@ -69,7 +69,7 @@ const allocator = (
 ///
 /// Recomputes the angles and proportions of each slice.  If this is a scaling
 /// issue, those could be precomputed and passed in.
-fn which_pie_slice_under_mouse(
+fn maybe_pie_slice_under_mouse(
     /// type of the values in the pie chart
     comptime T: type,
     labels: []const [*:0]const u8,
@@ -142,6 +142,65 @@ fn which_pie_slice_under_mouse(
     }
 
     return null;
+}
+
+fn draw_pie_chart(
+) !void
+{
+    const labels = STATE.data_from_json_file.items(.label);
+    const values = STATE.data_from_json_file.items(.value);
+
+    zplot.plotPieChart(
+        f64,
+        .{
+            .label_ids = labels,
+            .values = values,
+            .flags = .{ .normalize = true },
+        }
+    );
+
+    // Add tooltip on hover
+    if (maybe_pie_slice_under_mouse( f64, labels, values))
+        |hovered|
+    {
+        const mouse_screen_pos = zgui.getMousePos();
+
+        // scooch it over
+        zgui.setNextWindowPos(
+            .{
+                .x = mouse_screen_pos[0] + 15,
+                .y = mouse_screen_pos[1] + 15,
+            }
+        );
+        zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
+
+        if (
+            zgui.begin(
+                "###JSONPieChartTooltip",
+                .{
+                    .flags = .{
+                        .no_title_bar = true,
+                        .no_resize = true,
+                        .no_move = true,
+                        .always_auto_resize = true,
+                        .no_saved_settings = true,
+                        .no_focus_on_appearing = true,
+                        .no_nav_inputs = true,
+                        .no_nav_focus = true,
+                    },
+                },
+            )
+        )
+        {
+            defer zgui.end();
+
+            zgui.text(
+                "Item: {s}\nValue: {d}",
+                .{hovered.label, hovered.value}
+            );
+        }
+    }
+
 }
 
 /// draw the UI
@@ -631,7 +690,7 @@ fn draw(
 
                         // tooltip on hover/click
                         if (
-                            which_pie_slice_under_mouse(
+                            maybe_pie_slice_under_mouse(
                                 f64,
                                 &pie_labels,
                                 &pie_values
@@ -829,7 +888,10 @@ fn draw(
                                     .c = .{ 1.0, 0.0, 0.0, 1.0 },
                                 },
                             );
-                            zgui.text("Failed to load example.json via sokol.fetch", .{});
+                            zgui.text(
+                                "Failed to load example.json via sokol.fetch",
+                                .{},
+                            );
                             zgui.popStyleColor(.{});
                         },
                         .loading => {
@@ -874,62 +936,7 @@ fn draw(
                             {
                                 defer zgui.plot.endPlot();
 
-                                const labels =STATE.data_from_json_file.items(.label);
-                                const values =STATE.data_from_json_file.items(.value);
-
-                                zplot.plotPieChart(
-                                    f64,
-                                    .{
-                                        .label_ids = labels,
-                                        .values = values,
-                                        .flags = .{ .normalize = true },
-                                    }
-                                );
-
-                                // Add tooltip on hover
-                                if (
-                                    which_pie_slice_under_mouse(
-                                        f64,
-                                        labels,
-                                        values,
-                                    )
-                                ) |hovered|
-                                {
-                                    const mouse_screen_pos = zgui.getMousePos();
-                                    zgui.setNextWindowPos(
-                                        .{
-                                            .x = mouse_screen_pos[0] + 15,
-                                            .y = mouse_screen_pos[1] + 15,
-                                        }
-                                    );
-                                    zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
-
-                                    if (
-                                        zgui.begin(
-                                            "###JSONPieChartTooltip",
-                                            .{
-                                                .flags = .{
-                                                    .no_title_bar = true,
-                                                    .no_resize = true,
-                                                    .no_move = true,
-                                                    .always_auto_resize = true,
-                                                    .no_saved_settings = true,
-                                                    .no_focus_on_appearing = true,
-                                                    .no_nav_inputs = true,
-                                                    .no_nav_focus = true,
-                                                },
-                                                },
-                                            )
-                                    )
-                                    {
-                                        defer zgui.end();
-
-                                        zgui.text(
-                                            "Item: {s}\nValue: {d}",
-                                            .{hovered.label, hovered.value}
-                                        );
-                                    }
-                                }
+                                try draw_pie_chart();
                             }
                         }
                     }
