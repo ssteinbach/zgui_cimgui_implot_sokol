@@ -43,7 +43,9 @@ const STATE = struct {
     // JSON data storage... gets filled when the FetchQuery gets returned
     var data_from_json_file: std.MultiArrayList(PieChartSliceData) = .empty;
 
-    var big_text_example = @embedFile("app_wrapper_demo.zig");
+    // big text example (this source file)
+    var big_text_query: *app_wrapper.FetchQuery = undefined;
+    var big_text_example: []const u8 = undefined;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -943,11 +945,23 @@ fn draw(
                 defer zgui.endTabItem();
                 defer zgui.endChild();
 
-                zgui.separatorText("Big text embed test");
+                switch (STATE.big_text_query.state)
+                {
+                    .loaded => {
+                        zgui.separatorText("Big text embed test");
 
-                const TEXT = STATE.big_text_example;
+                        const TEXT = STATE.big_text_query.data;
 
-                zgui.textUnformatted(TEXT);
+                        zgui.textUnformatted(TEXT);
+                    },
+                    else => {
+                        zgui.text(
+                            "Load state of big data: {s}", 
+                            .{ @tagName(STATE.big_text_query.state) },
+                        );
+                    }
+                }
+
             }
         }
     }
@@ -957,6 +971,7 @@ fn cleanup (
 ) void
 {
     allocator.destroy(STATE.json_fetch_query);
+    allocator.destroy(STATE.big_text_query);
 
     STATE.point_buffers.deinit(allocator);
 
@@ -1075,14 +1090,24 @@ pub fn init(
     // configure initial fetch
     STATE.json_fetch_query = app_wrapper.fetch_resource_from_path(
         allocator,
-        // @TODO: move the example.json path into STATE so that it can be
-        // configured externally
         "example.json",
         json_parsing_callback,
     ) catch {
         std.log.err(
             "Unable to fetch data: {s}",
             .{ "example.json" },
+        );
+        return;
+    };
+
+    STATE.big_text_query = app_wrapper.fetch_resource_from_path(
+        allocator,
+        "src/app_wrapper_demo.zig",
+        null,
+    ) catch {
+        std.log.err(
+            "Unable to fetch data: {s}",
+            .{ "src/app_wrapper_demo.zig" },
         );
         return;
     };
