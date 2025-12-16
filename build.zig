@@ -169,7 +169,7 @@ pub fn build(
     // from here on different handling for native vs wasm builds
     if (target.result.cpu.arch.isWasm())
     {
-        try build_wasm(
+        const run_step = try build_wasm(
             b,
             .{
                 .app_name = "demo",
@@ -182,6 +182,24 @@ pub fn build(
                     lib_imgui,
                 },
             },
+        );
+
+        // install example.json and source file for examples
+        run_step.dependOn(
+            &(
+                b.addInstallFile(
+                    b.path("example.json"),
+                    "web/example.json",
+                ).step
+            )
+        );
+        run_step.dependOn(
+            &(
+                b.addInstallFile(
+                    b.path("src/app_wrapper_demo.zig"),
+                    "web/src/app_wrapper_demo.zig",
+                ).step
+            )
         );
     }
     else
@@ -229,7 +247,7 @@ pub fn build_wasm(
         optimize: std.builtin.OptimizeMode,
         dep_c_libs: []const *std.Build.Step.Compile,
     },
-) !void 
+) !*std.Build.Step 
 {
     // build the main file into a library, this is because the WASM 'exe'
     // needs to be linked in a separate build step with the Emscripten linker
@@ -318,4 +336,6 @@ pub fn build_wasm(
         name,
         desc,
     ).dependOn(&run.step);
+
+    return &run.step;
 }
