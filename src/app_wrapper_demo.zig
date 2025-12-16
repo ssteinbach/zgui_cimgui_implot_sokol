@@ -11,17 +11,10 @@ const app_wrapper = ziis.app_wrapper;
 
 const cimgui = ziis.cimgui;
 
-/// JSON data structure for dynamic key-value pairs
-const JsonData = struct {
-    items: std.StringHashMapUnmanaged(i32) = .empty,
-
-    pub const empty: JsonData = .{
-        .items = .empty,
-    };
-
-    pub fn deinit(self: *JsonData, alloc: std.mem.Allocator) void {
-        self.items.deinit(alloc);
-    }
+/// Data read from the example json, designed to be displayed by Zplot
+const PieChartSliceData = struct {
+    label: [*:0]const u8,
+    value: f64,
 };
 
 /// State container
@@ -48,8 +41,7 @@ const STATE = struct {
     var json_fetch_query: *app_wrapper.FetchQuery = undefined;
 
     // JSON data storage... gets filled when the FetchQuery gets returned
-    var json_data: JsonData = .empty;
-
+    var data_from_json_file: std.MultiArrayList(PieChartSliceData) = .empty;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -837,137 +829,101 @@ fn draw(
                             zgui.popStyleColor(.{});
                         },
                         .loading => {
+                            zgui.pushStyleColor4f(
+                                .{ 
+                                    .idx = .text,
+                                    .c = .{ 0.0, 0.5, 1.0, 1.0 },
+                                },
+                            );
                             zgui.text(
                                 "Loading example.json... ({s})",
                                 .{
                                     @tagName(STATE.json_fetch_query.state)
                                 }
                             );
+                            zgui.popStyleColor(.{});
                         },
                         .loaded => {
-                            if (STATE.json_data.items.count() == 0)
-                            {
-                                zgui.pushStyleColor4f(.{ .idx = .text, .c = .{ 1.0, 0.5, 0.0, 1.0 } });
-                                zgui.text("No data in example.json", .{});
-                                zgui.popStyleColor(.{});
-                            }
-                            else
-                            {
-                                {
-                                    // Display success message in green
-                                    zgui.pushStyleColor4f(.{ .idx = .text, .c = .{ 0.0, 1.0, 0.0, 1.0 } });
-                                    zgui.text("JSON data loaded successfully via sokol.fetch", .{});
-                                    zgui.popStyleColor(.{});
+                            // Display success message in green
+                            zgui.pushStyleColor4f(
+                                .{
+                                    .idx = .text,
+                                    .c = .{ 0.0, 1.0, 0.0, 1.0 },
                                 }
+                            );
+                            zgui.text(
+                                "JSON data loaded successfully via sokol.fetch",
+                                .{}
+                            );
+                            zgui.popStyleColor(.{});
 
-                                // Build arrays for pie chart
-                                var labels: std.ArrayListUnmanaged([*:0]const u8) = .empty;
-                                defer labels.deinit(allocator);
-                                var values: std.ArrayListUnmanaged(f64) = .empty;
-                                defer values.deinit(allocator);
-
-                                var iter = STATE.json_data.items.iterator();
-                                while (iter.next())
-                                    |entry|
-                                {
-                                    const label_buf = (
-                                        allocator.alloc(u8, entry.key_ptr.len + 1)
-                                        catch continue
-                                    );
-                                    const label = std.fmt.bufPrintZ(
-                                        label_buf,
-                                        "{s}",
-                                        .{entry.key_ptr.*}
-                                    ) catch {
-                                        allocator.free(label_buf);
-                                        continue;
-                                    };
-
-                                    labels.append(allocator, label.ptr) catch {
-                                        allocator.free(label_buf);
-                                        continue;
-                                    };
-                                    values.append(
-                                        allocator,
-                                        @floatFromInt(entry.value_ptr.*)
-                                    ) catch continue;
-                                }
-
-                                defer for (labels.items)
-                                    |label|
-                                {
-                                    const ptr = @as([*]u8, @ptrFromInt(@intFromPtr(label)));
-                                    allocator.free(ptr[0..std.mem.len(label) + 1]);
-                                };
-
-                                if (
-                                    zgui.plot.beginPlot(
-                                        "Data from example.json",
-                                        .{
-                                            .w = -1.0,
-                                            .h = -1.0,
-                                            .flags = .{ .equal = true },
-                                        },
-                                        )
+                            if (
+                                zgui.plot.beginPlot(
+                                    "Data from example.json",
+                                    .{
+                                        .w = -1.0,
+                                        .h = -1.0,
+                                        .flags = .{ .equal = true },
+                                    },
                                 )
+                            )
+                            {
+                                defer zgui.plot.endPlot();
+
+                                const labels =STATE.data_from_json_file.items(.label);
+                                const values =STATE.data_from_json_file.items(.value);
+
+                                zplot.plotPieChart(
+                                    f64,
+                                    .{
+                                        .label_ids = labels,
+                                        .values = values,
+                                        .flags = .{ .normalize = true },
+                                    }
+                                );
+
+                                // Add tooltip on hover
+                                if (
+                                    which_pie_slice_under_mouse(
+                                        f64,
+                                        labels,
+                                        values,
+                                    )
+                                ) |hovered|
                                 {
-                                    defer zgui.plot.endPlot();
-
-                                    if (labels.items.len > 0) 
-                                    {
-                                        zplot.plotPieChart(
-                                            f64,
-                                            .{
-                                                .label_ids = labels.items,
-                                                .values = values.items,
-                                                .flags = .{ .normalize = true },
-                                            }
-                                        );
-
-                                        // Add tooltip on hover
-                                        if (
-                                            which_pie_slice_under_mouse(
-                                                f64,
-                                                labels.items,
-                                                values.items
-                                            )
-                                        ) |hovered|
-                                        {
-                                            const mouse_screen_pos = zgui.getMousePos();
-                                            zgui.setNextWindowPos(
-                                                .{
-                                                    .x = mouse_screen_pos[0] + 15,
-                                                    .y = mouse_screen_pos[1] + 15,
-                                                }
-                                            );
-                                            zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
-
-                                            if (
-                                                zgui.begin(
-                                                    "###JSONPieChartTooltip",
-                                                    .{
-                                                        .flags = .{
-                                                            .no_title_bar = true,
-                                                            .no_resize = true,
-                                                            .no_move = true,
-                                                            .always_auto_resize = true,
-                                                            .no_saved_settings = true,
-                                                            .no_focus_on_appearing = true,
-                                                            .no_nav_inputs = true,
-                                                            .no_nav_focus = true,
-                                                        },
-                                                        },
-                                                    )
-                                            )
-                                            {
-                                                defer zgui.end();
-
-                                                zgui.text(
-                                                    "Item: {s}\nValue: {d}",
-                                                    .{hovered.label, hovered.value}
-                                                );
-                                            }
+                                    const mouse_screen_pos = zgui.getMousePos();
+                                    zgui.setNextWindowPos(
+                                        .{
+                                            .x = mouse_screen_pos[0] + 15,
+                                            .y = mouse_screen_pos[1] + 15,
                                         }
+                                    );
+                                    zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
+
+                                    if (
+                                        zgui.begin(
+                                            "###JSONPieChartTooltip",
+                                            .{
+                                                .flags = .{
+                                                    .no_title_bar = true,
+                                                    .no_resize = true,
+                                                    .no_move = true,
+                                                    .always_auto_resize = true,
+                                                    .no_saved_settings = true,
+                                                    .no_focus_on_appearing = true,
+                                                    .no_nav_inputs = true,
+                                                    .no_nav_focus = true,
+                                                },
+                                                },
+                                            )
+                                    )
+                                    {
+                                        defer zgui.end();
+
+                                        zgui.text(
+                                            "Item: {s}\nValue: {d}",
+                                            .{hovered.label, hovered.value}
+                                        );
                                     }
                                 }
                             }
@@ -986,14 +942,12 @@ fn cleanup (
 
     STATE.point_buffers.deinit(allocator);
 
-    // Clean up JSON data
-    var iter = STATE.json_data.items.keyIterator();
-    while (iter.next())
-        |key|
+    for (STATE.data_from_json_file.items(.label))
+        |labels|
     {
-        allocator.free(key.*);
+        allocator.free(std.mem.span(labels));
     }
-    STATE.json_data.deinit(allocator);
+    STATE.data_from_json_file.deinit(allocator);
 
     if (STATE.maybe_journal)
         |*definitely_journal|
@@ -1009,7 +963,6 @@ fn cleanup (
             std.log.debug("leak!", .{});
         }
     }
-
 }
 
 /// read the JSON from the parsed file blob and configure the STATE variables
@@ -1045,23 +998,28 @@ fn json_parsing_callback(
         while (iter.next())
             |entry|
         {
-            const key_copy = allocator.dupe(
+            // copy the key out into a format that is ready to display in zplot
+            const key_copy = allocator.dupeZ(
                 u8, 
                 entry.key_ptr.*,
             ) catch continue;
 
-            const value = @as(i32, @intCast(entry.value_ptr.integer));
-
-            STATE.json_data.items.put(
+            STATE.data_from_json_file.append(
                 allocator,
-                key_copy,
-                value,
+                .{
+                    .label = key_copy,
+                    .value = @as(
+                        f64,
+                        @floatFromInt(entry.value_ptr.integer),
+                    ),
+                },
             ) catch continue;
         }
 
-        if (STATE.json_data.items.count() == 0)
+        if (STATE.data_from_json_file.len == 0)
         {
             fetch_query.state = .failed;
+            return;
         }
 
         fetch_query.state = .loaded;
