@@ -936,7 +936,6 @@ fn draw(
                 }
             }
 
-            // @TODO: use fetch to do this instead
             if (
                 zgui.beginTabItem("Big Text Test", .{})
                 and zgui.beginChild("Big Child Test",.{})
