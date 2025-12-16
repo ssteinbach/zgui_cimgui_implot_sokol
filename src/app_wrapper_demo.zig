@@ -42,6 +42,8 @@ const STATE = struct {
 
     // JSON data storage... gets filled when the FetchQuery gets returned
     var data_from_json_file: std.MultiArrayList(PieChartSliceData) = .empty;
+
+    var big_text_example = @embedFile("app_wrapper_demo.zig");
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -943,7 +945,7 @@ fn draw(
 
                 zgui.separatorText("Big text embed test");
 
-                const TEXT = @embedFile(@src().file);
+                const TEXT = STATE.big_text_example;
 
                 zgui.textUnformatted(TEXT);
             }
