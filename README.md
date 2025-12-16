@@ -26,7 +26,7 @@ applications built with imgui and implot in zig.
 ## Demo
 
 * build and run the demo app: `zig build run` 
-* builds the demo in wasm mode: `zig build run -Dtarget=wasm32-emscripten` 
+* builds the demo in wasm mode: `zig build run-demo -Dtarget=wasm32-emscripten` 
 
 ### Demo App
 
