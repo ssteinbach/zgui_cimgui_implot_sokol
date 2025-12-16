@@ -931,6 +931,21 @@ fn draw(
                     }
                 }
             }
+
+            if (
+                zgui.beginTabItem("Big Text Test", .{})
+                and zgui.beginChild("Big Child Test",.{})
+            )
+            {
+                defer zgui.endTabItem();
+                defer zgui.endChild();
+
+                zgui.separatorText("Big text embed test");
+
+                const TEXT = @embedFile(@src().file);
+
+                zgui.textUnformatted(TEXT);
+            }
         }
     }
 }

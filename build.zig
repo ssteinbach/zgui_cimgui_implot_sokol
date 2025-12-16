@@ -284,6 +284,7 @@ pub fn build_wasm(
             .use_webgl2 = true,
             .use_emmalloc = true,
             .use_filesystem = true,
+            .use_webgpu = true,
             .shell_file_path = dep_sokol.path(
                 "src/sokol/web/shell.html",
             ),
