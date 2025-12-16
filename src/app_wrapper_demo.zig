@@ -974,61 +974,58 @@ fn json_parsing_callback(
     const resp = response.*;
     var fetch_query = app_wrapper.query_from_response(response);
 
-    // Data has been successfully loaded
-    if (resp.fetched)
-    {
-        // pull the data from the query
-        const data_slice: []const u8 = (
-            @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size]
-        );
-
-        const parsed = std.json.parseFromSlice(
-            std.json.Value,
-            allocator,
-            data_slice,
-            .{}
-        ) catch {
-            fetch_query.state = .failed;
-            return;
-        };
-        defer parsed.deinit();
-
-        const obj = parsed.value.object;
-        var iter = obj.iterator();
-        while (iter.next())
-            |entry|
-        {
-            // copy the key out into a format that is ready to display in zplot
-            const key_copy = allocator.dupeZ(
-                u8, 
-                entry.key_ptr.*,
-            ) catch continue;
-
-            STATE.data_from_json_file.append(
-                allocator,
-                .{
-                    .label = key_copy,
-                    .value = @as(
-                        f64,
-                        @floatFromInt(entry.value_ptr.integer),
-                    ),
-                },
-            ) catch continue;
-        }
-
-        if (STATE.data_from_json_file.len == 0)
-        {
-            fetch_query.state = .failed;
-            return;
-        }
-
-        fetch_query.state = .loaded;
-    }
-
-    if (resp.failed)
+    if (resp.failed == true or resp.fetched != true)
     {
         fetch_query.state = .failed;
+        return;
     }
+
+    // pull the data from the query
+    const data_slice: []const u8 = (
+        @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size]
+    );
+
+    const parsed = std.json.parseFromSlice(
+        std.json.Value,
+        allocator,
+        data_slice,
+        .{}
+    ) catch {
+        fetch_query.state = .failed;
+        return;
+    };
+    defer parsed.deinit();
+
+    const obj = parsed.value.object;
+    var iter = obj.iterator();
+    while (iter.next())
+        |entry|
+    {
+        // copy the key out into a format that is ready to display in zplot
+        const key_copy = allocator.dupeZ(
+            u8, 
+            entry.key_ptr.*,
+        ) catch continue;
+
+        STATE.data_from_json_file.append(
+            allocator,
+            .{
+                .label = key_copy,
+                .value = @as(
+                    f64,
+                    @floatFromInt(entry.value_ptr.integer),
+                ),
+            },
+        ) catch continue;
+    }
+
+    if (STATE.data_from_json_file.len == 0)
+    {
+        fetch_query.state = .failed;
+        return;
+    }
+
+    fetch_query.state = .loaded;
 }
 
 pub fn init(
