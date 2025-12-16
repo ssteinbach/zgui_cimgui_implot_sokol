@@ -152,16 +152,27 @@ export fn frame(
 //@{ fetch code
 /// Encapsulates a query for a resource, can work remotely or locally
 pub const FetchQuery = struct {
-    /// currently has a maximum size.  
-    /// @TODO: Buffer this in the future maybe so that larger files can be
-    /// read?
+    /// Buffer used for internal query stuff.
     buffer: [1024 * 1024]u8,
+
+    /// Handle to sokol.fetch query.
     handle: sfetch.Handle,
+
+    /// State of the query.
     state: FetchState,
 
-    pub const Response = sfetch.Response;
+    /// Optional callback to call when fetch is complete.
+    maybe_callback: CallbackFn,
 
-    /// Fetch state enum
+    /// Data read from the target.
+    data: []const u8,
+
+    /// Alias for query callback functions
+    pub const CallbackFn = (
+        ?*const fn (*FetchQuery) error{CallbackError}!void
+    );
+
+    /// State of the fetch operation, loading, failed, etc.
     const FetchState = enum
     {
         loading,
@@ -169,16 +180,19 @@ pub const FetchQuery = struct {
         failed,
     };
 
+    /// Default configuration for when data is to be loaded.
     pub const loading = FetchQuery {
         .buffer = undefined,
         .handle = .{},
         .state = .loading,
+        .maybe_callback= null,
+        .data = undefined,
     };
 };
 
 /// Extract a FetchQuery from a Sokol fetch response (useful in callbacks and
 /// so on)
-pub fn query_from_response(
+fn query_from_response(
     response: [*c]const sfetch.Response,
 ) *FetchQuery
 {
@@ -188,24 +202,64 @@ pub fn query_from_response(
     ).*;
 }
 
-/// can fetch resources from the webserver or from elsewhere.  returns a pointer.
+/// Wraps the user callback for a more ergonomic zig-interface.
+fn unpack_callback(
+    /// fetch response
+    response: [*c]const sfetch.Response,
+) callconv(.c) void
+{
+    const resp = response.*;
+    var fetch_query = query_from_response(response);
+    fetch_query.data = (
+        @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size]
+     );
+
+    if (resp.failed == true or resp.fetched != true)
+    {
+        fetch_query.state = .failed;
+        return;
+    }
+
+    if (fetch_query.maybe_callback)
+        |callback|
+    {
+        callback(fetch_query) catch {
+            fetch_query.state = .failed;
+            return;
+        };
+
+        fetch_query.state = .loaded;
+        return;
+    }
+
+    fetch_query.state = .failed;
+}
+
+/// Fetch resources from the webserver or from elsewhere.  returns a pointer to
+/// a FetchQuery object, which has the state and data read from the file (if
+/// the read was succesful)..
+///
 /// Caller owns the memory of the FetchQuery
 pub fn fetch_resource_from_path(
     allocator: std.mem.Allocator,
+    /// Path to the resource to load.
     path: []const u8,
     /// optional callback that is called when fetch is done
-    callback: ?*const fn ([*c]const sfetch.Response) callconv(.c) void,
+    maybe_callback: FetchQuery.CallbackFn,
 ) !*FetchQuery
 {
     const new_query = try allocator.create(FetchQuery);
     new_query.* = .loading;
+    new_query.maybe_callback = maybe_callback;
 
     // Send fetch request for example.json
     // Note: user_data will copy the pointer value itself (8 bytes), not the whole FetchQuery struct
     new_query.*.handle = sfetch.send(
         .{
             .path = @ptrCast(path),
-            .callback = callback,
+            .callback = (
+                if (maybe_callback != null) unpack_callback else null
+            ),
             .buffer = .{
                 .ptr = &new_query.buffer,
                 .size = new_query.buffer.len,

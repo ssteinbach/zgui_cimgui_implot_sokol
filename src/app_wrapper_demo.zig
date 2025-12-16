@@ -932,6 +932,7 @@ fn draw(
                 }
             }
 
+            // @TODO: use fetch to do this instead
             if (
                 zgui.beginTabItem("Big Text Test", .{})
                 and zgui.beginChild("Big Child Test",.{})
@@ -983,32 +984,17 @@ fn cleanup (
 /// read the JSON from the parsed file blob and configure the STATE variables
 fn json_parsing_callback(
     /// fetch response
-    response: [*c]const app_wrapper.FetchQuery.Response,
-) callconv(.c) void
+    fetch_query: *app_wrapper.FetchQuery,
+) error{CallbackError}!void
 {
-    const resp = response.*;
-    var fetch_query = app_wrapper.query_from_response(response);
-
-    if (resp.failed == true or resp.fetched != true)
-    {
-        fetch_query.state = .failed;
-        return;
-    }
-
-    // pull the data from the query
-    const data_slice: []const u8 = (
-        @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size]
-    );
-
     const parsed = std.json.parseFromSlice(
         std.json.Value,
         allocator,
-        data_slice,
+        fetch_query.data,
         .{}
     ) catch {
-        fetch_query.state = .failed;
-        return;
-    };
+        return error.CallbackError;
+    }; 
     defer parsed.deinit();
 
     const obj = parsed.value.object;
@@ -1036,11 +1022,8 @@ fn json_parsing_callback(
 
     if (STATE.data_from_json_file.len == 0)
     {
-        fetch_query.state = .failed;
-        return;
+        return error.CallbackError;
     }
-
-    fetch_query.state = .loaded;
 }
 
 pub fn init(
@@ -1088,10 +1071,10 @@ pub fn init(
     STATE.texid = ziis.sokol.imgui.imtextureid(STATE.view);
 
     // configure initial fetch
-    // @TODO: move the example.json path into STATE so that it can be
-    // configured externally
     STATE.json_fetch_query = app_wrapper.fetch_resource_from_path(
         allocator,
+        // @TODO: move the example.json path into STATE so that it can be
+        // configured externally
         "example.json",
         json_parsing_callback,
     ) catch {
