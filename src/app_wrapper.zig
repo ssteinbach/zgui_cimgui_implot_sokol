@@ -11,6 +11,7 @@ const sg = sokol.gfx;
 const sapp = sokol.app;
 const sglue = sokol.glue;
 const simgui = sokol.imgui;
+const sfetch = ziis.sokol.fetch;
 
 /// building with wasm?
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -118,6 +119,9 @@ export fn init(
 export fn frame(
 ) void 
 {
+    // Pump sokol-fetch message queues
+    sfetch.dowork();
+
     // call simgui.newFrame() before any ImGui calls
     simgui.newFrame(
         .{
@@ -145,6 +149,78 @@ export fn frame(
     sg.commit();
 }
 
+//@{ fetch code
+/// Encapsulates a query for a resource, can work remotely or locally
+pub const FetchQuery = struct {
+    /// currently has a maximum size.  
+    /// @TODO: Buffer this in the future maybe so that larger files can be
+    /// read?
+    buffer: [1024 * 1024]u8,
+    handle: sfetch.Handle,
+    state: FetchState,
+
+    pub const Response = sfetch.Response;
+
+    /// Fetch state enum
+    const FetchState = enum
+    {
+        loading,
+        loaded,
+        failed,
+    };
+
+    pub const loading = FetchQuery {
+        .buffer = undefined,
+        .handle = .{},
+        .state = .loading,
+    };
+};
+
+/// Extract a FetchQuery from a Sokol fetch response (useful in callbacks and
+/// so on)
+pub fn query_from_response(
+    response: [*c]const sfetch.Response,
+) *FetchQuery
+{
+    return @as(
+        *const *FetchQuery,
+        @alignCast(@ptrCast(response.*.user_data.?))
+    ).*;
+}
+
+/// can fetch resources from the webserver or from elsewhere.  returns a pointer.
+/// Caller owns the memory of the FetchQuery
+pub fn fetch_resource_from_path(
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    /// optional callback that is called when fetch is done
+    callback: ?*const fn ([*c]const sfetch.Response) callconv(.c) void,
+) !*FetchQuery
+{
+    const new_query = try allocator.create(FetchQuery);
+    new_query.* = .loading;
+
+    // Send fetch request for example.json
+    // Note: user_data will copy the pointer value itself (8 bytes), not the whole FetchQuery struct
+    new_query.*.handle = sfetch.send(
+        .{
+            .path = @ptrCast(path),
+            .callback = callback,
+            .buffer = .{
+                .ptr = &new_query.buffer,
+                .size = new_query.buffer.len,
+            },
+            .user_data = .{
+                .ptr = @ptrCast(&new_query),
+                .size = @sizeOf(*FetchQuery),
+            },
+        }
+    );
+
+    return new_query;
+}
+//@}
+
 export fn cleanup(
 ) void 
 {
@@ -153,6 +229,9 @@ export fn cleanup(
     {
         clean_fn();
     }
+
+    // Shutdown sokol-fetch
+    sfetch.shutdown();
 
     simgui.shutdown();
     zgui.deinit();
@@ -207,6 +286,16 @@ pub fn sokol_main(
 ) void 
 {
     STATE.app = app_in;
+
+    // Setup sokol-fetch
+    sfetch.setup(
+        .{
+            // @TODO: experiment with these settings
+            .max_requests = 4,
+            .num_channels = 1,
+            .num_lanes = 2,
+        }
+    );
 
     sapp.run(
         .{
