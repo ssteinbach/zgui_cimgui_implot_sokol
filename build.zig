@@ -57,6 +57,14 @@ pub fn build(
         },
     );
 
+    const dep_imanim = b.dependency(
+        "imanim",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+
     // inject the cimgui header search path into the sokol C library compile step
     dep_sokol.artifact("sokol_clib").addIncludePath(
         dep_cimgui.path(cimgui_conf.include_dir)
@@ -117,6 +125,7 @@ pub fn build(
             .files = &.{
                  "zgui.cpp",
                  "zplot.cpp",
+                 "zanim.cpp",
             },
             .flags = &cflags,
         },
@@ -137,6 +146,19 @@ pub fn build(
     );
     lib_imgui.addIncludePath(
         dep_implot.path("implot.h").dirname(),
+    );
+    lib_imgui.addIncludePath(
+        dep_imanim.path("im_anim.h").dirname(),
+    );
+
+    lib_imgui.addCSourceFiles(
+        .{
+            .root = dep_imanim.path("."),
+            .files = &.{
+                "im_anim.cpp",
+            },
+            .flags = &cflags,
+        },
     );
 
     mod_ziis.linkLibrary(lib_cimgui);

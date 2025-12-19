@@ -6,6 +6,7 @@ const builtin = @import("builtin");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
 const zplot = zgui.plot;
+const zanim = ziis.zanim;
 const sg = ziis.sokol.gfx;
 const app_wrapper = ziis.app_wrapper;
 
@@ -46,6 +47,10 @@ const STATE = struct {
     // big text example (this source file)
     var big_text_query: *app_wrapper.FetchQuery = undefined;
     var big_text_example: []const u8 = undefined;
+
+    // Animation demo state
+    var anim_target_value: f32 = 0.0;
+    var anim_target_pos: [2]f32 = .{ 50, 50 };
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -207,6 +212,10 @@ fn draw_pie_chart(
 fn draw(
 ) !void
 {
+    // Update animations each frame
+    zanim.updateBeginFrame();
+    zanim.clipUpdate(@floatCast(ziis.sokol.app.frameDuration()));
+
     const vp = zgui.getMainViewport();
     const size = vp.getSize();
 
@@ -968,6 +977,91 @@ fn draw(
                     }
                 }
 
+            if (zgui.beginTabItem("Animation Example", .{}))
+            {
+                defer zgui.endTabItem();
+
+                if (
+                    zgui.beginChild(
+                        "Animation Demo",
+                        .{ .w = -1, .h = -1 },
+                    )
+                )
+                {
+                    defer zgui.endChild();
+
+                    zgui.text("ImAnim Minimal MVP Demo", .{});
+                    zgui.separator();
+
+                    // Animated float demo
+                    _ = zgui.sliderFloat(
+                        "Target Value",
+                        .{
+                            .v = &STATE.anim_target_value,
+                            .min = 0.0,
+                            .max = 100.0,
+                        },
+                    );
+
+                    const animated_value = zanim.tweenFloat(
+                        .{
+                            .id = zgui.getStrIdZ("float_demo"),
+                            .target = STATE.anim_target_value,
+                            .duration = 0.5,
+                            .ease = .out_cubic,
+                            .dt = @floatCast(ziis.sokol.app.frameDuration()),
+                        },
+                    );
+
+                    zgui.text(
+                        "Animated Value: {d:.2}",
+                        .{animated_value},
+                    );
+                    zgui.progressBar(
+                        .{
+                            .fraction = animated_value / 100.0,
+                            .w = -1,
+                            .h = 0,
+                        },
+                    );
+
+                    zgui.separator();
+
+                    // Animated position demo
+                    if (zgui.button("Move to Random Position", .{}))
+                    {
+                        const rand = std.crypto.random;
+                        STATE.anim_target_pos = .{
+                            @as(f32, @floatFromInt(rand.intRangeAtMost(u32, 0, 200))),
+                            @as(f32, @floatFromInt(rand.intRangeAtMost(u32, 0, 200))),
+                        };
+                    }
+
+                    const animated_pos = zanim.tweenVec2(
+                        .{
+                            .id = zgui.getStrIdZ("pos_demo"),
+                            .target = STATE.anim_target_pos,
+                            .duration = 0.8,
+                            .ease = .in_out_cubic,
+                            .dt = @floatCast(ziis.sokol.app.frameDuration()),
+                        },
+                    );
+
+                    const dl = zgui.getWindowDrawList();
+                    const cursor_pos = zgui.getCursorScreenPos();
+                    dl.addCircleFilled(
+                        .{
+                            .p = .{
+                                cursor_pos[0] + animated_pos[0],
+                                cursor_pos[1] + animated_pos[1],
+                            },
+                            .r = 10,
+                            .col = 0xFF00FF00,
+                        },
+                    );
+
+                    zgui.dummy(.{ .w = 250, .h = 250 });
+                }
             }
         }
     }

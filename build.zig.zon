@@ -22,6 +22,10 @@
             .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#1dbc411ff56ba14181b640714e77b7297d850919",
             .hash = "do_undo_journal-1.0.0-1UllC4VrAACW9W1bVNXnDJPJqrQax5a02ubMqNpgESvd",
         },
+        .imanim = .{
+            .url = "git+https://github.com/soufianekhiat/ImAnim.git#36e7de65590389076a32e1be57edbd1fd447b768",
+            .hash = "N-V-__8AAOElFQD5vVQ3ksL0HaJgPfojklqg49qhJtWVZuBj",
+        },
     },
 
     .paths = .{
