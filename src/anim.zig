@@ -174,3 +174,14 @@ extern fn zguiAnim_TweenInt(
     policy: Policy,
     dt: f32,
 ) i32;
+
+//--------------------------------------------------------------------------------------------------
+// Demo and Inspector Windows
+//--------------------------------------------------------------------------------------------------
+/// Show comprehensive demo window with all ImAnim features
+pub const showDemoWindow = zguiAnim_ShowDemoWindow;
+extern fn zguiAnim_ShowDemoWindow() void;
+
+/// Show unified inspector (debug window + animation inspector)
+pub const showUnifiedInspector = zguiAnim_ShowUnifiedInspector;
+extern fn zguiAnim_ShowUnifiedInspector(p_open: ?*bool) void;

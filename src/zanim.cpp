@@ -10,6 +10,9 @@
 #define ZGUI_API
 #endif
 
+// Forward declaration for demo window (defined in im_anim_demo.cpp)
+extern void ImAnimDemoWindow();
+
 //--------------------------------------------------------------------------------------------------
 //
 // ImAnim
@@ -90,5 +93,15 @@ extern "C"
     {
         iam_ease_desc ease_desc = iam_ease_preset(ease);
         return iam_tween_int(id, channel_id, target, duration, ease_desc, policy, dt);
+    }
+
+    ZGUI_API void zguiAnim_ShowDemoWindow(void)
+    {
+        ImAnimDemoWindow();
+    }
+
+    ZGUI_API void zguiAnim_ShowUnifiedInspector(bool *p_open)
+    {
+        iam_show_unified_inspector(p_open);
     }
 }

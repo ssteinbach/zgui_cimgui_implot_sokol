@@ -23,6 +23,7 @@ const STATE = struct {
     var f: f32 = 0;
     var demo_window_gui = false;
     var demo_window_plot = false;
+    var demo_window_anim = false;
     const TEX_DIM : [2]i32 = .{ 256, 256 };
     const COLOR_CHANNELS:usize = 4;
     var tex: sg.Image = .{};
@@ -331,21 +332,29 @@ fn draw(
         }
 
         if (zgui.button("show gui demo", .{}) )
-        { 
-            STATE.demo_window_gui = ! STATE.demo_window_gui; 
+        {
+            STATE.demo_window_gui = ! STATE.demo_window_gui;
         }
         if (zgui.button("show plot demo", .{}))
         {
-            STATE.demo_window_plot = ! STATE.demo_window_plot; 
+            STATE.demo_window_plot = ! STATE.demo_window_plot;
+        }
+        if (zgui.button("show anim demo", .{}))
+        {
+            STATE.demo_window_anim = ! STATE.demo_window_anim;
         }
 
-        if (STATE.demo_window_gui) 
+        if (STATE.demo_window_gui)
         {
             zgui.showDemoWindow(&STATE.demo_window_gui);
         }
-        if (STATE.demo_window_plot) 
+        if (STATE.demo_window_plot)
         {
             zplot.showDemoWindow(&STATE.demo_window_plot);
+        }
+        if (STATE.demo_window_anim)
+        {
+            zanim.showDemoWindow();
         }
 
         if (zgui.beginTabBar("Panes", .{}))

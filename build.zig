@@ -156,6 +156,7 @@ pub fn build(
             .root = dep_imanim.path("."),
             .files = &.{
                 "im_anim.cpp",
+                "im_anim_demo.cpp",
             },
             .flags = &cflags,
         },
