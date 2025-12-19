@@ -1065,6 +1065,8 @@ fn draw(
             }
         }
     }
+
+    }
 }
 
 fn cleanup (
