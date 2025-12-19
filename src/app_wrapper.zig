@@ -55,7 +55,7 @@ export fn init(
     simgui.setup(
         .{
             // max out the vertex buffer... might be overkill
-            .max_vertices = if (IS_WASM) 64 * 1024 else 1024 * 1024,
+            .max_vertices = STATE.app.max_vertices,
             .logger = .{ .func = sokol.log.func }, 
         },
     );
@@ -328,6 +328,7 @@ const SokolApp = struct {
     /// escape key which quits the app
     event: *const fn (ev: [*c]const sapp.Event) callconv(.c) void = &event,
 
+    max_vertices: i32 =  if (IS_WASM) 64 * 1024 else 1024 * 1024,
 };
 
 pub fn sokol_main(
