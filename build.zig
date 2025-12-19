@@ -308,9 +308,35 @@ pub fn build_wasm(
             ),
         },
     );
-    // attach to default target
-    outer_builder.getInstallStep().dependOn(&link_step.step);
-    // ...and a special run step to start the web build output via 'emrun'
+
+    // Builds an Install and Run target for this app_name
+    ///////////////////////////////////////////////////////////////////////////
+
+    // install step
+
+    var buf:[1024]u8 = undefined;
+    const install_name = try std.fmt.bufPrint(
+        &buf,
+        "install-{s}",
+        .{opts.app_name}
+    );
+    const install_desc = try std.fmt.bufPrint(
+        buf[install_name.len..],
+        "Install {s} WASM artifact without running.",
+        .{opts.app_name}
+    );
+
+    const install_step = outer_builder.step(
+        install_name,
+        install_desc,
+    );
+    install_step.dependOn(&link_step.step);
+
+    // attach to default install target
+    outer_builder.getInstallStep().dependOn(install_step);
+
+    // Run step
+
     const run = sokol.emRunStep(
         outer_builder,
         .{
@@ -318,23 +344,22 @@ pub fn build_wasm(
             .emsdk = dep_emsdk,
         },
     );
-    run.step.dependOn(&link_step.step);
+    run.step.dependOn(install_step);
 
-    var buf:[1024]u8 = undefined;
-    const name = try std.fmt.bufPrint(
+    const run_name = try std.fmt.bufPrint(
         &buf,
         "run-{s}",
         .{opts.app_name}
     );
-    const desc = try std.fmt.bufPrint(
-        buf[name.len..],
+    const run_desc = try std.fmt.bufPrint(
+        buf[run_name.len..],
         "Run {s} as a wasm build.",
         .{opts.app_name}
     );
 
     outer_builder.step(
-        name,
-        desc,
+        run_name,
+        run_desc,
     ).dependOn(&run.step);
 
     return &run.step;
