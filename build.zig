@@ -306,6 +306,12 @@ pub fn build_wasm(
             .shell_file_path = dep_sokol.path(
                 "src/sokol/web/shell.html",
             ),
+            .extra_args = &.{
+                "-sINITIAL_MEMORY=134217728",  // 128MB initial memory
+                "-sMAXIMUM_MEMORY=268435456",   // 256MB maximum memory
+                "-sALLOW_MEMORY_GROWTH=1",      // Allow memory to grow
+                "-sSTACK_SIZE=5242880",         // 5MB stack size
+            },
         },
     );
 
