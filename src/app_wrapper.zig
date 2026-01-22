@@ -173,7 +173,7 @@ pub const FetchError = struct
 /// Encapsulates a query for a resource, can work remotely or locally
 pub const FetchQuery = struct {
     /// Buffer used for internal query stuff.
-    buffer: [10 * 1024 * 1024]u8,
+    buffer: [15 * 1024 * 1024]u8,
 
     /// Handle to sokol.fetch query.
     handle: sfetch.Handle,
