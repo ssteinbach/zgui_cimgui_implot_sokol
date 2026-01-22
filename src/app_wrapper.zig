@@ -150,10 +150,30 @@ export fn frame(
 }
 
 //@{ fetch code
+
+/// State of the fetch operation, loading, failed, etc.
+pub const FetchState = enum
+{
+    loading,
+    loaded,
+    failed,
+};
+
+/// Details about a fetch error
+pub const FetchError = struct
+{
+    /// Error code from sokol-fetch
+    error_code: sfetch.Error,
+    /// Path that was requested (up to 256 chars)
+    path: [256]u8,
+    /// Length of valid path bytes
+    path_len: usize,
+};
+
 /// Encapsulates a query for a resource, can work remotely or locally
 pub const FetchQuery = struct {
     /// Buffer used for internal query stuff.
-    buffer: [1024 * 1024]u8,
+    buffer: [10 * 1024 * 1024]u8,
 
     /// Handle to sokol.fetch query.
     handle: sfetch.Handle,
@@ -167,26 +187,71 @@ pub const FetchQuery = struct {
     /// Data read from the target.
     data: []const u8,
 
+    /// Error details when state == .failed (null if no error or still loading)
+    maybe_error: ?FetchError,
+
     /// Alias for query callback functions
     pub const CallbackFn = (
         *const fn (*FetchQuery) error{CallbackError}!void
     );
 
-    /// State of the fetch operation, loading, failed, etc.
-    const FetchState = enum
+    /// Get error code as string
+    pub fn getErrorCode(
+        self: *const FetchQuery,
+    ) []const u8
     {
-        loading,
-        loaded,
-        failed,
-    };
+        if (self.maybe_error)
+            |err|
+        {
+            return @tagName(err.error_code);
+        }
+        return "";
+    }
+
+    /// Get human-readable error message
+    pub fn getErrorMessage(
+        self: *const FetchQuery,
+    ) []const u8
+    {
+        if (self.maybe_error)
+            |err|
+        {
+            return switch (err.error_code)
+            {
+                .NO_ERROR => "No error",
+                .FILE_NOT_FOUND => "File not found or could not be opened",
+                .NO_BUFFER => "No buffer provided for fetch",
+                .BUFFER_TOO_SMALL => "Buffer too small for file content",
+                .UNEXPECTED_EOF => "Unexpected end of file",
+                .INVALID_HTTP_STATUS => "Invalid HTTP status (non-2xx response)",
+                .CANCELLED => "Fetch was cancelled",
+                .JS_OTHER => "JavaScript error (check browser console)",
+            };
+        }
+        return "";
+    }
+
+    /// Get the path that failed
+    pub fn getErrorPath(
+        self: *const FetchQuery,
+    ) []const u8
+    {
+        if (self.maybe_error)
+            |*err|
+        {
+            return err.path[0..err.path_len];
+        }
+        return "";
+    }
 
     /// Default configuration for when data is to be loaded.
-    pub const loading = FetchQuery {
+    pub const loading = FetchQuery{
         .buffer = undefined,
         .handle = .{},
         .state = .loading,
-        .maybe_callback= null,
+        .maybe_callback = null,
         .data = undefined,
+        .maybe_error = null,
     };
 };
 
@@ -217,6 +282,29 @@ fn unpack_callback(
     if (resp.failed == true or resp.fetched != true)
     {
         fetch_query.state = .failed;
+
+        // Capture error details
+        var error_info = FetchError{
+            .error_code = resp.error_code,
+            .path = undefined,
+            .path_len = 0,
+        };
+
+        // Copy path if available
+        if (resp.path != null)
+        {
+            const path_slice = std.mem.span(resp.path);
+            const copy_len = @min(path_slice.len, error_info.path.len);
+            @memcpy(error_info.path[0..copy_len], path_slice[0..copy_len]);
+            error_info.path_len = copy_len;
+        }
+
+        fetch_query.maybe_error = error_info;
+
+        std.log.err("Fetch failed for '{s}': {s}", .{
+            fetch_query.getErrorPath(),
+            fetch_query.getErrorCode(),
+        });
         return;
     }
 

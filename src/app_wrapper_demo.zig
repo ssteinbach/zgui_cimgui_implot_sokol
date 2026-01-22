@@ -46,6 +46,20 @@ const STATE = struct {
     // big text example (this source file)
     var big_text_query: *app_wrapper.FetchQuery = undefined;
     var big_text_example: []const u8 = undefined;
+
+    // Threading demo state
+    var thread_counter: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+    var threads_spawned: u32 = 0;
+    var thread_task_queue: ziis.TaskQueue(*std.atomic.Value(u32)) = undefined;
+    var task_queue_initialized: bool = false;
+    var auto_process_tasks: bool = false; // Control auto-processing
+
+    // Web Worker demo state (WASM only)
+    var worker_pool_initialized: bool = false;
+    var maybe_worker_pool: ?ziis.worker_pool.WorkerPool = null;
+    var worker_counter: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+    var worker_jobs_submitted: u32 = 0;
+    var worker_jobs_completed: u32 = 0;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -892,6 +906,23 @@ fn draw(
                                 "Failed to load example.json via sokol.fetch",
                                 .{},
                             );
+
+                            if (STATE.json_fetch_query.maybe_error != null)
+                            {
+                                zgui.text(
+                                    "  Error: {s}",
+                                    .{STATE.json_fetch_query.getErrorMessage()},
+                                );
+                                zgui.text(
+                                    "  Code: {s}",
+                                    .{STATE.json_fetch_query.getErrorCode()},
+                                );
+                                zgui.text(
+                                    "  Path: {s}",
+                                    .{STATE.json_fetch_query.getErrorPath()},
+                                );
+                            }
+
                             zgui.popStyleColor(.{});
                         },
                         .loading => {
@@ -960,14 +991,256 @@ fn draw(
 
                         zgui.textUnformatted(TEXT);
                     },
-                    else => {
-                        zgui.text(
-                            "Load state of big data: {s}", 
-                            .{ @tagName(STATE.big_text_query.state) },
+                    .failed => {
+                        zgui.pushStyleColor4f(
+                            .{
+                                .idx = .text,
+                                .c = .{ 1.0, 0.0, 0.0, 1.0 },
+                            },
                         );
+                        zgui.text(
+                            "Failed to load big text file",
+                            .{},
+                        );
+
+                        if (STATE.big_text_query.maybe_error != null)
+                        {
+                            zgui.text(
+                                "  Error: {s}",
+                                .{STATE.big_text_query.getErrorMessage()},
+                            );
+                            zgui.text(
+                                "  Code: {s}",
+                                .{STATE.big_text_query.getErrorCode()},
+                            );
+                            zgui.text(
+                                "  Path: {s}",
+                                .{STATE.big_text_query.getErrorPath()},
+                            );
+                        }
+
+                        zgui.popStyleColor(.{});
+                    },
+                    .loading => {
+                        zgui.text(
+                            "Loading big data...",
+                            .{},
+                        );
+                    },
+                }
+
+            }
+
+            // Threading Demo Tab
+            if (zgui.beginTabItem("Threading Demo", .{}))
+            {
+                defer zgui.endTabItem();
+
+                zgui.separatorText("Platform-Agnostic Threading Demo");
+
+                // Initialize task queue on first use
+                if (!STATE.task_queue_initialized)
+                {
+                    STATE.thread_task_queue = ziis.TaskQueue(
+                        *std.atomic.Value(u32)
+                    ).init(allocator);
+                    STATE.task_queue_initialized = true;
+                }
+
+                const HAS_THREADS = ziis.thread.HAS_THREADS;
+                const IS_WASM_TARGET = ziis.thread.IS_WASM;
+
+                zgui.text("Platform: {s}", .{
+                    if (IS_WASM_TARGET) "WASM (Emscripten)"
+                    else "Native"
+                });
+                zgui.text("Threading: {s}", .{
+                    if (HAS_THREADS) "True Multithreading (std.Thread)"
+                    else "Synchronous Fallback"
+                });
+
+                zgui.spacing();
+                zgui.separator();
+                zgui.spacing();
+
+                // Counter display
+                const current_count = STATE.thread_counter.load(.seq_cst);
+                zgui.text("Counter Value: {d}", .{current_count});
+                zgui.text("Threads/Tasks Spawned: {d}", .{STATE.threads_spawned});
+                zgui.text("Pending Tasks in Queue: {d}", .{
+                    STATE.thread_task_queue.pending()
+                });
+
+                zgui.spacing();
+
+                // Spawn thread button
+                if (zgui.button("Spawn Thread (adds 100)", .{}))
+                {
+                    if (HAS_THREADS)
+                    {
+                        // True multithreading
+                        if (ziis.Thread.spawn(
+                            .{},
+                            struct {
+                                fn work(counter: *std.atomic.Value(u32)) void {
+                                    var i: u32 = 0;
+                                    while (i < 100) : (i += 1)
+                                    {
+                                        _ = counter.fetchAdd(1, .seq_cst);
+                                    }
+                                }
+                            }.work,
+                            .{&STATE.thread_counter},
+                        )) |t|
+                        {
+                            t.detach();
+                            STATE.threads_spawned += 1;
+                        }
+                        else |err|
+                        {
+                            std.log.err("Failed to spawn thread: {any}", .{err});
+                        }
+                    }
+                    else
+                    {
+                        // WASM: executes synchronously
+                        _ = ziis.Thread.spawn(
+                            .{},
+                            struct {
+                                fn work(counter: *std.atomic.Value(u32)) void {
+                                    var i: u32 = 0;
+                                    while (i < 100) : (i += 1)
+                                    {
+                                        _ = counter.fetchAdd(1, .seq_cst);
+                                    }
+                                }
+                            }.work,
+                            .{&STATE.thread_counter},
+                        ) catch {};
+                        STATE.threads_spawned += 1;
                     }
                 }
 
+                if (zgui.isItemHovered(.{}) and zgui.beginItemTooltip())
+                {
+                    defer zgui.endTooltip();
+                    zgui.text(
+                        if (HAS_THREADS)
+                            "Spawns a real thread that increments counter"
+                        else
+                            "Executes synchronously (no true threading on WASM)",
+                        .{},
+                    );
+                }
+
+                zgui.sameLine(.{});
+
+                // Add to task queue button
+                if (zgui.button("Add to Task Queue (adds 1)", .{}))
+                {
+                    STATE.thread_task_queue.enqueue(.{
+                        .context = &STATE.thread_counter,
+                        .work = struct {
+                            fn work(counter: *std.atomic.Value(u32)) void {
+                                _ = counter.fetchAdd(1, .seq_cst);
+                            }
+                        }.work,
+                    }) catch {};
+                    STATE.threads_spawned += 1;
+                }
+
+                if (zgui.isItemHovered(.{}) and zgui.beginItemTooltip())
+                {
+                    defer zgui.endTooltip();
+                    zgui.text("Adds task to queue (processed per-frame)", .{});
+                }
+
+                zgui.spacing();
+
+                if (zgui.button("Process One Task", .{}))
+                {
+                    _ = STATE.thread_task_queue.processOne();
+                }
+
+                zgui.sameLine(.{});
+
+                if (zgui.button("Process All Tasks", .{}))
+                {
+                    _ = STATE.thread_task_queue.processAll();
+                }
+
+                zgui.spacing();
+
+                _ = zgui.checkbox("Auto-process tasks each frame", .{
+                    .v = &STATE.auto_process_tasks
+                });
+
+                zgui.spacing();
+
+                if (zgui.button("Reset Counter", .{}))
+                {
+                    STATE.thread_counter.store(0, .seq_cst);
+                    STATE.threads_spawned = 0;
+                }
+
+                zgui.spacing();
+                zgui.separator();
+                zgui.spacing();
+
+                zgui.textWrapped(
+                    \\This demo shows platform-agnostic threading:
+                    \\
+                    \\• Native builds use real threads (std.Thread)
+                    \\• WASM builds use synchronous fallback
+                    \\• TaskQueue provides cooperative multitasking
+                    \\  that works on all platforms
+                    \\
+                    \\The Thread abstraction makes code portable
+                    \\between native and web targets!
+                    \\
+                    \\TIP: Uncheck auto-process to see tasks accumulate!
+                    ,
+                    .{},
+                );
+
+                // Auto-process one task per frame if enabled
+                if (STATE.auto_process_tasks) {
+                    _ = STATE.thread_task_queue.processOne();
+                }
+            }
+
+            // Web Worker Pool Demo Tab (WASM only)
+            // NOTE: Currently disabled due to EM_JS linking issues with Zig build system
+            // The worker pool implementation is complete but needs the build system
+            // to properly handle EM_JS JavaScript extraction from C objects
+            if (false and IS_WASM and zgui.beginTabItem("Web Worker Pool", .{}))
+            {
+                defer zgui.endTabItem();
+
+                zgui.separatorText("Web Worker Pool Demo (Coming Soon)");
+
+                zgui.textWrapped(
+                    \\The Web Worker Pool implementation is complete!
+                    \\
+                    \\However, there's a known issue with linking EM_JS
+                    \\functions when using the Zig build system. The EM_JS
+                    \\macros in worker_js_interop.c generate JavaScript that
+                    \\needs special handling by emcc.
+                    \\
+                    \\To use the Worker Pool:
+                    \\• See worker_pool_full.zig for the API
+                    \\• See IMPLEMENTATION_STATUS.md for details
+                    \\• See WEBWORKER_PROJECT.md for the full spec
+                    \\
+                    \\The implementation includes:
+                    \\• 4 Web Workers running in parallel
+                    \\• Message passing (no SharedArrayBuffer needed)
+                    \\• 30 second timeout per work item
+                    \\• Automatic worker health monitoring
+                    \\• Context serialization for POD types
+                    ,
+                    .{},
+                );
             }
         }
     }
@@ -993,6 +1266,22 @@ fn cleanup (
     {
         definitely_journal.deinit();
     }
+
+    // Clean up threading demo resources
+    if (STATE.task_queue_initialized)
+    {
+        STATE.thread_task_queue.deinit();
+    }
+
+    // Clean up worker pool resources
+    // NOTE: Disabled due to EM_JS linking issues
+    // if (STATE.worker_pool_initialized)
+    // {
+    //     if (STATE.maybe_worker_pool) |*pool| {
+    //         pool.deinit();
+    //     }
+    // }
+    _ = STATE.worker_pool_initialized; // Suppress unused warning
 
     if (IS_WASM == false)
     {

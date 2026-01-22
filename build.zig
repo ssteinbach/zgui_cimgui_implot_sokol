@@ -142,6 +142,34 @@ pub fn build(
     mod_ziis.linkLibrary(lib_cimgui);
     mod_ziis.linkLibrary(lib_imgui);
 
+    // Web Worker C interop library (WASM only)
+    const lib_worker_interop = b.addLibrary(
+        .{
+            .linkage = .static,
+            .name = "worker_interop",
+            .root_module = b.createModule(
+                .{
+                    .target = target,
+                    .optimize = optimize,
+                    .link_libc = true,
+                },
+            ),
+        }
+    );
+
+    // Only add worker interop for WASM targets
+    if (target.result.cpu.arch.isWasm()) {
+        lib_worker_interop.addCSourceFiles(
+            .{
+                .root = b.path("src"),
+                .files = &.{
+                    "worker_js_interop.c",
+                },
+                .flags = &cflags,
+            },
+        );
+    }
+
     // main module with sokol and cimgui imports
     const mod_app_wrapper = b.createModule(
         .{
@@ -163,6 +191,69 @@ pub fn build(
         "Check if everything compiles",
     );
 
+    // Unit tests step
+    const test_step = b.step(
+        "test",
+        "Run unit tests",
+    );
+
+    // For WASM, zig test doesn't work (test runner needs POSIX)
+    // Just ensure thread.zig compiles as a library
+    if (target.result.cpu.arch.isWasm())
+    {
+        const wasm_thread_lib = b.addLibrary(
+            .{
+                .name = "thread_wasm_check",
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/thread.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                }),
+            },
+        );
+        check_step.dependOn(&wasm_thread_lib.step);
+    }
+    else
+    {
+        // Native: run full tests
+        const test_mod = b.createModule(
+            .{
+                .root_source_file = b.path("src/thread_test.zig"),
+                .target = target,
+                .optimize = optimize,
+            },
+        );
+
+        const unit_tests = b.addTest(
+            .{
+                .root_module = test_mod,
+            },
+        );
+        test_step.dependOn(&b.addRunArtifact(unit_tests).step);
+
+        // app_wrapper tests
+        const app_wrapper_test_mod = b.createModule(
+            .{
+                .root_source_file = b.path("src/app_wrapper_test.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{
+                        .name = "sokol",
+                        .module = dep_sokol.module("sokol"),
+                    },
+                },
+            },
+        );
+
+        const app_wrapper_tests = b.addTest(
+            .{
+                .root_module = app_wrapper_test_mod,
+            },
+        );
+        test_step.dependOn(&b.addRunArtifact(app_wrapper_tests).step);
+    }
+
     // Dispatch to build function based on target
     ///////////////////////////////////////////////////////////////////////////
 
@@ -180,6 +271,7 @@ pub fn build(
                 .dep_c_libs = &.{
                     lib_cimgui,
                     lib_imgui,
+                    // lib_worker_interop, // Disabled: EM_JS linking issue
                 },
             },
         );
@@ -198,6 +290,15 @@ pub fn build(
                 b.addInstallFile(
                     b.path("src/app_wrapper_demo.zig"),
                     "web/src/app_wrapper_demo.zig",
+                ).step
+            )
+        );
+        // install worker harness JavaScript
+        run_step.dependOn(
+            &(
+                b.addInstallFile(
+                    b.path("src/worker_js_harness.js"),
+                    "web/worker_js_harness.js",
                 ).step
             )
         );
@@ -228,7 +329,7 @@ fn build_native(
     check_step.dependOn(&exe.step);
     b.installArtifact(exe);
     var run_step = b.step(
-        "run",
+        "run-demo",
         "Run demo"
     );
 
@@ -257,6 +358,11 @@ pub fn build_wasm(
             .root_module = opts.mod_main,
         },
     );
+
+    // Link all C libraries to main app
+    for (opts.dep_c_libs) |lib| {
+        main_app.linkLibrary(lib);
+    }
 
     const dep_sokol = opts.dep_ziis_builder.dependency(
         "sokol",
@@ -311,6 +417,8 @@ pub fn build_wasm(
                 "-sMAXIMUM_MEMORY=268435456",   // 256MB maximum memory
                 "-sALLOW_MEMORY_GROWTH=1",      // Allow memory to grow
                 "-sSTACK_SIZE=5242880",         // 5MB stack size
+                "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free']",  // Export standard functions
+                "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",  // Export runtime methods for JS interop
             },
         },
     );
