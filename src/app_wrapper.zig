@@ -186,7 +186,7 @@ pub const FetchQuery = struct
 {
     // @TODO: use a dynamic buffer allocation rather than a fixed size
     /// Buffer used for internal query stuff.
-    buffer: [10 * 1024 * 1024]u8,
+    buffer: [15 * 1024 * 1024]u8,
 
     /// Handle to sokol.fetch query.
     handle: sfetch.Handle,
@@ -218,7 +218,7 @@ pub const FetchQuery = struct
     );
 
     /// Get error code as string
-    pub fn getErrorCode(
+    pub fn get_error_name(
         self: *const FetchQuery,
     ) []const u8
     {
@@ -431,6 +431,8 @@ fn unpack_callback(
     var fetch_query = query_from_response(response);
     const raw_data = @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size];
 
+    std.debug.print("unpacking callback...\n", .{});
+
     if (resp.failed == true or resp.fetched != true)
     {
         fetch_query.state = .failed;
@@ -441,6 +443,8 @@ fn unpack_callback(
             .path = undefined,
             .path_len = 0,
         };
+
+        std.debug.print("buffer size: {d}\n", .{fetch_query.buffer.len});
 
         // Copy path if available
         if (resp.path != null)
@@ -455,15 +459,19 @@ fn unpack_callback(
 
         std.log.err("Fetch failed for '{s}': {s}", .{
             fetch_query.get_error_path(),
-            fetch_query.getErrorCode(),
+            fetch_query.get_error_name(),
         });
         return;
     }
 
+
     // Handle decompression based on compression mode
     const should_decompress = switch (fetch_query.compression)
     {
-        .none => false,
+        .none => blk: {
+            std.debug.print("Not decompressing in sokol fetch\n", .{});
+            break :blk false;
+        },
         .gzip => true,
         .auto_detect => blk: {
             // Check magic bytes first, then fall back to extension
@@ -526,7 +534,7 @@ fn unpack_callback(
 pub const FetchOptions = struct
 {
     /// Path to the resource to load
-    path: []const u8,
+    path: [:0]const u8,
     /// Optional callback that is called when fetch is done
     maybe_callback: ?FetchQuery.CallbackFn = null,
     /// Compression handling mode (default: none for backward compatibility)
@@ -551,10 +559,11 @@ pub fn fetch_resource(
     new_query.decompressed_buffer = null;
 
     // Send fetch request
-    // Note: user_data will copy the pointer value itself (8 bytes), not the whole FetchQuery struct
+    // Note: user_data will copy the pointer value itself (8 bytes), not the
+    // whole FetchQuery struct
     new_query.*.handle = sfetch.send(
         .{
-            .path = @ptrCast(options.path),
+            .path = options.path,
             .callback = unpack_callback,
             .buffer = .{
                 .ptr = &new_query.buffer,
@@ -580,9 +589,11 @@ pub fn fetch_resource(
 pub fn fetch_resource_from_path(
     allocator: std.mem.Allocator,
     /// Path to the resource to load.
-    path: []const u8,
+    path: [:0]const u8,
     /// optional callback that is called when fetch is done
     maybe_callback: ?FetchQuery.CallbackFn,
+    /// whether or not to handle the gzipping on the sokol side
+    compression: Compression,
 ) !*FetchQuery
 {
     return fetch_resource(
@@ -590,7 +601,7 @@ pub fn fetch_resource_from_path(
         .{
             .path = path,
             .maybe_callback = maybe_callback,
-            .compression = .none,
+            .compression = compression,
         },
     );
 }

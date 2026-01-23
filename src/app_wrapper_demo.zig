@@ -972,7 +972,7 @@ fn draw(
                                 );
                                 zgui.text(
                                     "  Code: {s}",
-                                    .{STATE.json_fetch_query.getErrorCode()},
+                                    .{STATE.json_fetch_query.get_error_name()},
                                 );
                                 zgui.text(
                                     "  Path: {s}",
@@ -1068,7 +1068,7 @@ fn draw(
                             );
                             zgui.text(
                                 "  Code: {s}",
-                                .{STATE.big_text_query.getErrorCode()},
+                                .{STATE.big_text_query.get_error_name()},
                             );
                             zgui.text(
                                 "  Path: {s}",
@@ -1627,6 +1627,7 @@ pub fn init(
         allocator,
         "example.json",
         json_parsing_callback,
+        .none,
     ) catch {
         std.log.err(
             "Unable to fetch data: {s}",
@@ -1639,6 +1640,7 @@ pub fn init(
         allocator,
         "src/app_wrapper_demo.zig",
         null,
+        .none,
     ) catch {
         std.log.err(
             "Unable to fetch data: {s}",
