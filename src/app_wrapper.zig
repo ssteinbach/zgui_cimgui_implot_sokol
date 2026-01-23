@@ -159,6 +159,17 @@ pub const FetchState = enum
     failed,
 };
 
+/// Compression format for automatic decompression
+pub const Compression = enum
+{
+    /// No decompression (raw data)
+    none,
+    /// Gzip format (.gz files)
+    gzip,
+    /// Detect compression from file extension or magic bytes
+    auto_detect,
+};
+
 /// Details about a fetch error
 pub const FetchError = struct
 {
@@ -171,7 +182,8 @@ pub const FetchError = struct
 };
 
 /// Encapsulates a query for a resource, can work remotely or locally
-pub const FetchQuery = struct {
+pub const FetchQuery = struct
+{
     // @TODO: use a dynamic buffer allocation rather than a fixed size
     /// Buffer used for internal query stuff.
     buffer: [10 * 1024 * 1024]u8,
@@ -190,6 +202,15 @@ pub const FetchQuery = struct {
 
     /// Error details when state == .failed (null if no error or still loading)
     maybe_error: ?FetchError,
+
+    /// Compression mode for automatic decompression
+    compression: Compression,
+
+    /// Allocator for decompression buffer (needed for cleanup)
+    allocator: std.mem.Allocator,
+
+    /// Buffer for decompressed data (null if no decompression occurred)
+    decompressed_buffer: ?[]u8,
 
     /// Alias for query callback functions
     pub const CallbackFn = (
@@ -233,7 +254,7 @@ pub const FetchQuery = struct {
     }
 
     /// Get the path that failed
-    pub fn getErrorPath(
+    pub fn get_error_path(
         self: *const FetchQuery,
     ) []const u8
     {
@@ -245,6 +266,135 @@ pub const FetchQuery = struct {
         return "";
     }
 
+    /// Check if data has gzip magic bytes (0x1f 0x8b)
+    pub fn has_gzip_magic(
+        data: []const u8,
+    ) bool
+    {
+        return data.len >= 2 and data[0] == 0x1f and data[1] == 0x8b;
+    }
+
+    /// Check if path ends with .gz extension
+    pub fn has_gzip_extension(
+        path: []const u8,
+    ) bool
+    {
+        return std.mem.endsWith(u8, path, ".gz");
+    }
+
+    /// Decompress gzip data using std.compress.flate
+    pub fn decompress_gzip(
+        self: *FetchQuery,
+        compressed_data: []const u8,
+    ) ![]const u8
+    {
+        // Create an input reader from the compressed data
+        var input_reader = std.Io.Reader.fixed(compressed_data);
+
+        // Allocate window buffer for decompression (required by flate)
+        const window_buffer = self.allocator.alloc(
+            u8,
+            std.compress.flate.max_window_len,
+        ) catch
+            |err|
+        {
+            std.log.err("Failed to allocate decompression window: {any}", .{err});
+            return err;
+        };
+        defer self.allocator.free(window_buffer);
+
+        // Initialize the decompressor
+        var decomp = std.compress.flate.Decompress.init(
+            &input_reader,
+            .gzip,
+            window_buffer,
+        );
+
+        // Allocate output buffer - start with 4x compressed size as estimate
+        const initial_size = @max(compressed_data.len * 4, 4096);
+        var output = std.ArrayList(u8).initCapacity(
+            self.allocator,
+            initial_size,
+        ) catch
+            |err|
+        {
+            std.log.err("Failed to allocate output buffer: {any}", .{err});
+            return err;
+        };
+        errdefer output.deinit(self.allocator);
+
+        // Read decompressed data in chunks
+        var chunk_buf: [4096]u8 = undefined;
+        while (true)
+        {
+            // Use the reader's buffered method to get data
+            const buffered = decomp.reader.buffered();
+            if (buffered.len > 0)
+            {
+                output.appendSlice(self.allocator, buffered) catch
+                    |err|
+                {
+                    std.log.err("Failed to append decompressed data: {any}", .{err});
+                    return err;
+                };
+                decomp.reader.toss(buffered.len);
+            }
+            else
+            {
+                // Try to fill buffer
+                var writer = std.Io.Writer.fixed(&chunk_buf);
+                const n = decomp.reader.stream(
+                    &writer,
+                    .limited(chunk_buf.len),
+                ) catch
+                    |err|
+                {
+                    // EndOfStream means we're done
+                    if (err == error.EndOfStream)
+                    {
+                        break;
+                    }
+                    std.log.err("Decompression stream error: {any}", .{err});
+                    return err;
+                };
+
+                if (n == 0)
+                {
+                    break;
+                }
+
+                output.appendSlice(self.allocator, chunk_buf[0..n]) catch
+                    |err|
+                {
+                    std.log.err("Failed to append chunk: {any}", .{err});
+                    return err;
+                };
+            }
+        }
+
+        const owned = output.toOwnedSlice(self.allocator) catch
+            |err|
+        {
+            std.log.err("Failed to finalize output: {any}", .{err});
+            return err;
+        };
+        self.decompressed_buffer = owned;
+        return owned;
+    }
+
+    /// Free decompressed buffer if allocated
+    pub fn free_decompressed_buffer(
+        self: *FetchQuery,
+    ) void
+    {
+        if (self.decompressed_buffer)
+            |buf|
+        {
+            self.allocator.free(buf);
+            self.decompressed_buffer = null;
+        }
+    }
+
     /// Default configuration for when data is to be loaded.
     pub const loading = FetchQuery{
         .buffer = undefined,
@@ -253,6 +403,9 @@ pub const FetchQuery = struct {
         .maybe_callback = null,
         .data = undefined,
         .maybe_error = null,
+        .compression = .none,
+        .allocator = undefined,
+        .decompressed_buffer = null,
     };
 };
 
@@ -276,9 +429,7 @@ fn unpack_callback(
 {
     const resp = response.*;
     var fetch_query = query_from_response(response);
-    fetch_query.data = (
-        @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size]
-     );
+    const raw_data = @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size];
 
     if (resp.failed == true or resp.fetched != true)
     {
@@ -303,10 +454,60 @@ fn unpack_callback(
         fetch_query.maybe_error = error_info;
 
         std.log.err("Fetch failed for '{s}': {s}", .{
-            fetch_query.getErrorPath(),
+            fetch_query.get_error_path(),
             fetch_query.getErrorCode(),
         });
         return;
+    }
+
+    // Handle decompression based on compression mode
+    const should_decompress = switch (fetch_query.compression)
+    {
+        .none => false,
+        .gzip => true,
+        .auto_detect => blk: {
+            // Check magic bytes first, then fall back to extension
+            if (FetchQuery.has_gzip_magic(raw_data))
+            {
+                break :blk true;
+            }
+            if (resp.path != null)
+            {
+                const path_slice = std.mem.span(resp.path);
+                break :blk FetchQuery.has_gzip_extension(path_slice);
+            }
+            break :blk false;
+        },
+    };
+
+    if (should_decompress)
+    {
+        fetch_query.data = fetch_query.decompress_gzip(raw_data) catch
+            |err|
+        {
+            std.log.err("Decompression failed: {any}", .{err});
+            fetch_query.state = .failed;
+
+            // Set up error info for decompression failure
+            var error_info = FetchError{
+                .error_code = .JS_OTHER, // Reuse as generic error
+                .path = undefined,
+                .path_len = 0,
+            };
+            if (resp.path != null)
+            {
+                const path_slice = std.mem.span(resp.path);
+                const copy_len = @min(path_slice.len, error_info.path.len);
+                @memcpy(error_info.path[0..copy_len], path_slice[0..copy_len]);
+                error_info.path_len = copy_len;
+            }
+            fetch_query.maybe_error = error_info;
+            return;
+        };
+    }
+    else
+    {
+        fetch_query.data = raw_data;
     }
 
     if (fetch_query.maybe_callback)
@@ -321,28 +522,39 @@ fn unpack_callback(
     fetch_query.state = .loaded;
 }
 
+/// Options for fetching resources
+pub const FetchOptions = struct
+{
+    /// Path to the resource to load
+    path: []const u8,
+    /// Optional callback that is called when fetch is done
+    maybe_callback: ?FetchQuery.CallbackFn = null,
+    /// Compression handling mode (default: none for backward compatibility)
+    compression: Compression = .none,
+};
+
 /// Fetch resources from the webserver or from elsewhere.  returns a pointer to
 /// a FetchQuery object, which has the state and data read from the file (if
-/// the read was succesful)..
+/// the read was succesful).
 ///
 /// Caller owns the memory of the FetchQuery
-pub fn fetch_resource_from_path(
+pub fn fetch_resource(
     allocator: std.mem.Allocator,
-    /// Path to the resource to load.
-    path: []const u8,
-    /// optional callback that is called when fetch is done
-    maybe_callback: ?FetchQuery.CallbackFn,
+    options: FetchOptions,
 ) !*FetchQuery
 {
     const new_query = try allocator.create(FetchQuery);
     new_query.* = .loading;
-    new_query.maybe_callback = maybe_callback;
+    new_query.maybe_callback = options.maybe_callback;
+    new_query.compression = options.compression;
+    new_query.allocator = allocator;
+    new_query.decompressed_buffer = null;
 
-    // Send fetch request for example.json
+    // Send fetch request
     // Note: user_data will copy the pointer value itself (8 bytes), not the whole FetchQuery struct
     new_query.*.handle = sfetch.send(
         .{
-            .path = @ptrCast(path),
+            .path = @ptrCast(options.path),
             .callback = unpack_callback,
             .buffer = .{
                 .ptr = &new_query.buffer,
@@ -356,6 +568,31 @@ pub fn fetch_resource_from_path(
     );
 
     return new_query;
+}
+
+/// Fetch resources from the webserver or from elsewhere.  returns a pointer to
+/// a FetchQuery object, which has the state and data read from the file (if
+/// the read was succesful).
+///
+/// Caller owns the memory of the FetchQuery
+///
+/// Note: For gzip support, use `fetch_resource` with `FetchOptions` instead.
+pub fn fetch_resource_from_path(
+    allocator: std.mem.Allocator,
+    /// Path to the resource to load.
+    path: []const u8,
+    /// optional callback that is called when fetch is done
+    maybe_callback: ?FetchQuery.CallbackFn,
+) !*FetchQuery
+{
+    return fetch_resource(
+        allocator,
+        .{
+            .path = path,
+            .maybe_callback = maybe_callback,
+            .compression = .none,
+        },
+    );
 }
 //@}
 

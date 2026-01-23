@@ -976,7 +976,7 @@ fn draw(
                                 );
                                 zgui.text(
                                     "  Path: {s}",
-                                    .{STATE.json_fetch_query.getErrorPath()},
+                                    .{STATE.json_fetch_query.get_error_path()},
                                 );
                             }
 
@@ -1072,7 +1072,7 @@ fn draw(
                             );
                             zgui.text(
                                 "  Path: {s}",
-                                .{STATE.big_text_query.getErrorPath()},
+                                .{STATE.big_text_query.get_error_path()},
                             );
                         }
 
