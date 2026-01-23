@@ -12,9 +12,44 @@ const app_wrapper = ziis.app_wrapper;
 const cimgui = ziis.cimgui;
 
 /// Data read from the example json, designed to be displayed by Zplot
-const PieChartSliceData = struct {
+const PieChartSliceData = struct
+{
     label: [*:0]const u8,
     value: f64,
+};
+
+/// Context for sorting table rows
+const SortContext = struct
+{
+    column: i16,
+    ascending: bool,
+
+    /// Compare two TableRowData items based on the sort column and direction
+    pub fn lessThan(
+        ctx: SortContext,
+        a: STATE.TableRowData,
+        b: STATE.TableRowData,
+    ) bool
+    {
+        const result = switch (ctx.column)
+        {
+            // ID column
+            0 => std.math.order(a.id, b.id),
+            // Name column
+            1 => std.mem.order(u8, a.name, b.name),
+            // Quantity column
+            2 => std.math.order(a.quantity, b.quantity),
+            // Price column
+            3 => std.math.order(a.price, b.price),
+            // Default
+            else => .eq,
+        };
+
+        return if (ctx.ascending)
+            result == .lt
+        else
+            result == .gt;
+    }
 };
 
 /// State container
@@ -53,6 +88,28 @@ const STATE = struct {
     var thread_task_queue: ziis.TaskQueue(*std.atomic.Value(u32)) = undefined;
     var task_queue_initialized: bool = false;
     var auto_process_tasks: bool = false; // Control auto-processing
+
+    // Sortable table demo state
+    const TableRowData = struct
+    {
+        id: u32,
+        name: [:0]const u8,
+        quantity: i32,
+        price: f32,
+        is_active: bool,
+    };
+
+    // Sample data for the sortable table
+    var table_data = [_]TableRowData{
+        .{ .id = 1, .name = "Apples", .quantity = 150, .price = 1.25, .is_active = true },
+        .{ .id = 2, .name = "Bananas", .quantity = 200, .price = 0.75, .is_active = true },
+        .{ .id = 3, .name = "Cherries", .quantity = 50, .price = 4.50, .is_active = false },
+        .{ .id = 4, .name = "Dates", .quantity = 80, .price = 6.00, .is_active = true },
+        .{ .id = 5, .name = "Elderberries", .quantity = 25, .price = 8.99, .is_active = false },
+        .{ .id = 6, .name = "Figs", .quantity = 120, .price = 3.25, .is_active = true },
+        .{ .id = 7, .name = "Grapes", .quantity = 300, .price = 2.50, .is_active = true },
+        .{ .id = 8, .name = "Honeydew", .quantity = 45, .price = 5.00, .is_active = false },
+    };
 
     // Web Worker demo state (WASM only)
     var worker_pool_initialized: bool = false;
@@ -1029,6 +1086,189 @@ fn draw(
                     },
                 }
 
+            }
+
+            // Sortable Table Demo Tab
+            if (zgui.beginTabItem("Sortable Table", .{}))
+            {
+                defer zgui.endTabItem();
+
+                zgui.separatorText("Sortable Table Demo");
+
+                zgui.textWrapped(
+                    \\Click on column headers to sort. Hold Shift to multi-sort.
+                    \\Columns can be resized and reordered.
+                    ,
+                    .{},
+                );
+
+                zgui.spacing();
+
+                // Begin the table with sorting enabled
+                if (
+                    zgui.beginTable(
+                        "SortableTable",
+                        .{
+                            .column = 5,
+                            .flags = .{
+                                .sortable = true,
+                                .sort_multi = true,
+                                .resizable = true,
+                                .reorderable = true,
+                                .hideable = true,
+                                .row_bg = true,
+                                .borders = .{
+                                    .inner_h = true,
+                                    .inner_v = true,
+                                    .outer_h = true,
+                                    .outer_v = true,
+                                },
+                                .sizing = .stretch_prop,
+                                .scroll_y = true,
+                            },
+                            .outer_size = .{ 0, 300 },
+                        },
+                    )
+                )
+                {
+                    defer zgui.endTable();
+
+                    // Setup columns with sorting preferences
+                    zgui.tableSetupColumn(
+                        "ID",
+                        .{
+                            .flags = .{
+                                .default_sort = true,
+                                .prefer_sort_ascending = true,
+                            },
+                        },
+                    );
+                    zgui.tableSetupColumn(
+                        "Name",
+                        .{
+                            .flags = .{ .prefer_sort_ascending = true },
+                        },
+                    );
+                    zgui.tableSetupColumn(
+                        "Quantity",
+                        .{
+                            .flags = .{ .prefer_sort_descending = true },
+                        },
+                    );
+                    zgui.tableSetupColumn(
+                        "Price",
+                        .{
+                            .flags = .{ .prefer_sort_descending = true },
+                        },
+                    );
+                    zgui.tableSetupColumn(
+                        "Active",
+                        .{
+                            .flags = .{ .no_sort = true },
+                        },
+                    );
+
+                    // Freeze header row
+                    zgui.tableSetupScrollFreeze(0, 1);
+                    zgui.tableHeadersRow();
+
+                    // Handle sorting
+                    if (zgui.tableGetSortSpecs())
+                        |sort_specs|
+                    {
+                        if (sort_specs.dirty)
+                        {
+                            // Sort the data based on specs
+                            const specs = sort_specs.specs[0..@intCast(sort_specs.count)];
+                            if (specs.len > 0)
+                            {
+                                const spec = specs[0];
+                                const ascending = spec.sort_direction == .ascending;
+
+                                std.mem.sort(
+                                    STATE.TableRowData,
+                                    &STATE.table_data,
+                                    SortContext{ .column = spec.index, .ascending = ascending },
+                                    SortContext.lessThan,
+                                );
+                            }
+                            sort_specs.dirty = false;
+                        }
+                    }
+
+                    // Draw rows
+                    for (&STATE.table_data)
+                        |*row|
+                    {
+                        zgui.tableNextRow(.{});
+
+                        // ID column
+                        _ = zgui.tableNextColumn();
+                        zgui.text("{d}", .{row.id});
+
+                        // Name column
+                        _ = zgui.tableNextColumn();
+                        zgui.textUnformatted(row.name);
+
+                        // Quantity column
+                        _ = zgui.tableNextColumn();
+                        zgui.text("{d}", .{row.quantity});
+
+                        // Price column
+                        _ = zgui.tableNextColumn();
+                        zgui.text("${d:.2}", .{row.price});
+
+                        // Active column with colored indicator
+                        _ = zgui.tableNextColumn();
+                        if (row.is_active)
+                        {
+                            zgui.pushStyleColor4f(
+                                .{
+                                    .idx = .text,
+                                    .c = .{ 0.0, 1.0, 0.0, 1.0 },
+                                },
+                            );
+                            zgui.textUnformatted("Yes");
+                            zgui.popStyleColor(.{});
+                        }
+                        else
+                        {
+                            zgui.pushStyleColor4f(
+                                .{
+                                    .idx = .text,
+                                    .c = .{ 1.0, 0.3, 0.3, 1.0 },
+                                },
+                            );
+                            zgui.textUnformatted("No");
+                            zgui.popStyleColor(.{});
+                        }
+                    }
+                }
+
+                zgui.spacing();
+                zgui.separator();
+                zgui.spacing();
+
+                // Summary stats
+                var total_quantity: i32 = 0;
+                var total_value: f32 = 0;
+                var active_count: u32 = 0;
+
+                for (&STATE.table_data)
+                    |row|
+                {
+                    total_quantity += row.quantity;
+                    total_value += @as(f32, @floatFromInt(row.quantity)) * row.price;
+                    if (row.is_active)
+                    {
+                        active_count += 1;
+                    }
+                }
+
+                zgui.text("Total Items: {d}", .{STATE.table_data.len});
+                zgui.text("Total Quantity: {d}", .{total_quantity});
+                zgui.text("Total Value: ${d:.2}", .{total_value});
+                zgui.text("Active Products: {d}/{d}", .{ active_count, STATE.table_data.len });
             }
 
             // Threading Demo Tab
