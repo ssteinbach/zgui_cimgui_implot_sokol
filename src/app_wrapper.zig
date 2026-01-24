@@ -694,6 +694,7 @@ pub fn sokol_main(
             .height = STATE.app.dimensions[1],
             .icon = .{ .sokol_default = true },
             .window_title = STATE.app.title,
+            .html5_update_document_title = true,
             .logger = .{ .func = sokol.log.func },
             .win32_console_attach = true,
         },
