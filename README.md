@@ -23,6 +23,14 @@ applications built with imgui and implot in zig.
 * [https://github.com/ocornut/imgui](https://github.com/ocornut/imgui)
 * [https://github.com/epezent/implot](https://github.com/epezent/implot)
 
+## Additional Features
+
+Beyond Imgui, Implot, Sokol, ZIIS also includes:
+
+* an undo/redo journal
+* an ergonomic convienence layer around zig.fetch
+* build.zig support for building with `-Dtarget=wasm32-emscripten`
+
 ## Demo
 
 * build and run the demo app: `zig build run` 
