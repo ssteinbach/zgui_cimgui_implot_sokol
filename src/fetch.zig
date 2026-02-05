@@ -247,7 +247,7 @@ pub const Query = struct {
     /// query is owned by the caller.
     pub fn init(
         allocator: std.mem.Allocator,
-        target_path: [:0]const u8,
+        target_path: []const u8,
         options: struct{
             /// Optional callback that is called when fetch is done
             maybe_callback: ?Query.CallbackFn = null,
