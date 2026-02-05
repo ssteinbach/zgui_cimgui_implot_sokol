@@ -968,15 +968,15 @@ fn draw(
                             {
                                 zgui.text(
                                     "  Error: {s}",
-                                    .{STATE.json_fetch_query.getErrorMessage()},
+                                    .{STATE.json_fetch_query.error_message()},
                                 );
                                 zgui.text(
                                     "  Code: {s}",
-                                    .{STATE.json_fetch_query.get_error_name()},
+                                    .{STATE.json_fetch_query.error_name()},
                                 );
                                 zgui.text(
                                     "  Path: {s}",
-                                    .{STATE.json_fetch_query.get_error_path()},
+                                    .{STATE.json_fetch_query.target_path},
                                 );
                             }
 
@@ -1044,7 +1044,9 @@ fn draw(
                     .loaded => {
                         zgui.separatorText("Big text embed test");
 
-                        const TEXT = STATE.big_text_query.data;
+                        const TEXT = (
+                            STATE.big_text_query.result_data_buffer
+                        );
 
                         zgui.textUnformatted(TEXT);
                     },
@@ -1064,15 +1066,15 @@ fn draw(
                         {
                             zgui.text(
                                 "  Error: {s}",
-                                .{STATE.big_text_query.getErrorMessage()},
+                                .{STATE.big_text_query.error_message()},
                             );
                             zgui.text(
                                 "  Code: {s}",
-                                .{STATE.big_text_query.get_error_name()},
+                                .{STATE.big_text_query.error_name()},
                             );
                             zgui.text(
                                 "  Path: {s}",
-                                .{STATE.big_text_query.get_error_path()},
+                                .{STATE.big_text_query.target_path},
                             );
                         }
 
@@ -1545,7 +1547,7 @@ fn json_parsing_callback(
     const parsed = std.json.parseFromSlice(
         std.json.Value,
         allocator,
-        fetch_query.data,
+        fetch_query.result_data_buffer,
         .{}
     ) catch {
         return error.CallbackError;

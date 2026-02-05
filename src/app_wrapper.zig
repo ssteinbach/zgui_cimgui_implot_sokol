@@ -182,11 +182,52 @@ pub const FetchError = struct
 };
 
 /// Encapsulates a query for a resource, can work remotely or locally
-pub const FetchQuery = struct
-{
-    // @TODO: use a dynamic buffer allocation rather than a fixed size
-    /// Buffer used for internal query stuff.
-    buffer: [15 * 1024 * 1024]u8,
+pub const FetchQuery = struct {
+    /// Chunk size for streaming fetches (1MB)
+    /// Note: This must be small enough to fit on the stack since init()
+    /// returns FetchQuery by value. Default stack is typically 8MB.
+    pub const CHUNK_SIZE: usize = 1 * 1024 * 1024;
+
+    // inputs
+    ///////////////////////////////////////////////////////////////////////////
+
+    /// Allocator for decompression buffer (needed for cleanup).  This uses a
+    /// "managed" pattern because of the callback nature.
+    allocator: std.mem.Allocator,
+
+    /// Path that is being fetched
+    target_path: []const u8,
+
+    /// Optional callback to call when fetch is complete.
+    maybe_callback: ?CallbackFn,
+
+    /// Compression mode for automatic decompression
+    compression: Compression,
+
+    /// Whether or not to log anything about this query.
+    log: bool = false,
+
+    // Buffers
+    ///////////////////////////////////////////////////////////////////////////
+
+    // The chunk buffer is used to read chunks of the target resource
+    // The read chunks are moved from the chunk buffer to the accumulated_data
+    // buffer.  When the accumulated_data buffer is full, then the data pointer
+    // points at accumulated_data.items.  If there is compression, the data
+    // is decompressed and stored in decompressed_buffer.
+
+    /// Fixed buffer for sokol-fetch to write chunks into.
+    chunk_buffer: [CHUNK_SIZE]u8,
+
+    /// Dynamic buffer that accumulates all fetched data.
+    raw_data_read_buffer: std.ArrayList(u8),
+
+    /// Resulting data.  If no compression, will point at the raw_data_buffer.
+    /// Otherwise, will contain the decompressed data.
+    result_data_buffer: []const u8 = &.{},
+
+    // Internal State
+    ///////////////////////////////////////////////////////////////////////////
 
     /// Handle to sokol.fetch query.
     handle: sfetch.Handle,
@@ -194,23 +235,10 @@ pub const FetchQuery = struct
     /// State of the query.
     state: FetchState,
 
-    /// Optional callback to call when fetch is complete.
-    maybe_callback: ?CallbackFn,
-
-    /// Data read from the target.
-    data: []const u8,
-
     /// Error details when state == .failed (null if no error or still loading)
     maybe_error: ?FetchError,
 
-    /// Compression mode for automatic decompression
-    compression: Compression,
-
-    /// Allocator for decompression buffer (needed for cleanup)
-    allocator: std.mem.Allocator,
-
-    /// Buffer for decompressed data (null if no decompression occurred)
-    decompressed_buffer: ?[]u8,
+    ////////////////////////////////////////////////////////////////////////
 
     /// Alias for query callback functions
     pub const CallbackFn = (
@@ -218,7 +246,7 @@ pub const FetchQuery = struct
     );
 
     /// Get error code as string
-    pub fn get_error_name(
+    pub fn error_name(
         self: *const FetchQuery,
     ) []const u8
     {
@@ -231,7 +259,7 @@ pub const FetchQuery = struct
     }
 
     /// Get human-readable error message
-    pub fn getErrorMessage(
+    pub fn error_message(
         self: *const FetchQuery,
     ) []const u8
     {
@@ -253,21 +281,8 @@ pub const FetchQuery = struct
         return "";
     }
 
-    /// Get the path that failed
-    pub fn get_error_path(
-        self: *const FetchQuery,
-    ) []const u8
-    {
-        if (self.maybe_error)
-            |*err|
-        {
-            return err.path[0..err.path_len];
-        }
-        return "";
-    }
-
     /// Check if data has gzip magic bytes (0x1f 0x8b)
-    pub fn has_gzip_magic(
+    fn has_gzip_magic(
         data: []const u8,
     ) bool
     {
@@ -275,7 +290,7 @@ pub const FetchQuery = struct
     }
 
     /// Check if path ends with .gz extension
-    pub fn has_gzip_extension(
+    fn has_gzip_extension(
         path: []const u8,
     ) bool
     {
@@ -283,7 +298,7 @@ pub const FetchQuery = struct
     }
 
     /// Decompress gzip data using std.compress.flate
-    pub fn decompress_gzip(
+    fn decompress_gzip(
         self: *FetchQuery,
         compressed_data: []const u8,
     ) ![]const u8
@@ -378,35 +393,79 @@ pub const FetchQuery = struct
             std.log.err("Failed to finalize output: {any}", .{err});
             return err;
         };
-        self.decompressed_buffer = owned;
+        self.result_data_buffer = owned;
         return owned;
     }
 
-    /// Free decompressed buffer if allocated
-    pub fn free_decompressed_buffer(
+    pub const InitOptions = struct{
+        /// Optional callback that is called when fetch is done
+        maybe_callback: ?FetchQuery.CallbackFn = null,
+        /// Compression handling mode (default: none for backward compatibility)
+        compression: Compression = .none,
+    };
+
+    /// Initialize a new FetchQuery with the given allocator.  Memory of the
+    /// query is owned by the caller.
+    pub fn init(
+        allocator: std.mem.Allocator,
+        target_path: [:0]const u8,
+        options: InitOptions,
+    ) !*FetchQuery
+    {
+        const new_query = try allocator.create(FetchQuery);
+        new_query.* = .{
+            // options
+            .allocator = allocator,
+            .target_path = target_path,
+            .maybe_callback = options.maybe_callback,
+            .compression = options.compression,
+
+            // buffers
+            .chunk_buffer = undefined,
+            .raw_data_read_buffer = .empty,
+            .result_data_buffer = &.{},
+
+            // state
+            .state = .loading,
+            .maybe_error = null,
+            .handle = .{},
+        };
+
+        // Send fetch request with streaming (chunk_size enables multi-callback mode)
+        // Note: user_data will copy the pointer value itself (8 bytes), not the
+        // whole FetchQuery struct
+        new_query.*.handle = sfetch.send(
+            .{
+                .path = target_path,
+                .callback = streaming_callback,
+                .buffer = .{
+                    .ptr = &new_query.chunk_buffer,
+                    .size = new_query.chunk_buffer.len,
+                },
+                .chunk_size = FetchQuery.CHUNK_SIZE,
+                .user_data = .{
+                    .ptr = @ptrCast(&new_query),
+                    .size = @sizeOf(*FetchQuery),
+                },
+            }
+        );
+
+        return new_query;
+    }
+
+    /// Clean up allocated resources.
+    pub fn deinit(
         self: *FetchQuery,
     ) void
     {
-        if (self.decompressed_buffer)
-            |buf|
+        // if the result data buffer does not point at the raw data buffer
+        if (self.result_data_buffer.ptr != self.raw_data_read_buffer.items.ptr)
         {
-            self.allocator.free(buf);
-            self.decompressed_buffer = null;
-        }
-    }
+            self.allocator.free(self.result_data_buffer);
 
-    /// Default configuration for when data is to be loaded.
-    pub const loading = FetchQuery{
-        .buffer = undefined,
-        .handle = .{},
-        .state = .loading,
-        .maybe_callback = null,
-        .data = undefined,
-        .maybe_error = null,
-        .compression = .none,
-        .allocator = undefined,
-        .decompressed_buffer = null,
-    };
+        }
+        self.raw_data_read_buffer.deinit(self.allocator);
+    }
 };
 
 /// Extract a FetchQuery from a Sokol fetch response (useful in callbacks and
@@ -421,32 +480,27 @@ fn query_from_response(
     ).*;
 }
 
-/// Wraps the user callback for a more ergonomic zig-interface.
-fn unpack_callback(
-    /// fetch response
-    response: [*c]const sfetch.Response,
+/// Streaming callback - gets called multiple times as chunks arrive.
+/// Accumulates data into the FetchQuery's raw_data_read_buffer
+fn streaming_callback(
+    response_ptr: [*c]const sfetch.Response,
 ) callconv(.c) void
 {
-    const resp = response.*;
-    var fetch_query = query_from_response(response);
-    const raw_data = @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size];
+    const resp = response_ptr.*;
+    var fetch_query = query_from_response(response_ptr);
+    const allocator = fetch_query.allocator;
 
-    std.debug.print("unpacking callback...\n", .{});
-
-    if (resp.failed == true or resp.fetched != true)
+    // Handle errors
+    if (resp.failed)
     {
         fetch_query.state = .failed;
 
-        // Capture error details
         var error_info = FetchError{
             .error_code = resp.error_code,
             .path = undefined,
             .path_len = 0,
         };
 
-        std.debug.print("buffer size: {d}\n", .{fetch_query.buffer.len});
-
-        // Copy path if available
         if (resp.path != null)
         {
             const path_slice = std.mem.span(resp.path);
@@ -456,78 +510,107 @@ fn unpack_callback(
         }
 
         fetch_query.maybe_error = error_info;
-
-        std.log.err("Fetch failed for '{s}': {s}", .{
-            fetch_query.get_error_path(),
-            fetch_query.get_error_name(),
-        });
+        if (fetch_query.log)
+        {
+            std.log.err(
+                "Fetch failed for '{s}': {s}",
+                .{
+                    fetch_query.target_path,
+                    fetch_query.error_name(),
+                }
+            );
+        }
         return;
     }
 
-
-    // Handle decompression based on compression mode
-    const should_decompress = switch (fetch_query.compression)
+    // Append this chunk to accumulated data
+    if (resp.data.size > 0)
     {
-        .none => blk: {
-            std.debug.print("Not decompressing in sokol fetch\n", .{});
-            break :blk false;
-        },
-        .gzip => true,
-        .auto_detect => blk: {
-            // Check magic bytes first, then fall back to extension
-            if (FetchQuery.has_gzip_magic(raw_data))
-            {
-                break :blk true;
-            }
-            if (resp.path != null)
-            {
-                const path_slice = std.mem.span(resp.path);
-                break :blk FetchQuery.has_gzip_extension(path_slice);
-            }
-            break :blk false;
-        },
-    };
-
-    if (should_decompress)
-    {
-        fetch_query.data = fetch_query.decompress_gzip(raw_data) catch
+        const chunk_data = @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size];
+        fetch_query.raw_data_read_buffer.appendSlice(
+            allocator,
+            chunk_data
+        ) catch
             |err|
         {
-            std.log.err("Decompression failed: {any}", .{err});
+            std.log.err("Failed to accumulate chunk data: {any}", .{err});
             fetch_query.state = .failed;
+            return;
+        };
+    }
 
-            // Set up error info for decompression failure
-            var error_info = FetchError{
-                .error_code = .JS_OTHER, // Reuse as generic error
-                .path = undefined,
-                .path_len = 0,
-            };
-            if (resp.path != null)
+    // Check if this is the final chunk
+    if (resp.finished)
+    {
+        const raw_data = fetch_query.raw_data_read_buffer.items;
+        if (fetch_query.log)
+        {
+            std.log.info(
+                "Fetch complete: {d} bytes total",
+                .{raw_data.len},
+            );
+        }
+
+        // Handle decompression based on compression mode
+        const should_decompress = switch (fetch_query.compression)
+        {
+            .none => false,
+            .gzip => true,
+            .auto_detect => blk: {
+                if (FetchQuery.has_gzip_magic(raw_data))
+                {
+                    break :blk true;
+                }
+                if (resp.path != null)
+                {
+                    const path_slice = std.mem.span(resp.path);
+                    break :blk FetchQuery.has_gzip_extension(path_slice);
+                }
+                break :blk false;
+            },
+        };
+
+        if (should_decompress)
+        {
+            fetch_query.result_data_buffer = fetch_query.decompress_gzip(raw_data) catch
+                |err|
             {
-                const path_slice = std.mem.span(resp.path);
-                const copy_len = @min(path_slice.len, error_info.path.len);
-                @memcpy(error_info.path[0..copy_len], path_slice[0..copy_len]);
-                error_info.path_len = copy_len;
-            }
-            fetch_query.maybe_error = error_info;
-            return;
-        };
-    }
-    else
-    {
-        fetch_query.data = raw_data;
-    }
+                std.log.err("Decompression failed: {any}", .{err});
+                fetch_query.state = .failed;
 
-    if (fetch_query.maybe_callback)
-        |callback|
-    {
-        callback(fetch_query) catch {
-            fetch_query.state = .failed;
-            return;
-        };
-    }
+                var error_info = FetchError{
+                    .error_code = .JS_OTHER,
+                    .path = undefined,
+                    .path_len = 0,
+                };
+                if (resp.path != null)
+                {
+                    const path_slice = std.mem.span(resp.path);
+                    const copy_len = @min(path_slice.len, error_info.path.len);
+                    @memcpy(error_info.path[0..copy_len], path_slice[0..copy_len]);
+                    error_info.path_len = copy_len;
+                }
+                fetch_query.maybe_error = error_info;
+                return;
+            };
+        }
+        else
+        {
+            fetch_query.result_data_buffer = raw_data;
+        }
 
-    fetch_query.state = .loaded;
+        // Call user callback if provided
+        if (fetch_query.maybe_callback)
+            |callback|
+        {
+            callback(fetch_query) catch {
+                fetch_query.state = .failed;
+                return;
+            };
+        }
+
+        fetch_query.state = .loaded;
+    }
 }
 
 /// Options for fetching resources
@@ -545,38 +628,24 @@ pub const FetchOptions = struct
 /// a FetchQuery object, which has the state and data read from the file (if
 /// the read was succesful).
 ///
+/// Uses streaming with a fixed chunk buffer (1MB) and dynamically grows an
+/// accumulation buffer as data arrives. This allows fetching files of any size
+/// without pre-allocating a huge buffer.
+///
 /// Caller owns the memory of the FetchQuery
 pub fn fetch_resource(
     allocator: std.mem.Allocator,
     options: FetchOptions,
 ) !*FetchQuery
 {
-    const new_query = try allocator.create(FetchQuery);
-    new_query.* = .loading;
-    new_query.maybe_callback = options.maybe_callback;
-    new_query.compression = options.compression;
-    new_query.allocator = allocator;
-    new_query.decompressed_buffer = null;
-
-    // Send fetch request
-    // Note: user_data will copy the pointer value itself (8 bytes), not the
-    // whole FetchQuery struct
-    new_query.*.handle = sfetch.send(
+    return try FetchQuery.init(
+        allocator,
+        options.path,
         .{
-            .path = options.path,
-            .callback = unpack_callback,
-            .buffer = .{
-                .ptr = &new_query.buffer,
-                .size = new_query.buffer.len,
-            },
-            .user_data = .{
-                .ptr = @ptrCast(&new_query),
-                .size = @sizeOf(*FetchQuery),
-            },
-        }
+            .compression = options.compression,
+            .maybe_callback = options.maybe_callback,
+        },
     );
-
-    return new_query;
 }
 
 /// Fetch resources from the webserver or from elsewhere.  returns a pointer to
