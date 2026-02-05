@@ -42,7 +42,7 @@ pub const Query = struct {
     allocator: std.mem.Allocator,
 
     /// Path that is being fetched
-    target_path: []const u8,
+    target_path: [:0]const u8,
 
     /// Optional callback to call when fetch is complete.
     maybe_callback: ?CallbackFn,
@@ -260,7 +260,12 @@ pub const Query = struct {
         new_query.* = .{
             // options
             .allocator = allocator,
-            .target_path = target_path,
+            .target_path = try std.fmt.allocPrintSentinel(
+                allocator,
+                "{s}",
+                .{target_path},
+                '\x00',
+            ),
             .maybe_callback = options.maybe_callback,
             .compression = options.compression,
 
@@ -280,7 +285,7 @@ pub const Query = struct {
         // whole Query struct
         new_query.*.handle = sokol_fetch.send(
             .{
-                .path = target_path,
+                .path = @ptrCast(new_query.target_path),
                 .callback = streaming_callback,
                 .buffer = .{
                     .ptr = &new_query.chunk_buffer,
@@ -302,12 +307,8 @@ pub const Query = struct {
         self: *Query,
     ) void
     {
-        // if the result data buffer does not point at the raw data buffer
-        if (self.result_data_buffer.ptr != self.raw_data_read_buffer.items.ptr)
-        {
-            self.allocator.free(self.result_data_buffer);
-
-        }
+        self.allocator.free(self.target_path);
+        self.allocator.free(self.result_data_buffer);
         self.raw_data_read_buffer.deinit(self.allocator);
     }
 };
@@ -340,30 +341,32 @@ fn streaming_callback(
         fetch_query.state = .failed;
         fetch_query.maybe_error = resp.error_code;
 
-        if (fetch_query.log)
-        {
-            std.log.err(
-                "Fetch failed for '{s}': {s}",
-                .{
-                    fetch_query.target_path,
-                    fetch_query.error_name(),
-                }
-            );
-        }
+        std.log.err(
+            "Fetch failed for '{s}': {s}",
+            .{
+                fetch_query.target_path,
+                fetch_query.error_name(),
+            }
+        );
         return;
     }
 
     // Append this chunk to accumulated data
     if (resp.data.size > 0)
     {
-        const chunk_data = @as([*]const u8, @ptrCast(resp.data.ptr))[0..resp.data.size];
+        const chunk_ptr: [*]const u8 = @ptrCast(resp.data.ptr);
+        const chunk_data = chunk_ptr[0..resp.data.size];
+
         fetch_query.raw_data_read_buffer.appendSlice(
             allocator,
             chunk_data
         ) catch
             |err|
         {
-            std.log.err("Failed to accumulate chunk data: {any}", .{err});
+            std.log.err(
+                "Failed to accumulate chunk data: {any}",
+                .{err},
+            );
             fetch_query.state = .failed;
             return;
         };
@@ -413,7 +416,14 @@ fn streaming_callback(
         }
         else
         {
-            fetch_query.result_data_buffer = raw_data;
+            // bring the raw data buffer into the result buffer
+            fetch_query.result_data_buffer = (
+                fetch_query.raw_data_read_buffer.toOwnedSlice(allocator)
+                catch {
+                    fetch_query.state = .failed;
+                    return;
+                }
+            );
         }
 
         // Call user callback if provided
