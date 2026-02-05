@@ -1489,7 +1489,10 @@ fn draw(
 fn cleanup (
 ) void
 {
+    STATE.json_fetch_query.deinit();
     allocator.destroy(STATE.json_fetch_query);
+
+    STATE.big_text_query.deinit();
     allocator.destroy(STATE.big_text_query);
 
     STATE.point_buffers.deinit(allocator);
