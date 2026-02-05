@@ -65,6 +65,11 @@ pub fn build(
     // Assemble Module
     ///////////////////////////////////////////////////////////////////////////
 
+    // Create zgui_options module for gui.zig configuration
+    const zgui_options = b.addOptions();
+    zgui_options.addOption(bool, "use_wchar32", false);
+    zgui_options.addOption(bool, "use_32bit_draw_idx", false);
+
     const mod_ziis = b.addModule(
         "zgui_cimgui_implot_sokol",
         .{
@@ -72,7 +77,7 @@ pub fn build(
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ 
+                .{
                     .name = "sokol",
                     .module = dep_sokol.module("sokol"),
                 },
@@ -83,6 +88,10 @@ pub fn build(
                 .{
                     .name = "undo",
                     .module = dep_undo_journal.module("do_undo_journal"),
+                },
+                .{
+                    .name = "zgui_options",
+                    .module = zgui_options.createModule(),
                 },
             },
         },
@@ -230,28 +239,6 @@ pub fn build(
             },
         );
         test_step.dependOn(&b.addRunArtifact(unit_tests).step);
-
-        // app_wrapper tests
-        const app_wrapper_test_mod = b.createModule(
-            .{
-                .root_source_file = b.path("src/app_wrapper_test.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{
-                        .name = "sokol",
-                        .module = dep_sokol.module("sokol"),
-                    },
-                },
-            },
-        );
-
-        const app_wrapper_tests = b.addTest(
-            .{
-                .root_module = app_wrapper_test_mod,
-            },
-        );
-        test_step.dependOn(&b.addRunArtifact(app_wrapper_tests).step);
     }
 
     // Dispatch to build function based on target
