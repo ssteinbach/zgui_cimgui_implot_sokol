@@ -1628,11 +1628,13 @@ pub fn init(
     STATE.texid = ziis.sokol.imgui.imtextureid(STATE.view);
 
     // configure initial fetch
-    STATE.json_fetch_query = app_wrapper.fetch_resource_from_path(
+    STATE.json_fetch_query = app_wrapper.fetch_resource(
         allocator,
         "example.json",
-        json_parsing_callback,
-        .none,
+        .{
+            .maybe_callback = json_parsing_callback,
+            .compression = .none,
+        },
     ) catch {
         std.log.err(
             "Unable to fetch data: {s}",
@@ -1641,11 +1643,13 @@ pub fn init(
         return;
     };
 
-    STATE.big_text_query = app_wrapper.fetch_resource_from_path(
+    STATE.big_text_query = app_wrapper.fetch_resource(
         allocator,
         "src/app_wrapper_demo.zig",
-        null,
-        .none,
+        .{
+            // zig file should be uncomporessed
+            .compression = .none,
+        },
     ) catch {
         std.log.err(
             "Unable to fetch data: {s}",
