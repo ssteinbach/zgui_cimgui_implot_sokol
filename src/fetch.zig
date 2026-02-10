@@ -348,6 +348,13 @@ fn streaming_callback(
                 fetch_query.error_name(),
             }
         );
+
+        // Call user callback on failure so completion trackers don't hang
+        if (fetch_query.maybe_callback)
+            |callback|
+        {
+            callback(fetch_query) catch {};
+        }
         return;
     }
 

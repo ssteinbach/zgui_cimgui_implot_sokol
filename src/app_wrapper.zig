@@ -228,10 +228,9 @@ pub fn sokol_main(
     // Setup sokol-fetch
     sfetch.setup(
         .{
-            // @TODO: experiment with these settings
-            .max_requests = 4,
+            .max_requests = 8,
             .num_channels = 1,
-            .num_lanes = 2,
+            .num_lanes = 4,
         }
     );
 
