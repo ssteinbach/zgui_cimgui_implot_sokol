@@ -48,7 +48,7 @@ export fn init(
     sg.setup(
         .{
             .environment = sglue.environment(),
-            .logger = .{ .func = sokol.log.func },
+            .logger = .{ .func = STATE.app.logger },
         },
     );
 
@@ -57,7 +57,7 @@ export fn init(
         .{
             // max out the vertex buffer... might be overkill
             .max_vertices = STATE.app.max_vertices,
-            .logger = .{ .func = sokol.log.func }, 
+            .logger = .{ .func = STATE.app.logger },
         },
     );
 
@@ -191,6 +191,17 @@ export fn event(
     }
 }
 
+/// Logger function pointer type matching sokol's Logger.func signature.
+pub const LogFn = *const fn (
+    tag: [*c]const u8,
+    log_level: u32,
+    log_id: u32,
+    message: [*c]const u8,
+    line_nr: u32,
+    filename: [*c]const u8,
+    _: ?*anyopaque,
+) callconv(.c) void;
+
 const SokolApp = struct {
     /// where all your ui code should go (required)
     draw: *const fn () anyerror!void,
@@ -217,6 +228,9 @@ const SokolApp = struct {
     event: *const fn (ev: [*c]const sapp.Event) callconv(.c) void = &event,
 
     max_vertices: i32 =  if (IS_WASM) 64 * 1024 else 1024 * 1024,
+    /// Optional logging callback for sokol subsystems.  Off by default.
+    /// Pass `ziis.slog.func` to route sokol output through std.log.
+    logger: ?LogFn = null,
 };
 
 pub fn sokol_main(
@@ -231,6 +245,7 @@ pub fn sokol_main(
             .max_requests = 8,
             .num_channels = 1,
             .num_lanes = 4,
+            .logger = .{ .func = STATE.app.logger },
         }
     );
 
@@ -245,8 +260,8 @@ pub fn sokol_main(
             .icon = .{ .sokol_default = true },
             .window_title = STATE.app.title,
             .html5_update_document_title = true,
-            .logger = .{ .func = sokol.log.func },
             .win32_console_attach = true,
+            .logger = .{ .func = STATE.app.logger },
         },
     );
 }

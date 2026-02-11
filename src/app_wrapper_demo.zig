@@ -1673,6 +1673,7 @@ pub fn main(
             .maybe_pre_zgui_shutdown_cleanup = cleanup,
             .maybe_post_zgui_init = init,
             .title = "ZIIS Demo App",
+            .logger = ziis.std_log_scoped,
         },
     );
 }
