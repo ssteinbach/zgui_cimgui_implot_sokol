@@ -1587,7 +1587,7 @@ pub fn init(
 ) void
 { 
     // right around the minimum number of points to make the plot disapear
-    const BIGCOUNT = 775000;
+    const BIGCOUNT = if (IS_WASM) 7000 else 75000;
     STATE.point_buffers.ensureUnusedCapacity(
         allocator,
         BIGCOUNT,
