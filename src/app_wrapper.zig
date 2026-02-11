@@ -238,7 +238,7 @@ const SokolApp = struct {
     max_vertices: i32 =  if (IS_WASM) 64 * 1024 else 256*1024*1024,
 
     /// Optional logging callback for sokol subsystems.  Off by default.
-    /// Pass `ziis.slog.func` to route sokol output through std.log.
+    /// Pass `ziis.std_log_scoped` to route sokol output through std.log.
     logger: ?LogFn = null,
 };
 
