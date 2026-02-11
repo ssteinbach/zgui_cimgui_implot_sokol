@@ -1587,7 +1587,7 @@ pub fn init(
 ) void
 { 
     // right around the minimum number of points to make the plot disapear
-    const BIGCOUNT = 7750;
+    const BIGCOUNT = 775000;
     STATE.point_buffers.ensureUnusedCapacity(
         allocator,
         BIGCOUNT,
@@ -1669,7 +1669,7 @@ pub fn main(
 
     app_wrapper.sokol_main(
         .{
-            .draw = draw, 
+            .draw = draw,
             .maybe_pre_zgui_shutdown_cleanup = cleanup,
             .maybe_post_zgui_init = init,
             .title = "ZIIS Demo App",

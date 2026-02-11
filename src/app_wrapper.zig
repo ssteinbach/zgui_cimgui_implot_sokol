@@ -41,6 +41,14 @@ const STATE = struct {
     const allocator = backing_allocator;
 };
 
+/// Wrapper around sokol window update function
+pub fn set_window_title(
+    title: [:0]const u8,
+) void
+{
+    sapp.setWindowTitle(title);
+}
+
 export fn init(
 ) void 
 {
@@ -227,7 +235,8 @@ const SokolApp = struct {
     /// escape key which quits the app
     event: *const fn (ev: [*c]const sapp.Event) callconv(.c) void = &event,
 
-    max_vertices: i32 =  if (IS_WASM) 64 * 1024 else 1024 * 1024,
+    max_vertices: i32 =  if (IS_WASM) 64 * 1024 else 256*1024*1024,
+
     /// Optional logging callback for sokol subsystems.  Off by default.
     /// Pass `ziis.slog.func` to route sokol output through std.log.
     logger: ?LogFn = null,
@@ -259,8 +268,6 @@ pub fn sokol_main(
             .height = STATE.app.dimensions[1],
             .icon = .{ .sokol_default = true },
             .window_title = STATE.app.title,
-            .html5_update_document_title = true,
-            .win32_console_attach = true,
             .logger = .{ .func = STATE.app.logger },
         },
     );
