@@ -30,7 +30,7 @@ pub fn build(
             .target = target,
             .optimize = optimize,
             .with_sokol_imgui = true,
-        }
+        },
     );
 
     const dep_cimgui = b.dependency(
@@ -40,12 +40,12 @@ pub fn build(
             .optimize = optimize,
         },
     );
-    // Get the matching Zig module name, C header search path and C library for
-    // vanilla imgui vs the imgui docking branch.
+    // Get the matching Zig module name, C header search path and C library
+    // for vanilla imgui vs the imgui docking branch.
     const cimgui_conf = cimgui.getConfig(
         // Currently *not* using the docking version, although not for any big
         // reason.
-        false
+        false,
     );
     const lib_cimgui = dep_cimgui.artifact(cimgui_conf.clib_name);
 
@@ -57,9 +57,10 @@ pub fn build(
         },
     );
 
-    // inject the cimgui header search path into the sokol C library compile step
+    // inject the cimgui header search path into the sokol C library compile
+    // step
     dep_sokol.artifact("sokol_clib").addIncludePath(
-        dep_cimgui.path(cimgui_conf.include_dir)
+        dep_cimgui.path(cimgui_conf.include_dir),
     );
 
     // Assemble Module
@@ -109,7 +110,7 @@ pub fn build(
                     .link_libc = true,
                 },
             ),
-        }
+        },
     );
 
     lib_imgui.addIncludePath(dep_sokol.path("src/sokol/c"));
@@ -163,11 +164,12 @@ pub fn build(
                     .link_libc = true,
                 },
             ),
-        }
+        },
     );
 
     // Only add worker interop for WASM targets
-    if (target.result.cpu.arch.isWasm()) {
+    if (target.result.cpu.arch.isWasm())
+    {
         lib_worker_interop.addCSourceFiles(
             .{
                 .root = b.path("src"),
@@ -188,7 +190,7 @@ pub fn build(
             .imports = &.{
                 .{
                     .name = "zgui_cimgui_implot_sokol",
-                    .module = mod_ziis 
+                    .module = mod_ziis, 
                 },
             },
         },
@@ -213,11 +215,13 @@ pub fn build(
         const wasm_thread_lib = b.addLibrary(
             .{
                 .name = "thread_wasm_check",
-                .root_module = b.createModule(.{
-                    .root_source_file = b.path("src/thread.zig"),
-                    .target = target,
-                    .optimize = optimize,
-                }),
+                .root_module = b.createModule(
+                    .{
+                        .root_source_file = b.path("src/thread.zig"),
+                        .target = target,
+                        .optimize = optimize,
+                    },
+                ),
             },
         );
         check_step.dependOn(&wasm_thread_lib.step);
@@ -270,7 +274,7 @@ pub fn build(
                     b.path("example.json"),
                     "web/example.json",
                 ).step
-            )
+            ),
         );
         run_step.dependOn(
             &(
@@ -278,7 +282,7 @@ pub fn build(
                     b.path("src/app_wrapper_demo.zig"),
                     "web/src/app_wrapper_demo.zig",
                 ).step
-            )
+            ),
         );
         // install worker harness JavaScript
         run_step.dependOn(
@@ -287,7 +291,7 @@ pub fn build(
                     b.path("src/worker_js_harness.js"),
                     "web/worker_js_harness.js",
                 ).step
-            )
+            ),
         );
     }
     else
@@ -347,7 +351,9 @@ pub fn build_wasm(
     );
 
     // Link all C libraries to main app
-    for (opts.dep_c_libs) |lib| {
+    for (opts.dep_c_libs)
+        |lib|
+    {
         main_app.linkLibrary(lib);
     }
 
@@ -404,8 +410,10 @@ pub fn build_wasm(
                 "-sMAXIMUM_MEMORY=268435456",   // 256MB maximum memory
                 "-sALLOW_MEMORY_GROWTH=1",      // Allow memory to grow
                 "-sSTACK_SIZE=5242880",         // 5MB stack size
-                "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free']",  // Export standard functions
-                "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",  // Export runtime methods for JS interop
+                // Export standard functions
+                "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free']",
+                // Export runtime methods for JS interop
+                "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
             },
         },
     );

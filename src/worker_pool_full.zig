@@ -22,7 +22,8 @@ pub const HAS_THREADS = thread.HAS_THREADS;
 // JAVASCRIPT INTEROP (WASM only)
 //==============================================================================
 
-// External C functions for JavaScript interop (defined in worker_js_interop.c)
+// External C functions for JavaScript interop (defined in
+// worker_js_interop.c)
 extern fn js_worker_pool_create(num_workers: c_int) c_int;
 extern fn js_worker_pool_destroy() void;
 extern fn js_worker_submit(work_id: c_int, work_fn_id: c_int, context_ptr: c_int, context_size: c_int, timeout_ms: c_int) c_int;
@@ -44,14 +45,19 @@ pub const WorkerPoolConfig = struct {
 // WORK ITEM
 //==============================================================================
 
-pub fn WorkItem(comptime Context: type) type {
+pub fn WorkItem(
+    comptime Context: type,
+) type
+{
     return struct {
         const Self = @This();
 
         id: u32,
         context: Context,
         work_fn_id: u32,
-        completed: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        completed: std.atomic.Value(bool) = std.atomic.Value(bool).init(
+            false,
+        ),
         error_code: std.atomic.Value(i32) = std.atomic.Value(i32).init(0),
     };
 }
@@ -75,12 +81,17 @@ const NativeWorkerPool = struct {
     pending_work: std.ArrayList(*anyopaque),
     pending_lock: std.Thread.Mutex = .{},
 
-    pub fn init(config: WorkerPoolConfig) !Self {
+    pub fn init(
+        config: WorkerPoolConfig,
+    ) !Self
+    {
         var pool = std.Thread.Pool{};
-        try pool.init(.{
-            .allocator = config.allocator,
-            .n_jobs = config.core_workers,
-        });
+        try pool.init(
+            .{
+                .allocator = config.allocator,
+                .n_jobs = config.core_workers,
+            },
+        );
 
         return .{
             .thread_pool = pool,
@@ -89,7 +100,10 @@ const NativeWorkerPool = struct {
         };
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(
+        self: *Self,
+    ) void
+    {
         self.thread_pool.deinit();
         self.pending_work.deinit(self.allocator);
     }
@@ -99,7 +113,8 @@ const NativeWorkerPool = struct {
         comptime Context: type,
         work_item: *WorkItem(Context),
         work_fn: fn (Context) void,
-    ) !void {
+    ) !void
+    {
         const work_id = self.next_work_id.fetchAdd(1, .seq_cst);
         work_item.id = work_id;
 
@@ -114,32 +129,45 @@ const NativeWorkerPool = struct {
         try self.pending_work.append(self.allocator, @ptrCast(work_item));
 
         // Spawn thread pool task
-        try self.thread_pool.spawn(struct {
-            fn run(item: *WorkItem(Context), fn_id: u32) void {
-                const work_func = registry.getWorkFunction(fn_id) orelse {
-                    item.error_code.store(-1, .seq_cst);
+        try self.thread_pool.spawn(
+            struct {
+                fn run(
+                    item: *WorkItem(Context),
+                    fn_id: u32,
+                ) void
+                {
+                    const work_func = registry.getWorkFunction(fn_id) orelse {
+                        item.error_code.store(-1, .seq_cst);
+                        item.completed.store(true, .seq_cst);
+                        return;
+                    };
+
+                    // Execute work
+                    work_func(@ptrCast(&item.context));
+
+                    // Mark complete
                     item.completed.store(true, .seq_cst);
-                    return;
-                };
-
-                // Execute work
-                work_func(@ptrCast(&item.context));
-
-                // Mark complete
-                item.completed.store(true, .seq_cst);
-            }
-        }.run, .{ work_item, work_fn_id });
+                }
+            }.run,
+            .{ work_item, work_fn_id },
+        );
     }
 
-    pub fn wait(self: *Self) void {
+    pub fn wait(
+        self: *Self,
+    ) void
+    {
         // Wait for all pending work
         self.pending_lock.lock();
         const items = self.pending_work.items;
         self.pending_lock.unlock();
 
-        for (items) |item_ptr| {
+        for (items)
+            |item_ptr|
+        {
             const item: *WorkItem(anyopaque) = @ptrCast(@alignCast(item_ptr));
-            while (!item.completed.load(.seq_cst)) {
+            while (!item.completed.load(.seq_cst))
+            {
                 std.Thread.yield() catch {};
             }
         }
@@ -150,7 +178,10 @@ const NativeWorkerPool = struct {
         self.pending_work.clearRetainingCapacity();
     }
 
-    pub fn getAvailableWorkerCount(self: *const Self) u32 {
+    pub fn getAvailableWorkerCount(
+        self: *const Self,
+    ) u32
+    {
         _ = self;
         // std.Thread.Pool doesn't expose this easily
         return 0;
@@ -177,20 +208,29 @@ const WasmWorkerPool = struct {
     pending_lock: std.Thread.Mutex = .{},
     initialized: bool = false,
 
-    pub fn init(config: WorkerPoolConfig) !Self {
-        if (!IS_WASM) {
+    pub fn init(
+        config: WorkerPoolConfig,
+    ) !Self
+    {
+        if (!IS_WASM)
+        {
             return error.WasmWorkerPoolOnlySupportsWasm;
         }
 
         var self = Self{
             .allocator = config.allocator,
             .config = config,
-            .pending_work = std.AutoHashMap(u32, WorkItemState).init(config.allocator),
+            .pending_work = std.AutoHashMap(u32, WorkItemState).init(
+                config.allocator,
+            ),
         };
 
         // Create Web Worker pool
-        const num_created = js_worker_pool_create(@intCast(config.core_workers));
-        if (num_created < 0) {
+        const num_created = js_worker_pool_create(
+            @intCast(config.core_workers),
+        );
+        if (num_created < 0)
+        {
             return error.FailedToCreateWorkerPool;
         }
 
@@ -198,8 +238,12 @@ const WasmWorkerPool = struct {
         return self;
     }
 
-    pub fn deinit(self: *Self) void {
-        if (IS_WASM) {
+    pub fn deinit(
+        self: *Self,
+    ) void
+    {
+        if (IS_WASM)
+        {
             js_worker_pool_destroy();
         }
         self.pending_work.deinit();
@@ -210,8 +254,10 @@ const WasmWorkerPool = struct {
         comptime Context: type,
         work_item: *WorkItem(Context),
         work_fn: fn (Context) void,
-    ) !void {
-        if (!self.initialized) {
+    ) !void
+    {
+        if (!self.initialized)
+        {
             return error.WorkerPoolNotInitialized;
         }
 
@@ -225,11 +271,14 @@ const WasmWorkerPool = struct {
 
         // Track pending work
         self.pending_lock.lock();
-        try self.pending_work.put(work_id, .{
-            .item_ptr = @ptrCast(work_item),
-            .completed_flag = &work_item.completed,
-            .error_flag = &work_item.error_code,
-        });
+        try self.pending_work.put(
+            work_id,
+            .{
+                .item_ptr = @ptrCast(work_item),
+                .completed_flag = &work_item.completed,
+                .error_flag = &work_item.error_code,
+            },
+        );
         self.pending_lock.unlock();
 
         // Submit to Web Worker
@@ -245,24 +294,35 @@ const WasmWorkerPool = struct {
             timeout_ms,
         );
 
-        if (result < 0) {
+        if (result < 0)
+        {
             // Failed to submit - clean up
             self.pending_lock.lock();
             _ = self.pending_work.remove(work_id);
             self.pending_lock.unlock();
 
-            return if (result == -2) error.NoAvailableWorkers else error.WorkerSubmitFailed;
+            return (
+                if (result == -2) error.NoAvailableWorkers
+                else error.WorkerSubmitFailed
+            );
         }
     }
 
-    pub fn wait(self: *Self) void {
+    pub fn wait(
+        self: *Self,
+    ) void
+    {
         // Poll pending work until all complete
-        while (true) {
+        while (true)
+        {
             self.pending_lock.lock();
             const count = self.pending_work.count();
             self.pending_lock.unlock();
 
-            if (count == 0) break;
+            if (count == 0)
+            {
+                break;
+            }
 
             // Yield to let JavaScript event loop run
             // In WASM, we need to yield control back to browser
@@ -270,24 +330,38 @@ const WasmWorkerPool = struct {
         }
     }
 
-    pub fn getAvailableWorkerCount(self: *const Self) u32 {
+    pub fn getAvailableWorkerCount(
+        self: *const Self,
+    ) u32
+    {
         _ = self;
-        if (!IS_WASM) return 0;
+        if (!IS_WASM)
+        {
+            return 0;
+        }
         return @intCast(js_worker_get_available_count());
     }
 
     /// Called from JavaScript when work completes
-    pub fn notifyWorkComplete(self: *Self, work_id: u32, error_code: i32) void {
+    pub fn notifyWorkComplete(
+        self: *Self,
+        work_id: u32,
+        error_code: i32,
+    ) void
+    {
         self.pending_lock.lock();
         defer self.pending_lock.unlock();
 
-        if (self.pending_work.get(work_id)) |state| {
+        if (self.pending_work.get(work_id))
+            |state|
+        {
             state.error_flag.store(error_code, .seq_cst);
             state.completed_flag.store(true, .seq_cst);
             _ = self.pending_work.remove(work_id);
 
             // Mark worker as available in JavaScript
-            if (IS_WASM) {
+            if (IS_WASM)
+            {
                 js_worker_mark_available(@intCast(work_id));
             }
         }
@@ -297,12 +371,21 @@ const WasmWorkerPool = struct {
 // Export for JavaScript callback
 var GLOBAL_WASM_WORKER_POOL: ?*WasmWorkerPool = null;
 
-pub fn setGlobalWorkerPool(pool: *WasmWorkerPool) void {
+pub fn setGlobalWorkerPool(
+    pool: *WasmWorkerPool,
+) void
+{
     GLOBAL_WASM_WORKER_POOL = pool;
 }
 
-export fn _worker_complete_callback(work_id: u32, error_code: i32) void {
-    if (GLOBAL_WASM_WORKER_POOL) |pool| {
+export fn _worker_complete_callback(
+    work_id: u32,
+    error_code: i32,
+) void
+{
+    if (GLOBAL_WASM_WORKER_POOL)
+        |pool|
+    {
         pool.notifyWorkComplete(work_id, error_code);
     }
 }
@@ -311,7 +394,10 @@ export fn _worker_complete_callback(work_id: u32, error_code: i32) void {
 // WORK GROUP
 //==============================================================================
 
-pub fn WorkGroup(comptime Context: type) type {
+pub fn WorkGroup(
+    comptime Context: type,
+) type
+{
     return struct {
         const Self = @This();
 
@@ -319,7 +405,11 @@ pub fn WorkGroup(comptime Context: type) type {
         work_items: std.ArrayList(WorkItem(Context)),
         allocator: std.mem.Allocator,
 
-        pub fn init(allocator: std.mem.Allocator, pool: *WorkerPool) Self {
+        pub fn init(
+            allocator: std.mem.Allocator,
+            pool: *WorkerPool,
+        ) Self
+        {
             return .{
                 .pool = pool,
                 .work_items = std.ArrayList(WorkItem(Context)){},
@@ -327,7 +417,10 @@ pub fn WorkGroup(comptime Context: type) type {
             };
         }
 
-        pub fn deinit(self: *Self) void {
+        pub fn deinit(
+            self: *Self,
+        ) void
+        {
             self.work_items.deinit(self.allocator);
         }
 
@@ -335,7 +428,8 @@ pub fn WorkGroup(comptime Context: type) type {
             self: *Self,
             work_fn: fn (Context) void,
             context: Context,
-        ) !void {
+        ) !void
+        {
             const item = WorkItem(Context){
                 .id = 0,
                 .context = context,
@@ -343,23 +437,37 @@ pub fn WorkGroup(comptime Context: type) type {
             };
 
             try self.work_items.append(self.allocator, item);
-            const item_ptr = &self.work_items.items[self.work_items.items.len - 1];
+            const item_ptr = (
+                &self.work_items.items[self.work_items.items.len - 1]
+            );
 
             try self.pool.submit(Context, item_ptr, work_fn);
         }
 
-        pub fn join(self: *Self) void {
-            for (self.work_items.items) |*item| {
-                while (!item.completed.load(.seq_cst)) {
+        pub fn join(
+            self: *Self,
+        ) void
+        {
+            for (self.work_items.items)
+                |*item|
+            {
+                while (!item.completed.load(.seq_cst))
+                {
                     std.Thread.yield() catch {};
                 }
             }
         }
 
-        pub fn getErrorCount(self: *const Self) u32 {
+        pub fn getErrorCount(
+            self: *const Self,
+        ) u32
+        {
             var count: u32 = 0;
-            for (self.work_items.items) |*item| {
-                if (item.error_code.load(.seq_cst) != 0) {
+            for (self.work_items.items)
+                |*item|
+            {
+                if (item.error_code.load(.seq_cst) != 0)
+                {
                     count += 1;
                 }
             }
@@ -372,29 +480,41 @@ pub fn WorkGroup(comptime Context: type) type {
 // TESTS
 //==============================================================================
 
-test "worker pool native" {
-    if (!HAS_THREADS) return error.SkipZigTest;
+test "worker pool native"
+{
+    if (!HAS_THREADS)
+    {
+        return error.SkipZigTest;
+    }
 
     const allocator = std.testing.allocator;
 
-    var pool = try WorkerPool.init(.{
-        .core_workers = 2,
-        .allocator = allocator,
-    });
+    var pool = try WorkerPool.init(
+        .{
+            .core_workers = 2,
+            .allocator = allocator,
+        },
+    );
     defer pool.deinit();
 
     // Test will be implemented
 }
 
-test "work group" {
-    if (!HAS_THREADS) return error.SkipZigTest;
+test "work group"
+{
+    if (!HAS_THREADS)
+    {
+        return error.SkipZigTest;
+    }
 
     const allocator = std.testing.allocator;
 
-    var pool = try WorkerPool.init(.{
-        .core_workers = 2,
-        .allocator = allocator,
-    });
+    var pool = try WorkerPool.init(
+        .{
+            .core_workers = 2,
+            .allocator = allocator,
+        },
+    );
     defer pool.deinit();
 
     const Context = struct {
@@ -409,17 +529,29 @@ test "work group" {
     defer group.deinit();
 
     // Spawn work
-    try group.spawn(struct {
-        fn work(c: *Context) void {
-            _ = c.value.fetchAdd(1, .seq_cst);
-        }
-    }.work, &ctx);
+    try group.spawn(
+        struct {
+            fn work(
+                c: *Context,
+            ) void
+            {
+                _ = c.value.fetchAdd(1, .seq_cst);
+            }
+        }.work,
+        &ctx,
+    );
 
-    try group.spawn(struct {
-        fn work(c: *Context) void {
-            _ = c.value.fetchAdd(1, .seq_cst);
-        }
-    }.work, &ctx);
+    try group.spawn(
+        struct {
+            fn work(
+                c: *Context,
+            ) void
+            {
+                _ = c.value.fetchAdd(1, .seq_cst);
+            }
+        }.work,
+        &ctx,
+    );
 
     // Wait for completion
     group.join();

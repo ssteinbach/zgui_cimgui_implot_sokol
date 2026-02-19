@@ -150,7 +150,7 @@ export fn frame(
         .{
             .action = STATE.pass_action,
             .swapchain = sglue.swapchain(),
-        }
+        },
     );
 
     simgui.render();
@@ -192,7 +192,10 @@ export fn event(
     _ = simgui.handleEvent(ev.*);
 
     // Check if the key event is a key press, and if it is the Escape key 
-    if (ev.*.type == .KEY_DOWN and ev.*.key_code == .ESCAPE) 
+    if (
+        ev.*.type == .KEY_DOWN
+        and ev.*.key_code == .ESCAPE
+    ) 
     { 
         // Quit the application 
         sapp.quit();
@@ -255,7 +258,7 @@ pub fn sokol_main(
             .num_channels = 1,
             .num_lanes = 4,
             .logger = .{ .func = STATE.app.logger },
-        }
+        },
     );
 
     sapp.run(

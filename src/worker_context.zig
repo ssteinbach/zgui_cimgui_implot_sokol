@@ -16,7 +16,10 @@ pub const SerializedContext = struct {
     data: []u8,
     allocator: std.mem.Allocator,
 
-    pub fn deinit(self: *SerializedContext) void {
+    pub fn deinit(
+        self: *SerializedContext,
+    ) void
+    {
         self.allocator.free(self.data);
     }
 };
@@ -26,9 +29,11 @@ pub fn serialize(
     comptime Context: type,
     context: *const Context,
     allocator: std.mem.Allocator,
-) !SerializedContext {
+) !SerializedContext
+{
     // For POD types, we can just copy the bytes
-    if (comptime isPOD(Context)) {
+    if (comptime isPOD(Context))
+    {
         const size = @sizeOf(Context);
         const data = try allocator.alloc(u8, size);
         const src_bytes: [*]const u8 = @ptrCast(context);
@@ -38,10 +43,16 @@ pub fn serialize(
             .data = data,
             .allocator = allocator,
         };
-    } else {
+    }
+    else
+    {
         // For complex types, we need custom serialization
-        // This is a placeholder - real implementation would need type-specific serialization
-        @compileError("Complex types not yet supported for worker serialization");
+        // This is a placeholder - real implementation would need
+        // type-specific serialization
+        @compileError((
+            "Complex types not yet supported for worker "
+            ++ "serialization"
+        ));
     }
 }
 
@@ -50,11 +61,14 @@ pub fn deserialize(
     comptime Context: type,
     data: []const u8,
     allocator: std.mem.Allocator,
-) !Context {
+) !Context
+{
     _ = allocator;
 
-    if (comptime isPOD(Context)) {
-        if (data.len != @sizeOf(Context)) {
+    if (comptime isPOD(Context))
+    {
+        if (data.len != @sizeOf(Context))
+        {
             return error.InvalidSerializedData;
         }
 
@@ -63,14 +77,22 @@ pub fn deserialize(
         @memcpy(dest_bytes[0..@sizeOf(Context)], data);
 
         return result;
-    } else {
-        @compileError("Complex types not yet supported for worker deserialization");
+    }
+    else
+    {
+        @compileError((
+            "Complex types not yet supported for worker "
+            ++ "deserialization"
+        ));
     }
 }
 
 /// Check if a type is Plain Old Data (POD)
 /// POD types can be safely copied byte-by-byte
-fn isPOD(comptime T: type) bool {
+fn isPOD(
+    comptime T: type,
+) bool
+{
     const info = @typeInfo(T);
 
     switch (info) {
@@ -79,8 +101,13 @@ fn isPOD(comptime T: type) bool {
         .Array => |array_info| return isPOD(array_info.child),
         .Struct => |struct_info| {
             // Check all fields are POD
-            inline for (struct_info.fields) |field| {
-                if (!isPOD(field.type)) return false;
+            inline for (struct_info.fields)
+                |field|
+            {
+                if (!isPOD(field.type))
+                {
+                    return false;
+                }
             }
             return true;
         },
@@ -91,15 +118,23 @@ fn isPOD(comptime T: type) bool {
 }
 
 /// In-place context holder for workers
-/// This allocates memory for the context in a way that can be passed to workers
-pub fn WorkerContext(comptime Context: type) type {
+/// This allocates memory for the context in a way that can be passed to
+/// workers
+pub fn WorkerContext(
+    comptime Context: type,
+) type
+{
     return struct {
         const Self = @This();
 
         data: *Context,
         allocator: std.mem.Allocator,
 
-        pub fn init(allocator: std.mem.Allocator, context: Context) !Self {
+        pub fn init(
+            allocator: std.mem.Allocator,
+            context: Context,
+        ) !Self
+        {
             const data = try allocator.create(Context);
             data.* = context;
 
@@ -109,21 +144,31 @@ pub fn WorkerContext(comptime Context: type) type {
             };
         }
 
-        pub fn deinit(self: *Self) void {
+        pub fn deinit(
+            self: *Self,
+        ) void
+        {
             self.allocator.destroy(self.data);
         }
 
-        pub fn ptr(self: *Self) *Context {
+        pub fn ptr(
+            self: *Self,
+        ) *Context
+        {
             return self.data;
         }
 
-        pub fn constPtr(self: *const Self) *const Context {
+        pub fn constPtr(
+            self: *const Self,
+        ) *const Context
+        {
             return self.data;
         }
     };
 }
 
-test "serialize POD type" {
+test "serialize POD type"
+{
     const TestContext = struct {
         value: u32,
         flag: bool,
@@ -141,19 +186,27 @@ test "serialize POD type" {
 
     try std.testing.expectEqual(@sizeOf(TestContext), serialized.data.len);
 
-    const deserialized = try deserialize(TestContext, serialized.data, allocator);
+    const deserialized = try deserialize(
+        TestContext,
+        serialized.data,
+        allocator,
+    );
     try std.testing.expectEqual(ctx.value, deserialized.value);
     try std.testing.expectEqual(ctx.flag, deserialized.flag);
 }
 
-test "worker context" {
+test "worker context"
+{
     const TestContext = struct {
         value: u32,
     };
 
     const allocator = std.testing.allocator;
 
-    var worker_ctx = try WorkerContext(TestContext).init(allocator, .{ .value = 123 });
+    var worker_ctx = try WorkerContext(TestContext).init(
+        allocator,
+        .{ .value = 123 },
+    );
     defer worker_ctx.deinit();
 
     try std.testing.expectEqual(@as(u32, 123), worker_ctx.ptr().value);

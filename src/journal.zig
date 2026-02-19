@@ -47,7 +47,8 @@ const Journal = struct {
          self: *@This(),
      ) !void
      {
-         if (self.entries.items.len == 0) {
+         if (self.entries.items.len == 0)
+         {
              return;
          }
 
@@ -96,11 +97,11 @@ test "Journal Test"
 
         try std.testing.expectEqual(
             TEST_JOURNAL_LIMIT,
-            journal.max_depth
+            journal.max_depth,
         );
         try std.testing.expectEqual(
             0,
-            journal.entries.items.len
+            journal.entries.items.len,
         );
 
         try journal.add(cmd);
@@ -132,7 +133,10 @@ test "Journal Test"
     try std.testing.expectEqual(5, value);
 
     try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.max_depth);
-    try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.entries.items.len);
+    try std.testing.expectEqual(
+        TEST_JOURNAL_LIMIT,
+        journal.entries.items.len,
+    );
 
     while (journal.entries.items.len > 0)
         : (try journal.undo())
@@ -179,7 +183,10 @@ test "Journal Test (undo/redo)"
     try std.testing.expectEqual(5, value);
 
     try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.max_depth);
-    try std.testing.expectEqual(TEST_JOURNAL_LIMIT, journal.entries.items.len);
+    try std.testing.expectEqual(
+        TEST_JOURNAL_LIMIT,
+        journal.entries.items.len,
+    );
 
     // undo twice, leaving one action in the journal
     try journal.undo();

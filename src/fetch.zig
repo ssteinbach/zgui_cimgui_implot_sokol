@@ -7,8 +7,7 @@ const std = @import("std");
 const sokol_fetch = @import("sokol").fetch;
 
 /// Compression format for automatic decompression
-pub const Compression = enum
-{
+pub const Compression = enum {
     /// No decompression (raw data)
     none,
     /// Gzip format (.gz files)
@@ -27,8 +26,7 @@ pub const Query = struct {
     pub const CHUNK_SIZE: usize = 1 * 1024 * 1024;
 
     /// State of the fetch operation, loading, failed, etc.
-    pub const State = enum
-    {
+    pub const State = enum {
         loading,
         loaded,
         failed,
@@ -81,7 +79,8 @@ pub const Query = struct {
     /// State of the query.
     state: State,
 
-    /// Error details when state == .failed (null if no error or still loading)
+    /// Error details when state == .failed (null if no error or still
+    /// loading)
     maybe_error: ?sokol_fetch.Error,
 
     ////////////////////////////////////////////////////////////////////////
@@ -112,14 +111,16 @@ pub const Query = struct {
         if (self.maybe_error)
             |err|
         {
-            return switch (err)
-            {
+            return switch (err) {
                 .NO_ERROR => "No error",
                 .FILE_NOT_FOUND => "File not found or could not be opened",
                 .NO_BUFFER => "No buffer provided for fetch",
                 .BUFFER_TOO_SMALL => "Buffer too small for file content",
                 .UNEXPECTED_EOF => "Unexpected end of file",
-                .INVALID_HTTP_STATUS => "Invalid HTTP status (non-2xx response)",
+                .INVALID_HTTP_STATUS => (
+                    "Invalid HTTP status (non-2xx "
+                    ++ "response)"
+                ),
                 .CANCELLED => "Fetch was cancelled",
                 .JS_OTHER => "JavaScript error (check browser console)",
             };
@@ -189,7 +190,8 @@ pub const Query = struct {
         options: struct{
             /// Optional callback that is called when fetch is done
             maybe_callback: ?Query.CallbackFn = null,
-            /// Compression handling mode (default: none for backward compatibility)
+            /// Compression handling mode (default: none for backward
+            /// compatibility)
             compression: Compression = .none,
         },
     ) !*Query
@@ -218,9 +220,10 @@ pub const Query = struct {
             .handle = .{},
         };
 
-        // Send fetch request with streaming (chunk_size enables multi-callback mode)
-        // Note: user_data will copy the pointer value itself (8 bytes), not the
-        // whole Query struct
+        // Send streaming fetch request (chunk_size enables multi-callback
+        // mode) 
+        // Note: user_data will copies pointer value (8 bytes), not the whole
+        // Query struct
         new_query.*.handle = sokol_fetch.send(
             .{
                 .path = @ptrCast(new_query.target_path),
@@ -234,7 +237,7 @@ pub const Query = struct {
                     .ptr = @ptrCast(&new_query),
                     .size = @sizeOf(*Query),
                 },
-            }
+            },
         );
 
         return new_query;
@@ -284,7 +287,7 @@ fn streaming_callback(
             .{
                 fetch_query.target_path,
                 fetch_query.error_name(),
-            }
+            },
         );
 
         // Call user callback on failure so completion trackers don't hang
@@ -304,7 +307,7 @@ fn streaming_callback(
 
         fetch_query.raw_data_read_buffer.appendSlice(
             allocator,
-            chunk_data
+            chunk_data,
         ) catch
             |err|
         {
@@ -330,8 +333,7 @@ fn streaming_callback(
         }
 
         // Handle decompression based on compression mode
-        const should_decompress = switch (fetch_query.compression)
-        {
+        const should_decompress = switch (fetch_query.compression) {
             .none => false,
             .gzip => true,
             .auto_detect => blk: {
@@ -350,7 +352,9 @@ fn streaming_callback(
 
         if (should_decompress)
         {
-            fetch_query.result_data_buffer = fetch_query.decompress_gzip(raw_data) catch
+            fetch_query.result_data_buffer = fetch_query.decompress_gzip(
+                raw_data,
+            ) catch
                 |err|
             {
                 std.log.err("Decompression failed: {any}", .{err});

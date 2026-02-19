@@ -18,13 +18,19 @@ pub const WorkFn = *const fn (*anyopaque) void;
 pub const MAX_WORK_FUNCTIONS = 256;
 
 /// Global work function registry
-var WORK_FUNCTION_REGISTRY: [MAX_WORK_FUNCTIONS]?WorkFn = [_]?WorkFn{null} ** MAX_WORK_FUNCTIONS;
+var WORK_FUNCTION_REGISTRY: [MAX_WORK_FUNCTIONS]?WorkFn = (
+    [_]?WorkFn{null} ** MAX_WORK_FUNCTIONS
+);
 var NEXT_WORK_FN_ID: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
 
 /// Register a work function and return its unique ID
-pub fn registerWorkFunction(work_fn: WorkFn) u32 {
+pub fn registerWorkFunction(
+    work_fn: WorkFn,
+) u32
+{
     const id = NEXT_WORK_FN_ID.fetchAdd(1, .seq_cst);
-    if (id >= MAX_WORK_FUNCTIONS) {
+    if (id >= MAX_WORK_FUNCTIONS)
+    {
         @panic("Too many work functions registered");
     }
     WORK_FUNCTION_REGISTRY[id] = work_fn;
@@ -32,15 +38,28 @@ pub fn registerWorkFunction(work_fn: WorkFn) u32 {
 }
 
 /// Get a work function by ID
-pub fn getWorkFunction(id: u32) ?WorkFn {
-    if (id >= MAX_WORK_FUNCTIONS) return null;
+pub fn getWorkFunction(
+    id: u32,
+) ?WorkFn
+{
+    if (id >= MAX_WORK_FUNCTIONS)
+    {
+        return null;
+    }
     return WORK_FUNCTION_REGISTRY[id];
 }
 
 /// WASM export: Worker dispatcher entry point
 /// Called from JavaScript worker harness
-export fn _worker_dispatch(work_fn_id: u32, context_ptr: *anyopaque) i32 {
-    if (!IS_WASM) return -1; // Should never be called on native
+export fn _worker_dispatch(
+    work_fn_id: u32,
+    context_ptr: *anyopaque,
+) i32
+{
+    if (!IS_WASM)
+    {
+        return -1;
+    } // Should never be called on native
 
     const work_fn = getWorkFunction(work_fn_id) orelse {
         std.log.err("Invalid work function ID: {d}", .{work_fn_id});
@@ -54,8 +73,13 @@ export fn _worker_dispatch(work_fn_id: u32, context_ptr: *anyopaque) i32 {
 }
 
 /// WASM export: Worker initialization (optional)
-export fn _worker_init() void {
-    if (!IS_WASM) return;
+export fn _worker_init(
+) void
+{
+    if (!IS_WASM)
+    {
+        return;
+    }
     // Per-worker initialization if needed
     // Could initialize thread-local state, etc.
 }
@@ -64,9 +88,13 @@ export fn _worker_init() void {
 pub fn makeWorkFunction(
     comptime Context: type,
     comptime func: fn (Context) void,
-) WorkFn {
+) WorkFn
+{
     return struct {
-        fn wrapper(ctx_ptr: *anyopaque) void {
+        fn wrapper(
+            ctx_ptr: *anyopaque,
+        ) void
+        {
             const typed_ptr: *Context = @ptrCast(@alignCast(ctx_ptr));
             func(typed_ptr.*);
         }
@@ -74,9 +102,13 @@ pub fn makeWorkFunction(
 }
 
 // Tests
-test "register and retrieve work function" {
+test "register and retrieve work function"
+{
     const test_fn = struct {
-        fn work(ctx: *anyopaque) void {
+        fn work(
+            ctx: *anyopaque,
+        ) void
+        {
             _ = ctx;
         }
     }.work;
@@ -88,17 +120,24 @@ test "register and retrieve work function" {
     try std.testing.expectEqual(test_fn, retrieved.?);
 }
 
-test "makeWorkFunction wrapper" {
+test "makeWorkFunction wrapper"
+{
     const TestContext = struct {
         value: u32,
     };
 
-    const work_fn = makeWorkFunction(TestContext, struct {
-        fn work(ctx: TestContext) void {
-            _ = ctx;
-            // Work happens here
-        }
-    }.work);
+    const work_fn = makeWorkFunction(
+        TestContext,
+        struct {
+            fn work(
+            ctx: TestContext,
+        ) void
+        {
+                _ = ctx;
+                // Work happens here
+            }
+        }.work,
+    );
 
     var ctx = TestContext{ .value = 42 };
     work_fn(@ptrCast(&ctx));

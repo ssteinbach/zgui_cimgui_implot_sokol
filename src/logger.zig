@@ -17,9 +17,9 @@ const scoped_log = std.log.scoped(.sokol);
 
 /// Logger callback compatible with sokol's Logger.func signature.
 ///
-/// Routes sokol log messages to std.log at the appropriate level. Safe to call
-/// from multiple threads.  Treats all string pointers as potentially null, per
-/// sokol convention.
+/// Routes sokol log messages to std.log at the appropriate level. Safe to
+/// call from multiple threads.  Treats all string pointers as potentially
+/// null, per sokol convention.
 pub fn std_log_scoped(
     tag: [*c]const u8,
     log_level: u32,

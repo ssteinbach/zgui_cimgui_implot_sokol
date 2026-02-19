@@ -12,15 +12,13 @@ const app_wrapper = ziis.app_wrapper;
 const cimgui = ziis.cimgui;
 
 /// Data read from the example json, designed to be displayed by Zplot
-const PieChartSliceData = struct
-{
+const PieChartSliceData = struct {
     label: [*:0]const u8,
     value: f64,
 };
 
 /// Context for sorting table rows
-const SortContext = struct
-{
+const SortContext = struct {
     column: i16,
     ascending: bool,
 
@@ -31,8 +29,7 @@ const SortContext = struct
         b: STATE.TableRowData,
     ) bool
     {
-        const result = switch (ctx.column)
-        {
+        const result = switch (ctx.column) {
             // ID column
             0 => std.math.order(a.id, b.id),
             // Name column
@@ -64,7 +61,7 @@ const STATE = struct {
     var texid: u64 = 0;
     var frame_number: usize = 0;
     var buffer = std.mem.zeroes(
-        [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8
+        [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8,
     );
     var maybe_journal : ?ziis.undo.Journal = null;
     var image_data = ziis.sokol.gfx.ImageData{};
@@ -90,8 +87,7 @@ const STATE = struct {
     var auto_process_tasks: bool = false; // Control auto-processing
 
     // Sortable table demo state
-    const TableRowData = struct
-    {
+    const TableRowData = struct {
         id: u32,
         name: [:0]const u8,
         quantity: i32,
@@ -101,14 +97,62 @@ const STATE = struct {
 
     // Sample data for the sortable table
     var table_data = [_]TableRowData{
-        .{ .id = 1, .name = "Apples", .quantity = 150, .price = 1.25, .is_active = true },
-        .{ .id = 2, .name = "Bananas", .quantity = 200, .price = 0.75, .is_active = true },
-        .{ .id = 3, .name = "Cherries", .quantity = 50, .price = 4.50, .is_active = false },
-        .{ .id = 4, .name = "Dates", .quantity = 80, .price = 6.00, .is_active = true },
-        .{ .id = 5, .name = "Elderberries", .quantity = 25, .price = 8.99, .is_active = false },
-        .{ .id = 6, .name = "Figs", .quantity = 120, .price = 3.25, .is_active = true },
-        .{ .id = 7, .name = "Grapes", .quantity = 300, .price = 2.50, .is_active = true },
-        .{ .id = 8, .name = "Honeydew", .quantity = 45, .price = 5.00, .is_active = false },
+        .{
+            .id = 1,
+            .name = "Apples",
+            .quantity = 150,
+            .price = 1.25,
+            .is_active = true,
+        },
+        .{
+            .id = 2,
+            .name = "Bananas",
+            .quantity = 200,
+            .price = 0.75,
+            .is_active = true,
+        },
+        .{
+            .id = 3,
+            .name = "Cherries",
+            .quantity = 50,
+            .price = 4.50,
+            .is_active = false,
+        },
+        .{
+            .id = 4,
+            .name = "Dates",
+            .quantity = 80,
+            .price = 6.00,
+            .is_active = true,
+        },
+        .{
+            .id = 5,
+            .name = "Elderberries",
+            .quantity = 25,
+            .price = 8.99,
+            .is_active = false,
+        },
+        .{
+            .id = 6,
+            .name = "Figs",
+            .quantity = 120,
+            .price = 3.25,
+            .is_active = true,
+        },
+        .{
+            .id = 7,
+            .name = "Grapes",
+            .quantity = 300,
+            .price = 2.50,
+            .is_active = true,
+        },
+        .{
+            .id = 8,
+            .name = "Honeydew",
+            .quantity = 45,
+            .price = 5.00,
+            .is_active = false,
+        },
     };
 
     // Web Worker demo state (WASM only)
@@ -150,8 +194,7 @@ fn maybe_pie_slice_under_mouse(
     value: T,
 }
 {
-    switch (@typeInfo(T))
-    {
+    switch (@typeInfo(T)) {
         .@"float", .@"int" => {},
         inline else => @compileError(
             "Only supports pie charts of numeric values"
@@ -186,7 +229,7 @@ fn maybe_pie_slice_under_mouse(
     // calculate angle (atan2 from right, CCW)
     // rotate -90° to start from top
     const angle_raw = std.math.radiansToDegrees(
-        std.math.atan2(dy, dx)
+        std.math.atan2(dy, dx),
     );
     const angle = @mod(angle_raw - 90.0, 360.0);
 
@@ -227,7 +270,7 @@ fn draw_pie_chart(
             .label_ids = labels,
             .values = values,
             .flags = .{ .normalize = true },
-        }
+        },
     );
 
     // Add tooltip on hover
@@ -241,7 +284,7 @@ fn draw_pie_chart(
             .{
                 .x = mouse_screen_pos[0] + 15,
                 .y = mouse_screen_pos[1] + 15,
-            }
+            },
         );
         zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
 
@@ -267,7 +310,7 @@ fn draw_pie_chart(
 
             zgui.text(
                 "Item: {s}\nValue: {d}",
-                .{hovered.label, hovered.value}
+                .{hovered.label, hovered.value},
             );
         }
     }
@@ -357,7 +400,7 @@ fn draw(
                     allocator,
                     &STATE.f,
                     new,
-                    "texture offset"
+                    "texture offset",
             );
             try cmd.do();
             try STATE.maybe_journal.?.update_if_new_or_add(cmd);
@@ -371,7 +414,7 @@ fn draw(
 
         zgui.bulletText(
             "Head Entry in Journal: {?d}",
-            .{ STATE.maybe_journal.?.maybe_head_entry }
+            .{ STATE.maybe_journal.?.maybe_head_entry },
         );
 
         if (zgui.beginItemTooltip()) 
@@ -451,7 +494,7 @@ fn draw(
                         zgui.plot.setupLegend(
                             .{ 
                                 .south = true,
-                                .west = true 
+                                .west = true, 
                             },
                             .{},
                         );
@@ -466,7 +509,7 @@ fn draw(
                                 .x = xs[0],
                                 .y = ys[0],
                                 .pix_offset = .{ -15, -10 },
-                            }
+                            },
                         );
                         zplot.plotText(
                             "end",
@@ -474,7 +517,7 @@ fn draw(
                                 .x = xs[xs.len-1],
                                 .y = ys[ys.len-1],
                                 .pix_offset = .{ 15, 0 },
-                            }
+                            },
                         );
 
                         zplot.plotLine(
@@ -594,7 +637,9 @@ fn draw(
                         zgui.plot.setupFinish();
 
                         // Example 1: Simple stairs with values only
-                        const values= [_]f32{1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 3.0};
+                        const values= (
+                            [_]f32{1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 3.0}
+                        );
                         zplot.plotStairsValues(
                             "Auto X-axis",
                             f32,
@@ -629,7 +674,9 @@ fn draw(
                         );
 
                         // Example 4: Shaded stairs
-                        const xs3= [_]f32{0.25, 1.25, 2.25, 3.25, 4.25, 5.25, 6.25};
+                        const xs3= (
+                            [_]f32{0.25, 1.25, 2.25, 3.25, 4.25, 5.25, 6.25}
+                        );
                         const ys3= [_]f32{0.5, 1.5, 1.0, 2.5, 2.0, 3.0, 2.5};
                         zplot.plotStairs(
                             "Shaded Stairs",
@@ -882,10 +929,18 @@ fn draw(
                 );
 
 
-                const c1 = zgui.colorConvertFloat4ToU32(.{0.8, 0.2, 0.2, 0.4});
-                const c2 = zgui.colorConvertFloat4ToU32(.{0.2, 0.8, 0.2, 0.4});
-                const c3 = zgui.colorConvertFloat4ToU32(.{0.2, 0.2, 0.8, 0.4});
-                const c4 = zgui.colorConvertFloat4ToU32(.{0.8, 0.8, 0.8, 0.9});
+                const c1 = zgui.colorConvertFloat4ToU32(
+                    .{0.8, 0.2, 0.2, 0.4},
+                );
+                const c2 = zgui.colorConvertFloat4ToU32(
+                    .{0.2, 0.8, 0.2, 0.4},
+                );
+                const c3 = zgui.colorConvertFloat4ToU32(
+                    .{0.2, 0.2, 0.8, 0.4},
+                );
+                const c4 = zgui.colorConvertFloat4ToU32(
+                    .{0.8, 0.8, 0.8, 0.9},
+                );
 
                 dl.addRect(
                     .{
@@ -936,8 +991,7 @@ fn draw(
                     defer zgui.endChild();
 
                     // Display fetch status with colors
-                    switch (STATE.json_fetch_query.state)
-                    {
+                    switch (STATE.json_fetch_query.state) {
                         .failed => {
                             zgui.pushStyleColor4f(
                                 .{
@@ -992,7 +1046,10 @@ fn draw(
                                 }
                             );
                             zgui.text(
-                                "JSON data loaded successfully via sokol.fetch",
+                                (
+                                    "JSON data loaded successfully via "
+                                    ++ "sokol.fetch"
+                                ),
                                 .{}
                             );
                             zgui.popStyleColor(.{});
@@ -1025,8 +1082,7 @@ fn draw(
                 defer zgui.endTabItem();
                 defer zgui.endChild();
 
-                switch (STATE.big_text_query.state)
-                {
+                switch (STATE.big_text_query.state) {
                     .loaded => {
                         zgui.separatorText("Big text embed test");
 
@@ -1167,16 +1223,23 @@ fn draw(
                         if (sort_specs.dirty)
                         {
                             // Sort the data based on specs
-                            const specs = sort_specs.specs[0..@intCast(sort_specs.count)];
+                            const specs = (
+                                sort_specs.specs[0..@intCast(sort_specs.count)]
+                            );
                             if (specs.len > 0)
                             {
                                 const spec = specs[0];
-                                const ascending = spec.sort_direction == .ascending;
+                                const ascending = (
+                                    spec.sort_direction == .ascending
+                                );
 
                                 std.mem.sort(
                                     STATE.TableRowData,
                                     &STATE.table_data,
-                                    SortContext{ .column = spec.index, .ascending = ascending },
+                                    SortContext{
+                                        .column = spec.index,
+                                        .ascending = ascending,
+                                    },
                                     SortContext.lessThan,
                                 );
                             }
@@ -1246,7 +1309,9 @@ fn draw(
                     |row|
                 {
                     total_quantity += row.quantity;
-                    total_value += @as(f32, @floatFromInt(row.quantity)) * row.price;
+                    total_value += (
+                        @as(f32, @floatFromInt(row.quantity)) * row.price
+                    );
                     if (row.is_active)
                     {
                         active_count += 1;
@@ -1256,7 +1321,10 @@ fn draw(
                 zgui.text("Total Items: {d}", .{STATE.table_data.len});
                 zgui.text("Total Quantity: {d}", .{total_quantity});
                 zgui.text("Total Value: ${d:.2}", .{total_value});
-                zgui.text("Active Products: {d}/{d}", .{ active_count, STATE.table_data.len });
+                zgui.text(
+                    "Active Products: {d}/{d}",
+                    .{ active_count, STATE.table_data.len },
+                );
             }
 
             // Threading Demo Tab
@@ -1294,7 +1362,10 @@ fn draw(
                 // Counter display
                 const current_count = STATE.thread_counter.load(.seq_cst);
                 zgui.text("Counter Value: {d}", .{current_count});
-                zgui.text("Threads/Tasks Spawned: {d}", .{STATE.threads_spawned});
+                zgui.text(
+                    "Threads/Tasks Spawned: {d}",
+                    .{STATE.threads_spawned},
+                );
                 zgui.text("Pending Tasks in Queue: {d}", .{
                     STATE.thread_task_queue.pending()
                 });
@@ -1307,26 +1378,36 @@ fn draw(
                     if (HAS_THREADS)
                     {
                         // True multithreading
-                        if (ziis.Thread.spawn(
-                            .{},
-                            struct {
-                                fn work(counter: *std.atomic.Value(u32)) void {
-                                    var i: u32 = 0;
-                                    while (i < 100) : (i += 1)
-                                    {
-                                        _ = counter.fetchAdd(1, .seq_cst);
+                        if (
+                            ziis.Thread.spawn(
+                                .{},
+                                struct {
+                                    fn work(
+                                    counter: *std.atomic.Value(u32),
+                                ) void
+                                {
+                                        var i: u32 = 0;
+                                        while (i < 100)
+                                        : (i += 1)
+                                        {
+                                            _ = counter.fetchAdd(1, .seq_cst);
+                                        }
                                     }
-                                }
-                            }.work,
-                            .{&STATE.thread_counter},
-                        )) |t|
+                                }.work,
+                                .{&STATE.thread_counter},
+                            )
+                        ) |t|
                         {
                             t.detach();
                             STATE.threads_spawned += 1;
                         }
-                        else |err|
+                        else
+                            |err|
                         {
-                            std.log.err("Failed to spawn thread: {any}", .{err});
+                            std.log.err(
+                                "Failed to spawn thread: {any}",
+                                .{err},
+                            );
                         }
                     }
                     else
@@ -1335,9 +1416,15 @@ fn draw(
                         _ = ziis.Thread.spawn(
                             .{},
                             struct {
-                                fn work(counter: *std.atomic.Value(u32)) void {
+                                fn work(
+                                    counter: *std.atomic.Value(
+                                    u32,
+                                ),
+                                ) void
+                                {
                                     var i: u32 = 0;
-                                    while (i < 100) : (i += 1)
+                                    while (i < 100)
+                                        : (i += 1)
                                     {
                                         _ = counter.fetchAdd(1, .seq_cst);
                                     }
@@ -1349,14 +1436,20 @@ fn draw(
                     }
                 }
 
-                if (zgui.isItemHovered(.{}) and zgui.beginItemTooltip())
+                if (
+                    zgui.isItemHovered(.{})
+                    and zgui.beginItemTooltip()
+                )
                 {
                     defer zgui.endTooltip();
                     zgui.text(
                         if (HAS_THREADS)
                             "Spawns a real thread that increments counter"
                         else
-                            "Executes synchronously (no true threading on WASM)",
+                            (
+                                "Executes synchronously (no true threading "
+                                ++ "on WASM)"
+                            ),
                         .{},
                     );
                 }
@@ -1369,7 +1462,10 @@ fn draw(
                     STATE.thread_task_queue.enqueue(.{
                         .context = &STATE.thread_counter,
                         .work = struct {
-                            fn work(counter: *std.atomic.Value(u32)) void {
+                            fn work(
+                                counter: *std.atomic.Value(u32),
+                            ) void
+                            {
                                 _ = counter.fetchAdd(1, .seq_cst);
                             }
                         }.work,
@@ -1377,10 +1473,16 @@ fn draw(
                     STATE.threads_spawned += 1;
                 }
 
-                if (zgui.isItemHovered(.{}) and zgui.beginItemTooltip())
+                if (
+                    zgui.isItemHovered(.{})
+                    and zgui.beginItemTooltip()
+                )
                 {
                     defer zgui.endTooltip();
-                    zgui.text("Adds task to queue (processed per-frame)", .{});
+                    zgui.text(
+                        "Adds task to queue (processed per-frame)",
+                        .{},
+                    );
                 }
 
                 zgui.spacing();
@@ -1432,16 +1534,22 @@ fn draw(
                 );
 
                 // Auto-process one task per frame if enabled
-                if (STATE.auto_process_tasks) {
+                if (STATE.auto_process_tasks)
+                {
                     _ = STATE.thread_task_queue.processOne();
                 }
             }
 
             // Web Worker Pool Demo Tab (WASM only)
-            // NOTE: Currently disabled due to EM_JS linking issues with Zig build system
-            // The worker pool implementation is complete but needs the build system
-            // to properly handle EM_JS JavaScript extraction from C objects
-            if (false and IS_WASM and zgui.beginTabItem("Web Worker Pool", .{}))
+            // NOTE: Currently disabled due to EM_JS linking issues with Zig
+            // build system The worker pool implementation is complete but
+            // needs the build system to properly handle EM_JS JavaScript
+            // extraction from C objects
+            if (
+                false
+                and IS_WASM
+                and zgui.beginTabItem("Web Worker Pool", .{})
+            )
             {
                 defer zgui.endTabItem();
 

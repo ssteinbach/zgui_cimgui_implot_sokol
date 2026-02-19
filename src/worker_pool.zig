@@ -40,7 +40,10 @@ pub const WorkerPoolConfig = struct {
 };
 
 /// Work item submitted to the pool
-pub fn WorkItem(comptime Context: type) type {
+pub fn WorkItem(
+    comptime Context: type,
+) type
+{
     return struct {
         const Self = @This();
 
@@ -51,7 +54,9 @@ pub fn WorkItem(comptime Context: type) type {
         work_fn: *const fn (Context) void,
 
         /// Completion flag (for tracking)
-        completed: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        completed: std.atomic.Value(bool) = std.atomic.Value(bool).init(
+            false,
+        ),
     };
 }
 
@@ -70,12 +75,17 @@ const NativeWorkerPool = struct {
     thread_pool: std.Thread.Pool,
     allocator: std.mem.Allocator,
 
-    pub fn init(config: WorkerPoolConfig) !Self {
+    pub fn init(
+        config: WorkerPoolConfig,
+    ) !Self
+    {
         var pool = std.Thread.Pool{};
-        try pool.init(.{
-            .allocator = config.allocator,
-            .n_jobs = config.core_workers,
-        });
+        try pool.init(
+            .{
+                .allocator = config.allocator,
+                .n_jobs = config.core_workers,
+            },
+        );
 
         return .{
             .thread_pool = pool,
@@ -83,7 +93,10 @@ const NativeWorkerPool = struct {
         };
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(
+        self: *Self,
+    ) void
+    {
         self.thread_pool.deinit();
     }
 
@@ -93,7 +106,8 @@ const NativeWorkerPool = struct {
         self: *Self,
         comptime Context: type,
         work: WorkItem(Context),
-    ) !void {
+    ) !void
+    {
         _ = self;
         _ = work;
         // TODO: Implement using thread_pool.spawn()
@@ -101,7 +115,10 @@ const NativeWorkerPool = struct {
     }
 
     /// Wait for all submitted work to complete
-    pub fn wait(self: *Self) void {
+    pub fn wait(
+        self: *Self,
+    ) void
+    {
         // TODO: Implement wait logic
         _ = self;
     }
@@ -118,14 +135,20 @@ const WasmWorkerPool = struct {
     // TODO: Track pending work items
     // TODO: Message passing infrastructure
 
-    pub fn init(config: WorkerPoolConfig) !Self {
+    pub fn init(
+        config: WorkerPoolConfig,
+    ) !Self
+    {
         return .{
             .allocator = config.allocator,
             .config = config,
         };
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(
+        self: *Self,
+    ) void
+    {
         // TODO: Terminate Web Workers
         _ = self;
     }
@@ -135,7 +158,8 @@ const WasmWorkerPool = struct {
         self: *Self,
         comptime Context: type,
         work: WorkItem(Context),
-    ) !void {
+    ) !void
+    {
         _ = self;
         _ = work;
         // TODO: Serialize work item and send to Web Worker via postMessage
@@ -143,7 +167,10 @@ const WasmWorkerPool = struct {
     }
 
     /// Wait for all Web Workers to complete their work
-    pub fn wait(self: *Self) void {
+    pub fn wait(
+        self: *Self,
+    ) void
+    {
         // TODO: Implement wait via promise or polling
         _ = self;
     }
@@ -151,7 +178,10 @@ const WasmWorkerPool = struct {
 
 /// Work Group - coordinates a batch of related work items
 /// Provides spawn/join API similar to std.Thread
-pub fn WorkGroup(comptime Context: type) type {
+pub fn WorkGroup(
+    comptime Context: type,
+) type
+{
     return struct {
         const Self = @This();
 
@@ -162,15 +192,21 @@ pub fn WorkGroup(comptime Context: type) type {
         pub fn init(
             allocator: std.mem.Allocator,
             pool: *WorkerPool,
-        ) Self {
+        ) Self
+        {
             return .{
                 .pool = pool,
-                .work_items = std.ArrayList(WorkItem(Context)).init(allocator),
+                .work_items = std.ArrayList(WorkItem(Context)).init(
+                    allocator,
+                ),
                 .allocator = allocator,
             };
         }
 
-        pub fn deinit(self: *Self) void {
+        pub fn deinit(
+            self: *Self,
+        ) void
+        {
             self.work_items.deinit(self.allocator);
         }
 
@@ -180,7 +216,8 @@ pub fn WorkGroup(comptime Context: type) type {
             self: *Self,
             work_fn: *const fn (Context) void,
             context: Context,
-        ) !void {
+        ) !void
+        {
             const item = WorkItem(Context){
                 .context = context,
                 .work_fn = work_fn,
@@ -192,10 +229,16 @@ pub fn WorkGroup(comptime Context: type) type {
 
         /// Wait for all work in this group to complete
         /// Similar to std.Thread.join
-        pub fn join(self: *Self) void {
+        pub fn join(
+            self: *Self,
+        ) void
+        {
             // Wait for all work items to be marked complete
-            for (self.work_items.items) |*item| {
-                while (!item.completed.load(.seq_cst)) {
+            for (self.work_items.items)
+                |*item|
+            {
+                while (!item.completed.load(.seq_cst))
+                {
                     std.Thread.yield() catch {};
                 }
             }
@@ -207,14 +250,22 @@ pub fn WorkGroup(comptime Context: type) type {
 // TESTS
 //==============================================================================
 
-test "worker pool basic" {
-    if (!HAS_THREADS) return error.SkipZigTest;
+test "worker pool basic"
+{
+    if (!HAS_THREADS)
+    {
+        return error.SkipZigTest;
+    }
 
     // TODO: Implement and test
 }
 
-test "work group spawn and join" {
-    if (!HAS_THREADS) return error.SkipZigTest;
+test "work group spawn and join"
+{
+    if (!HAS_THREADS)
+    {
+        return error.SkipZigTest;
+    }
 
     // TODO: Implement and test
 }

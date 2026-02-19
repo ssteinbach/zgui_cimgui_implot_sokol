@@ -12,6 +12,8 @@ comptime {
     _ = thread.IS_WASM;
 }
 
-pub fn main() void {
+pub fn main(
+) void
+{
     // Minimal function to make this a valid executable for check step
 }
