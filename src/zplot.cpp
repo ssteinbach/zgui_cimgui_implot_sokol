@@ -10,6 +10,36 @@
 #define ZGUI_API
 #endif
 
+static ImPlotSpec makeSpec(
+    int flags,
+    int offset,
+    int stride,
+    float fill_alpha,
+    const float line_color[4],
+    float line_weight,
+    const float fill_color[4],
+    int marker,
+    float marker_size,
+    const float marker_line_color[4],
+    const float marker_fill_color[4],
+    float size)
+{
+    ImPlotSpec spec;
+    spec.Flags = flags;
+    spec.Offset = offset;
+    spec.Stride = stride;
+    spec.FillAlpha = fill_alpha;
+    spec.LineColor = {line_color[0], line_color[1], line_color[2], line_color[3]};
+    spec.LineWeight = line_weight;
+    spec.FillColor = {fill_color[0], fill_color[1], fill_color[2], fill_color[3]};
+    spec.Marker = marker;
+    spec.MarkerSize = marker_size;
+    spec.MarkerLineColor = {marker_line_color[0], marker_line_color[1], marker_line_color[2], marker_line_color[3]};
+    spec.MarkerFillColor = {marker_fill_color[0], marker_fill_color[1], marker_fill_color[2], marker_fill_color[3]};
+    spec.Size = size;
+    return spec;
+}
+
 //--------------------------------------------------------------------------------------------------
 //
 // ImPlot
@@ -32,9 +62,9 @@ extern "C"
         return ImPlot::GetCurrentContext();
     }
 
-    ZGUI_API ImPlotStyle zguiPlotStyle_Init(void)
+    ZGUI_API void zguiPlotStyle_Init(ImPlotStyle *out)
     {
-        return ImPlotStyle();
+        *out = ImPlotStyle();
     }
 
     ZGUI_API ImPlotStyle *zguiPlot_GetStyle(void)
@@ -116,24 +146,34 @@ extern "C"
         double x0,
         ImPlotLineFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotLine(label_id, (const ImS8 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImS8 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotLine(label_id, (const ImU8 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImU8 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotLine(label_id, (const ImS16 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImS16 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotLine(label_id, (const ImU16 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImU16 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotLine(label_id, (const ImS32 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImS32 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotLine(label_id, (const ImU32 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImU32 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotLine(label_id, (const float *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const float *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotLine(label_id, (const double *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const double *)values, count, xscale, x0, spec);
         else
             assert(false);
     }
@@ -146,24 +186,34 @@ extern "C"
         int count,
         ImPlotLineFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotLine(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotLine(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotLine(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotLine(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotLine(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotLine(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotLine(label_id, (const float *)xv, (const float *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const float *)xv, (const float *)yv, count, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotLine(label_id, (const double *)xv, (const double *)yv, count, flags, offset, stride);
+            ImPlot::PlotLine(label_id, (const double *)xv, (const double *)yv, count, spec);
         else
             assert(false);
     }
@@ -176,24 +226,34 @@ extern "C"
         int count,
         ImPlotScatterFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotScatter(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotScatter(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotScatter(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotScatter(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotScatter(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotScatter(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotScatter(label_id, (const float *)xv, (const float *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const float *)xv, (const float *)yv, count, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotScatter(label_id, (const double *)xv, (const double *)yv, count, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const double *)xv, (const double *)yv, count, spec);
         else
             assert(false);
     }
@@ -207,24 +267,34 @@ extern "C"
         double x0,
         ImPlotScatterFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotScatter(label_id, (const ImS8 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImS8 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotScatter(label_id, (const ImU8 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImU8 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotScatter(label_id, (const ImS16 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImS16 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotScatter(label_id, (const ImU16 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImU16 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotScatter(label_id, (const ImS32 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImS32 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotScatter(label_id, (const ImU32 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const ImU32 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotScatter(label_id, (const float *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const float *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotScatter(label_id, (const double *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotScatter(label_id, (const double *)values, count, xscale, x0, spec);
         else
             assert(false);
     }
@@ -238,24 +308,34 @@ extern "C"
         double x0,
         ImPlotStairsFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotStairs(label_id, (const ImS8 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImS8 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotStairs(label_id, (const ImU8 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImU8 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotStairs(label_id, (const ImS16 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImS16 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotStairs(label_id, (const ImU16 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImU16 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotStairs(label_id, (const ImS32 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImS32 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotStairs(label_id, (const ImU32 *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImU32 *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotStairs(label_id, (const float *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const float *)values, count, xscale, x0, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotStairs(label_id, (const double *)values, count, xscale, x0, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const double *)values, count, xscale, x0, spec);
         else
             assert(false);
     }
@@ -268,24 +348,34 @@ extern "C"
         int count,
         ImPlotStairsFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotStairs(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotStairs(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotStairs(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotStairs(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotStairs(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotStairs(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotStairs(label_id, (const float *)xv, (const float *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const float *)xv, (const float *)yv, count, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotStairs(label_id, (const double *)xv, (const double *)yv, count, flags, offset, stride);
+            ImPlot::PlotStairs(label_id, (const double *)xv, (const double *)yv, count, spec);
         else
             assert(false);
     }
@@ -299,24 +389,34 @@ extern "C"
         double yref,
         ImPlotShadedFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotShaded(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotShaded(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotShaded(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotShaded(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotShaded(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotShaded(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotShaded(label_id, (const float *)xv, (const float *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const float *)xv, (const float *)yv, count, yref, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotShaded(label_id, (const double *)xv, (const double *)yv, count, yref, flags, offset, stride);
+            ImPlot::PlotShaded(label_id, (const double *)xv, (const double *)yv, count, yref, spec);
         else
             assert(false);
     }
@@ -329,24 +429,34 @@ extern "C"
         double bar_size,
         ImPlotBarsFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotBars(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotBars(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotBars(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotBars(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotBars(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotBars(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotBars(label_id, (const float *)xv, (const float *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const float *)xv, (const float *)yv, count, bar_size, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotBars(label_id, (const double *)xv, (const double *)yv, count, bar_size, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const double *)xv, (const double *)yv, count, bar_size, spec);
         else
             assert(false);
     }
@@ -360,24 +470,34 @@ extern "C"
         double shift,
         ImPlotBarsFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotBars(label_id, (const ImS8 *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImS8 *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotBars(label_id, (const ImU8 *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImU8 *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotBars(label_id, (const ImS16 *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImS16 *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotBars(label_id, (const ImU16 *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImU16 *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotBars(label_id, (const ImS32 *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImS32 *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotBars(label_id, (const ImU32 *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const ImU32 *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotBars(label_id, (const float *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const float *)values, count, bar_size, shift, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotBars(label_id, (const double *)values, count, bar_size, shift, flags, offset, stride);
+            ImPlot::PlotBars(label_id, (const double *)values, count, bar_size, shift, spec);
         else
             assert(false);
     }
@@ -455,7 +575,9 @@ extern "C"
         ImPlotTextFlags flags = 0)
     {
         const ImVec2 p(pix_offset[0], pix_offset[1]);
-        ImPlot::PlotText(text, x, y, p, flags);
+        ImPlotSpec spec;
+        spec.Flags = flags;
+        ImPlot::PlotText(text, x, y, p, spec);
     }
 
     ZGUI_API void zguiPlot_GetPlotLimits(
@@ -477,24 +599,34 @@ extern "C"
         int count,
         ImPlotInfLinesFlags flags,
         int offset,
-        int stride)
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
     {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotInfLines(label_id, (const ImS8 *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const ImS8 *)values, count, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotInfLines(label_id, (const ImU8 *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const ImU8 *)values, count, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotInfLines(label_id, (const ImS16 *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const ImS16 *)values, count, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotInfLines(label_id, (const ImU16 *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const ImU16 *)values, count, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotInfLines(label_id, (const ImS32 *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const ImS32 *)values, count, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotInfLines(label_id, (const ImU32 *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const ImU32 *)values, count, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotInfLines(label_id, (const float *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const float *)values, count, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotInfLines(label_id, (const double *)values, count, flags, offset, stride);
+            ImPlot::PlotInfLines(label_id, (const double *)values, count, spec);
         else
             assert(false);
     }
@@ -511,22 +643,24 @@ extern "C"
         double angle0,
         ImPlotPieChartFlags flags)
     {
+        ImPlotSpec spec;
+        spec.Flags = flags;
         if (data_type == ImGuiDataType_S8)
-            ImPlot::PlotPieChart(label_ids, (const ImS8 *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const ImS8 *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_U8)
-            ImPlot::PlotPieChart(label_ids, (const ImU8 *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const ImU8 *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_S16)
-            ImPlot::PlotPieChart(label_ids, (const ImS16 *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const ImS16 *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_U16)
-            ImPlot::PlotPieChart(label_ids, (const ImU16 *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const ImU16 *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_S32)
-            ImPlot::PlotPieChart(label_ids, (const ImS32 *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const ImS32 *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_U32)
-            ImPlot::PlotPieChart(label_ids, (const ImU32 *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const ImU32 *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_Float)
-            ImPlot::PlotPieChart(label_ids, (const float *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const float *)values, count, x, y, radius, label_fmt, angle0, spec);
         else if (data_type == ImGuiDataType_Double)
-            ImPlot::PlotPieChart(label_ids, (const double *)values, count, x, y, radius, label_fmt, angle0, flags);
+            ImPlot::PlotPieChart(label_ids, (const double *)values, count, x, y, radius, label_fmt, angle0, spec);
         else
             assert(false);
     }

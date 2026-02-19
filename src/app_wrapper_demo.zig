@@ -460,14 +460,6 @@ fn draw(
                         const xs= [_]f32{0, 1, 2, 3, 4};
                         const ys= [_]f32{0, 1, 2, 3, 6};
 
-                        zplot.pushStyleVar1f(
-                            .{
-                                .idx = .fill_alpha,
-                                .v = 0.1,
-                            }
-                        );
-                        defer zplot.popStyleVar(.{ .count = 1, });
-
                         zplot.plotText(
                             "start",
                             .{
@@ -487,11 +479,12 @@ fn draw(
 
                         zplot.plotLine(
                             "example function",
-                            f32, 
+                            f32,
                             .{
                                 .xv = &xs,
                                 .yv = &ys,
-                                .flags = .{ .shaded = true }
+                                .flags = .{ .shaded = true },
+                                .fill_alpha = 0.1,
                             },
                         );
                     }
@@ -544,21 +537,14 @@ fn draw(
                         const xs= STATE.point_buffers.items(.x);
                         const ys= STATE.point_buffers.items(.y);
 
-                        zplot.pushStyleVar1f(
-                            .{
-                                .idx = .fill_alpha,
-                                .v = 0.1,
-                            }
-                        );
-                        defer zplot.popStyleVar(.{ .count = 1, });
-
                         zplot.plotLine(
                             "Sine wave with lots of samples",
-                            f32, 
+                            f32,
                             .{
                                 .xv = xs,
                                 .yv = ys,
-                                .flags = .{ .shaded = true }
+                                .flags = .{ .shaded = true },
+                                .fill_alpha = 0.1,
                             },
                         );
                     }

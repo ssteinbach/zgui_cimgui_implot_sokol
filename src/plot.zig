@@ -22,7 +22,8 @@ extern fn zguiPlot_CreateContext() Context;
 extern fn zguiPlot_DestroyContext(ctx: ?Context) void;
 //--------------------------------------------------------------------------------------------------
 pub const Marker = enum(i32) {
-    none = -1,
+    none = -2,
+    auto = -1,
     circle = 0,
     square,
     diamond,
@@ -90,9 +91,13 @@ pub const Style = extern struct {
     use_iso_8601: bool,
     use_24h_clock: bool,
 
-    /// `pub fn init() Style`
-    pub const init = zguiPlotStyle_Init;
-    extern fn zguiPlotStyle_Init() Style;
+    pub fn init() Style
+    {
+        var style: Style = undefined;
+        zguiPlotStyle_Init(&style);
+        return style;
+    }
+    extern fn zguiPlotStyle_Init(out: *Style) void;
 
     pub fn getColor(style: Style, idx: StyleCol) [4]f32 {
         return style.colors[@intFromEnum(idx)];
@@ -153,15 +158,8 @@ extern fn zguiPlot_PushStyleColor1u(idx: StyleCol, col: u32) void;
 extern fn zguiPlot_PopStyleColor(count: i32) void;
 //--------------------------------------------------------------------------------------------------
 pub const StyleVar = enum(u32) {
-    line_weight, // 1f
-    marker, // 1i
-    marker_size, // 1f
-    marker_weight, // 1f
-    fill_alpha, // 1f
-    error_bar_size, // 1f
-    error_bar_weight, // 1f
-    digital_bit_height, // 1f
-    digital_bit_gap, // 1f
+    plot_default_size, // 2f
+    plot_min_size, // 2f
     plot_border_size, // 1f
     minor_alpha, // 1f
     major_tick_len, // 2f
@@ -178,8 +176,8 @@ pub const StyleVar = enum(u32) {
     mouse_pos_padding, // 2f
     annotation_padding, // 2f
     fit_padding, // 2f
-    plot_default_size, // 2f
-    plot_min_size, // 2f
+    digital_padding, // 1f
+    digital_spacing, // 1f
 };
 const PushStyleVar1i = struct {
     idx: StyleVar,
@@ -369,6 +367,15 @@ fn PlotLineValuesGen(comptime T: type) type {
         flags: LineFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotLineValues(label_id: [:0]const u8, comptime T: type, args: PlotLineValuesGen(T)) void {
@@ -382,6 +389,15 @@ pub fn plotLineValues(label_id: [:0]const u8, comptime T: type, args: PlotLineVa
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotLineValues(
@@ -394,6 +410,15 @@ extern fn zguiPlot_PlotLineValues(
     flags: LineFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 fn PlotLineGen(comptime T: type) type {
@@ -403,6 +428,15 @@ fn PlotLineGen(comptime T: type) type {
         flags: LineFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotLine(label_id: [:0]const u8, comptime T: type, args: PlotLineGen(T)) void {
@@ -416,6 +450,15 @@ pub fn plotLine(label_id: [:0]const u8, comptime T: type, args: PlotLineGen(T)) 
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotLine(
@@ -427,6 +470,15 @@ extern fn zguiPlot_PlotLine(
     flags: LineFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 // fn PlotInfLinesGen(comptime T: type) type {
@@ -487,6 +539,15 @@ fn PlotScatterValuesGen(comptime T: type) type {
         flags: ScatterFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotScatterValues(label_id: [:0]const u8, comptime T: type, args: PlotScatterValuesGen(T)) void {
@@ -500,6 +561,15 @@ pub fn plotScatterValues(label_id: [:0]const u8, comptime T: type, args: PlotSca
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotScatterValues(
@@ -512,6 +582,15 @@ extern fn zguiPlot_PlotScatterValues(
     flags: ScatterFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 fn PlotScatterGen(comptime T: type) type {
@@ -521,6 +600,15 @@ fn PlotScatterGen(comptime T: type) type {
         flags: ScatterFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotScatter(label_id: [:0]const u8, comptime T: type, args: PlotScatterGen(T)) void {
@@ -534,6 +622,15 @@ pub fn plotScatter(label_id: [:0]const u8, comptime T: type, args: PlotScatterGe
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotScatter(
@@ -545,6 +642,15 @@ extern fn zguiPlot_PlotScatter(
     flags: ScatterFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 fn PlotStairsValuesGen(comptime T: type) type {
@@ -555,6 +661,15 @@ fn PlotStairsValuesGen(comptime T: type) type {
         flags: StairsFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotStairsValues(label_id: [:0]const u8, comptime T: type, args: PlotStairsValuesGen(T)) void {
@@ -568,6 +683,15 @@ pub fn plotStairsValues(label_id: [:0]const u8, comptime T: type, args: PlotStai
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotStairsValues(
@@ -580,6 +704,15 @@ extern fn zguiPlot_PlotStairsValues(
     flags: StairsFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 fn PlotStairsGen(comptime T: type) type {
@@ -589,6 +722,15 @@ fn PlotStairsGen(comptime T: type) type {
         flags: StairsFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotStairs(label_id: [:0]const u8, comptime T: type, args: PlotStairsGen(T)) void {
@@ -602,6 +744,15 @@ pub fn plotStairs(label_id: [:0]const u8, comptime T: type, args: PlotStairsGen(
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotStairs(
@@ -613,6 +764,15 @@ extern fn zguiPlot_PlotStairs(
     flags: StairsFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 pub const ShadedFlags = packed struct(u32) {
@@ -626,6 +786,15 @@ fn PlotShadedGen(comptime T: type) type {
         flags: ShadedFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotShaded(label_id: [:0]const u8, comptime T: type, args: PlotShadedGen(T)) void {
@@ -640,6 +809,15 @@ pub fn plotShaded(label_id: [:0]const u8, comptime T: type, args: PlotShadedGen(
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotShaded(
@@ -652,6 +830,15 @@ extern fn zguiPlot_PlotShaded(
     flags: ShadedFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 pub const BarsFlags = packed struct(u32) {
@@ -676,6 +863,15 @@ fn PlotBarsGen(comptime T: type) type {
         flags: BarsFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotBars(label_id: [:0]const u8, comptime T: type, args: PlotBarsGen(T)) void {
@@ -690,6 +886,15 @@ pub fn plotBars(label_id: [:0]const u8, comptime T: type, args: PlotBarsGen(T)) 
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotBars(
@@ -702,6 +907,15 @@ extern fn zguiPlot_PlotBars(
     flags: BarsFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 
 fn PlotBarsValuesGen(comptime T: type) type {
@@ -712,6 +926,15 @@ fn PlotBarsValuesGen(comptime T: type) type {
         flags: BarsFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotBarsValues(label_id: [:0]const u8, comptime T: type, args: PlotBarsValuesGen(T)) void {
@@ -725,6 +948,15 @@ pub fn plotBarsValues(label_id: [:0]const u8, comptime T: type, args: PlotBarsVa
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotBarsValues(
@@ -737,6 +969,15 @@ extern fn zguiPlot_PlotBarsValues(
     flags: BarsFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 pub const DragToolFlags = packed struct(u32) {
@@ -860,6 +1101,15 @@ fn PlotInfLinesGen(comptime T: type) type {
         flags: InfLinesFlags = .{},
         offset: i32 = 0,
         stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
     };
 }
 pub fn plotInfLines(label_id: [:0]const u8, comptime T: type, args: PlotInfLinesGen(T)) void {
@@ -871,6 +1121,15 @@ pub fn plotInfLines(label_id: [:0]const u8, comptime T: type, args: PlotInfLines
         args.flags,
         args.offset,
         args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
     );
 }
 extern fn zguiPlot_PlotInfLines(
@@ -881,6 +1140,15 @@ extern fn zguiPlot_PlotInfLines(
     flags: InfLinesFlags,
     offset: i32,
     stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
 ) void;
 //----------------------------------------------------------------------------------------------
 pub const PieChartFlags = packed struct(u32) {

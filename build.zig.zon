@@ -11,8 +11,8 @@
             .hash = "cimgui-0.1.0-44ClkdQjlQDAxGXHT035QPGsTEex3c7VXeDkqJG8eUqO",
         },
         .implot = .{
-            .url = "git+https://github.com/epezent/implot.git#3da8bd34299965d3b0ab124df743fe3e076fa222",
-            .hash = "N-V-__8AAEp-CgAgvyx1wqLjwzz_RQC5EwY-tJLdzjp6ITbN",
+            .url = "git+https://github.com/epezent/implot.git#93c801b4bb801c5c11031d880b6af1d1f70bd79d",
+            .hash = "N-V-__8AAKDxCgCytNvujhC3JhOoFzBiqNwcxQdmTdPBaLTc",
         },
         .sokol = .{
             .url = "git+https://github.com/floooh/sokol-zig.git#baa842af7081c0d26d94847c5ecb398d8c5005cb",
