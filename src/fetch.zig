@@ -149,96 +149,34 @@ pub const Query = struct {
         compressed_data: []const u8,
     ) ![]const u8
     {
-        // Create an input reader from the compressed data
-        var input_reader = std.Io.Reader.fixed(compressed_data);
+        // Create a fixed reader from the compressed data
+        var input_reader: std.Io.Reader = .fixed(compressed_data);
 
-        // Allocate window buffer for decompression (required by flate)
-        const window_buffer = self.allocator.alloc(
-            u8,
-            std.compress.flate.max_window_len,
-        ) catch
-            |err|
-        {
-            std.log.err("Failed to allocate decompression window: {any}", .{err});
-            return err;
-        };
-        defer self.allocator.free(window_buffer);
+        // Create an allocating writer for the output
+        var output_writer: std.Io.Writer.Allocating = .init(self.allocator);
+        errdefer output_writer.deinit();
 
-        // Initialize the decompressor
-        var decomp = std.compress.flate.Decompress.init(
+        // Initialize gzip decompressor
+        var decomp: std.compress.flate.Decompress = .init(
             &input_reader,
             .gzip,
-            window_buffer,
+            &.{},
         );
 
-        // Allocate output buffer - start with 4x compressed size as estimate
-        const initial_size = @max(compressed_data.len * 4, 4096);
-        var output = std.ArrayList(u8).initCapacity(
-            self.allocator,
-            initial_size,
-        ) catch
-            |err|
+        // Stream all decompressed data to the writer
+        _ = decomp.reader.streamRemaining(&output_writer.writer)
+            catch |err|
         {
-            std.log.err("Failed to allocate output buffer: {any}", .{err});
+            std.log.err("Gzip decompression error: {any}", .{err});
+            if (decomp.err)
+                |decomp_err|
+            {
+                std.log.err("Decompressor error: {any}", .{decomp_err});
+            }
             return err;
         };
-        errdefer output.deinit(self.allocator);
 
-        // Read decompressed data in chunks
-        var chunk_buf: [4096]u8 = undefined;
-        while (true)
-        {
-            // Use the reader's buffered method to get data
-            const buffered = decomp.reader.buffered();
-            if (buffered.len > 0)
-            {
-                output.appendSlice(self.allocator, buffered) catch
-                    |err|
-                {
-                    std.log.err("Failed to append decompressed data: {any}", .{err});
-                    return err;
-                };
-                decomp.reader.toss(buffered.len);
-            }
-            else
-            {
-                // Try to fill buffer
-                var writer = std.Io.Writer.fixed(&chunk_buf);
-                const n = decomp.reader.stream(
-                    &writer,
-                    .limited(chunk_buf.len),
-                ) catch
-                    |err|
-                {
-                    // EndOfStream means we're done
-                    if (err == error.EndOfStream)
-                    {
-                        break;
-                    }
-                    std.log.err("Decompression stream error: {any}", .{err});
-                    return err;
-                };
-
-                if (n == 0)
-                {
-                    break;
-                }
-
-                output.appendSlice(self.allocator, chunk_buf[0..n]) catch
-                    |err|
-                {
-                    std.log.err("Failed to append chunk: {any}", .{err});
-                    return err;
-                };
-            }
-        }
-
-        const owned = output.toOwnedSlice(self.allocator) catch
-            |err|
-        {
-            std.log.err("Failed to finalize output: {any}", .{err});
-            return err;
-        };
+        const owned = try output_writer.toOwnedSlice();
         self.result_data_buffer = owned;
         return owned;
     }
