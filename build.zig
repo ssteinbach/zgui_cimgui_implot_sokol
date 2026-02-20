@@ -343,11 +343,12 @@ pub fn build(
 /// Build for native (non-wasm) target
 fn build_native(
     b: *std.Build,
-    name: []const u8,
+    comptime name: []const u8,
     mod: *std.Build.Module,
     check_step: *std.Build.Step,
 ) !void
 {
+    // the executable
     const exe = b.addExecutable(
         .{
             .name = name,
@@ -374,6 +375,23 @@ fn build_native(
         run_desc,
     );
 
+    // an install step specifically for the executable
+    const install_exe_step = b.addInstallArtifact(
+        exe,
+        .{},
+    );
+    var install_step = b.step(
+        "install-" ++ name,
+        "Install " ++ name,
+    );
+    install_step.dependOn(&install_exe_step.step);
+    b.getInstallStep().dependOn(install_step);
+
+    // a run step specifically for the executable
+    var run_step = b.step(
+        "run-" ++ name,
+        "Run " ++ name,
+    );
     run_step.dependOn(&b.addRunArtifact(exe).step);
 }
 
