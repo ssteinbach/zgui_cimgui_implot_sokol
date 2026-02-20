@@ -49,6 +49,11 @@ pub fn set_window_title(
     sapp.setWindowTitle(title);
 }
 
+/// Set the background clear color (RGBA, 0.0–1.0).
+pub fn set_clear_color(r: f32, g: f32, b: f32, a: f32) void {
+    STATE.pass_action.colors[0].clear_value = .{ .r = r, .g = g, .b = b, .a = a };
+}
+
 export fn init(
 ) void 
 {
