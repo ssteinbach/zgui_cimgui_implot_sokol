@@ -190,7 +190,22 @@ pub fn build(
             .imports = &.{
                 .{
                     .name = "zgui_cimgui_implot_sokol",
-                    .module = mod_ziis, 
+                    .module = mod_ziis,
+                },
+            },
+        },
+    );
+
+    // 3D demo module
+    const mod_3d_demo = b.createModule(
+        .{
+            .root_source_file = b.path("src/3d_app_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "zgui_cimgui_implot_sokol",
+                    .module = mod_ziis,
                 },
             },
         },
@@ -251,6 +266,11 @@ pub fn build(
     // from here on different handling for native vs wasm builds
     if (target.result.cpu.arch.isWasm())
     {
+        const dep_c_libs: []const *std.Build.Step.Compile = &.{
+            lib_cimgui,
+            lib_imgui,
+        };
+
         const run_step = try build_wasm(
             b,
             .{
@@ -259,11 +279,7 @@ pub fn build(
                 .dep_ziis_builder = b,
                 .target = target,
                 .optimize = optimize,
-                .dep_c_libs = &.{
-                    lib_cimgui,
-                    lib_imgui,
-                    // lib_worker_interop, // Disabled: EM_JS linking issue
-                },
+                .dep_c_libs = dep_c_libs,
             },
         );
 
@@ -293,12 +309,32 @@ pub fn build(
                 ).step
             ),
         );
+
+        // 3D demo WASM build
+        _ = try build_wasm(
+            b,
+            .{
+                .app_name = "3d-demo",
+                .mod_main = mod_3d_demo,
+                .dep_ziis_builder = b,
+                .target = target,
+                .optimize = optimize,
+                .dep_c_libs = dep_c_libs,
+            },
+        );
     }
     else
     {
         try build_native(
             b,
+            "demo",
             mod_app_wrapper,
+            check_step,
+        );
+        try build_native(
+            b,
+            "3d-demo",
+            mod_3d_demo,
             check_step,
         );
     }
@@ -307,21 +343,35 @@ pub fn build(
 /// Build for native (non-wasm) target
 fn build_native(
     b: *std.Build,
+    name: []const u8,
     mod: *std.Build.Module,
     check_step: *std.Build.Step,
-) !void 
+) !void
 {
     const exe = b.addExecutable(
         .{
-            .name = "demo",
+            .name = name,
             .root_module = mod,
         },
     );
     check_step.dependOn(&exe.step);
     b.installArtifact(exe);
-    var run_step = b.step(
-        "run-demo",
-        "Run demo"
+
+    var buf: [256]u8 = undefined;
+    const run_name = try std.fmt.bufPrint(
+        &buf,
+        "run-{s}",
+        .{name},
+    );
+    const run_desc = try std.fmt.bufPrint(
+        buf[run_name.len..],
+        "Run {s}",
+        .{name},
+    );
+
+    const run_step = b.step(
+        run_name,
+        run_desc,
     );
 
     run_step.dependOn(&b.addRunArtifact(exe).step);

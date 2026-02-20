@@ -80,6 +80,11 @@ export fn init(
         },
     };
 
+    STATE.pass_action.depth = .{
+        .load_action = .CLEAR,
+        .clear_value = 1.0,
+    };
+
     zgui.init(STATE.allocator);
     zgui.plot.init();
 
@@ -152,6 +157,12 @@ export fn frame(
             .swapchain = sglue.swapchain(),
         },
     );
+
+    if (STATE.app.maybe_pre_imgui_render)
+        |pre_render|
+    {
+        pre_render();
+    }
 
     simgui.render();
     sg.endPass();
@@ -233,6 +244,10 @@ const SokolApp = struct {
 
     /// optional function that is called once after zgui setup
     maybe_post_zgui_init: ?*const fn() void = null,
+
+    /// optional callback invoked inside the render pass, before ImGui
+    /// rendering.  Use this to inject custom sokol_gl/sokol_gfx drawing.
+    maybe_pre_imgui_render: ?*const fn() void = null,
 
     /// event handler - for keyboard shortcuts.  Default only catches the
     /// escape key which quits the app
