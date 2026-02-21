@@ -358,23 +358,6 @@ fn build_native(
     check_step.dependOn(&exe.step);
     b.installArtifact(exe);
 
-    var buf: [256]u8 = undefined;
-    const run_name = try std.fmt.bufPrint(
-        &buf,
-        "run-{s}",
-        .{name},
-    );
-    const run_desc = try std.fmt.bufPrint(
-        buf[run_name.len..],
-        "Run {s}",
-        .{name},
-    );
-
-    const run_step = b.step(
-        run_name,
-        run_desc,
-    );
-
     // an install step specifically for the executable
     const install_exe_step = b.addInstallArtifact(
         exe,
