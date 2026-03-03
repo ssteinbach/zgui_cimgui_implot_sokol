@@ -291,6 +291,7 @@ pub fn sokol_main(
             .height = STATE.app.dimensions[1],
             .icon = .{ .sokol_default = true },
             .window_title = STATE.app.title,
+            .enable_clipboard = true,
             .html5 = .{
                 .update_document_title = true,
             },
