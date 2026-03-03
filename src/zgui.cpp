@@ -1234,10 +1234,10 @@ extern "C"
         ImGui::EndDisabled();
     }
 
-    // ZGUI_API ImGuiListClipper zguiListClipper_Init()
-    // {
-    //     return ImGuiListClipper();
-    // }
+    ZGUI_API ImGuiListClipper zguiListClipper_Init()
+    {
+        return ImGuiListClipper();
+    }
 
     ZGUI_API void zguiListClipper_Begin(ImGuiListClipper *clipper, int items_count, float items_height)
     {
