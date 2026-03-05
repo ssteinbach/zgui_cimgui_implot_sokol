@@ -17,6 +17,10 @@ const sfetch = ziis.sokol.fetch;
 /// building with wasm?
 const IS_WASM = builtin.target.cpu.arch.isWasm();
 
+/// Maximum number of vertices you can configure the app to support.  Get more
+/// vertices than this and the UI drops out.
+pub const MAX_VERTICES = std.math.maxInt(i32)/7;
+
 var debug_allocator = (
     if (IS_WASM) null 
     else std.heap.DebugAllocator(.{}){}

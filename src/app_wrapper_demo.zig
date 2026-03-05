@@ -1560,6 +1560,7 @@ pub fn main(
             .maybe_post_zgui_init = init,
             .title = "ZIIS Demo App",
             .logger = ziis.std_log_scoped,
+            .max_vertices = ziis.MAX_VERTICES,
         },
     );
 }
