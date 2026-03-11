@@ -695,4 +695,44 @@ extern "C"
         *out_x = plot.x;
         *out_y = plot.y;
     }
+
+    ZGUI_API void zguiPlot_PlotPolygon(
+        const char *label_id,
+        ImGuiDataType data_type,
+        const void *xv,
+        const void *yv,
+        int count,
+        ImPlotPolygonFlags flags,
+        int offset,
+        int stride,
+        float fill_alpha,
+        const float line_color[4],
+        float line_weight,
+        const float fill_color[4],
+        int marker,
+        float marker_size,
+        const float marker_line_color[4],
+        const float marker_fill_color[4],
+        float size)
+    {
+        const ImPlotSpec spec = makeSpec(flags, offset, stride, fill_alpha, line_color, line_weight, fill_color, marker, marker_size, marker_line_color, marker_fill_color, size);
+        if (data_type == ImGuiDataType_S8)
+            ImPlot::PlotPolygon(label_id, (const ImS8 *)xv, (const ImS8 *)yv, count, spec);
+        else if (data_type == ImGuiDataType_U8)
+            ImPlot::PlotPolygon(label_id, (const ImU8 *)xv, (const ImU8 *)yv, count, spec);
+        else if (data_type == ImGuiDataType_S16)
+            ImPlot::PlotPolygon(label_id, (const ImS16 *)xv, (const ImS16 *)yv, count, spec);
+        else if (data_type == ImGuiDataType_U16)
+            ImPlot::PlotPolygon(label_id, (const ImU16 *)xv, (const ImU16 *)yv, count, spec);
+        else if (data_type == ImGuiDataType_S32)
+            ImPlot::PlotPolygon(label_id, (const ImS32 *)xv, (const ImS32 *)yv, count, spec);
+        else if (data_type == ImGuiDataType_U32)
+            ImPlot::PlotPolygon(label_id, (const ImU32 *)xv, (const ImU32 *)yv, count, spec);
+        else if (data_type == ImGuiDataType_Float)
+            ImPlot::PlotPolygon(label_id, (const float *)xv, (const float *)yv, count, spec);
+        else if (data_type == ImGuiDataType_Double)
+            ImPlot::PlotPolygon(label_id, (const double *)xv, (const double *)yv, count, spec);
+        else
+            assert(false);
+    }
 } /* extern "C" */

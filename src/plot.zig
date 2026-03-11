@@ -531,6 +531,80 @@ pub const StairsFlags = packed struct(u32) {
     shaded: bool = false,
     _padding: u20 = 0,
 };
+pub const PolygonFlags = packed struct(u32) {
+    _reserved0: bool = false,
+    _reserved1: bool = false,
+    _reserved2: bool = false,
+    _reserved3: bool = false,
+    _reserved4: bool = false,
+    _reserved5: bool = false,
+    _reserved6: bool = false,
+    _reserved7: bool = false,
+    _reserved8: bool = false,
+    _reserved9: bool = false,
+    concave: bool = false,
+    _padding: u21 = 0,
+};
+fn PlotPolygonGen(comptime T: type) type {
+    return struct {
+        xv: []const T,
+        yv: []const T,
+        flags: PolygonFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+        fill_alpha: f32 = 1.0,
+        line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        line_weight: f32 = 1.0,
+        fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker: Marker = .none,
+        marker_size: f32 = 4,
+        marker_line_color: [4]f32 = .{ 0, 0, 0, -1 },
+        marker_fill_color: [4]f32 = .{ 0, 0, 0, -1 },
+        size: f32 = 4,
+    };
+}
+pub fn plotPolygon(label_id: [:0]const u8, comptime T: type, args: PlotPolygonGen(T)) void {
+    assert(args.xv.len == args.yv.len);
+    zguiPlot_PlotPolygon(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.xv.ptr,
+        args.yv.ptr,
+        @as(i32, @intCast(args.xv.len)),
+        args.flags,
+        args.offset,
+        args.stride,
+        args.fill_alpha,
+        &args.line_color,
+        args.line_weight,
+        &args.fill_color,
+        @intFromEnum(args.marker),
+        args.marker_size,
+        &args.marker_line_color,
+        &args.marker_fill_color,
+        args.size,
+    );
+}
+extern fn zguiPlot_PlotPolygon(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    xv: *const anyopaque,
+    yv: *const anyopaque,
+    count: i32,
+    flags: PolygonFlags,
+    offset: i32,
+    stride: i32,
+    fill_alpha: f32,
+    line_color: *const [4]f32,
+    line_weight: f32,
+    fill_color: *const [4]f32,
+    marker: i32,
+    marker_size: f32,
+    marker_line_color: *const [4]f32,
+    marker_fill_color: *const [4]f32,
+    size: f32,
+) void;
+//----------------------------------------------------------------------------------------------
 fn PlotScatterValuesGen(comptime T: type) type {
     return struct {
         v: []const T,
