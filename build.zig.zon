@@ -26,6 +26,9 @@
             .url = "git+https://github.com/ssteinbach/zgui_cimgui_implot_sokol.git#def89603ac1aceab2486f52a5b6d47948a395559",
             .hash = "zgui_cimgui_implot_sokol-1.91.8-17SdXg_gCAC4MCA2FeXJNTArn1sOygWswvC3r65s0sd5",
         },
+        .MeshulaLab = .{
+            .path = "../../../external_sources/MeshulaLab",
+        },
     },
 
     .paths = .{

@@ -49,6 +49,15 @@ pub fn build(
     );
     const lib_cimgui = dep_cimgui.artifact(cimgui_conf.clib_name);
 
+    const dep_meshulalab = b.dependency(
+        "MeshulaLab",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+    const mod_meshulalab = dep_meshulalab.module("MeshulaLab");
+
     const dep_undo_journal = b.dependency(
         "do_undo_journal",
         .{
@@ -191,6 +200,10 @@ pub fn build(
                 .{
                     .name = "zgui_cimgui_implot_sokol",
                     .module = mod_ziis,
+                },
+                .{
+                    .name = "MeshulaLab",
+                    .module = mod_meshulalab,
                 },
             },
         },

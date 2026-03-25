@@ -10,6 +10,7 @@ const sg = ziis.sokol.gfx;
 const app_wrapper = ziis.app_wrapper;
 
 const cimgui = ziis.cimgui;
+const MeshulaLab = @import("MeshulaLab");
 
 /// Data read from the example json, designed to be displayed by Zplot
 const PieChartSliceData = struct {
@@ -1589,7 +1590,14 @@ fn json_parsing_callback(
 
 pub fn init(
 ) void
-{ 
+{
+    // Smoke test: verify MeshulaLab types are accessible
+    comptime {
+        _ = @sizeOf(MeshulaLab.ViewDimensions);
+        _ = @sizeOf(MeshulaLab.Activity);
+        _ = @sizeOf(MeshulaLab.Studio);
+    }
+
     // right around the minimum number of points to make the plot disapear
     const BIGCOUNT = if (IS_WASM) 7000 else 75000;
     STATE.point_buffers.ensureUnusedCapacity(
