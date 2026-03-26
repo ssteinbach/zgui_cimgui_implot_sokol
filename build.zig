@@ -190,6 +190,22 @@ pub fn build(
         );
     }
 
+    // MeshulaLabZig: Zig-ergonomic wrappers for the MeshulaLab architecture
+    const mod_meshulalab_zig = b.addModule(
+        "MeshulaLabZig",
+        .{
+            .root_source_file = b.path("src/MeshulaLabZig/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "MeshulaLab",
+                    .module = mod_meshulalab,
+                },
+            },
+        },
+    );
+
     // main module with sokol and cimgui imports
     const mod_app_wrapper = b.createModule(
         .{
@@ -204,6 +220,10 @@ pub fn build(
                 .{
                     .name = "MeshulaLab",
                     .module = mod_meshulalab,
+                },
+                .{
+                    .name = "MeshulaLabZig",
+                    .module = mod_meshulalab_zig,
                 },
             },
         },

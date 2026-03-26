@@ -11,6 +11,8 @@ const app_wrapper = ziis.app_wrapper;
 
 const cimgui = ziis.cimgui;
 const MeshulaLab = @import("MeshulaLab");
+const MLZ = @import("MeshulaLabZig");
+const activities = @import("demo_activities/root.zig");
 
 /// Data read from the example json, designed to be displayed by Zplot
 const PieChartSliceData = struct {
@@ -19,7 +21,7 @@ const PieChartSliceData = struct {
 };
 
 /// Context for sorting table rows
-const SortContext = struct {
+pub const SortContext = struct {
     column: i16,
     ascending: bool,
 
@@ -51,37 +53,37 @@ const SortContext = struct {
 };
 
 /// State container
-const STATE = struct {
-    var f: f32 = 0;
-    var demo_window_gui = false;
-    var demo_window_plot = false;
-    const TEX_DIM : [2]i32 = .{ 256, 256 };
-    const COLOR_CHANNELS:usize = 4;
-    var tex: sg.Image = .{};
-    var view: sg.View = .{};
-    var texid: u64 = 0;
-    var frame_number: usize = 0;
-    var buffer = std.mem.zeroes(
+pub const STATE = struct {
+    pub var f: f32 = 0;
+    pub var demo_window_gui = false;
+    pub var demo_window_plot = false;
+    pub const TEX_DIM : [2]i32 = .{ 256, 256 };
+    pub const COLOR_CHANNELS:usize = 4;
+    pub var tex: sg.Image = .{};
+    pub var view: sg.View = .{};
+    pub var texid: u64 = 0;
+    pub var frame_number: usize = 0;
+    pub var buffer = std.mem.zeroes(
         [STATE.TEX_DIM[0]][STATE.TEX_DIM[1]][COLOR_CHANNELS]u8,
     );
-    var maybe_journal : ?ziis.undo.Journal = null;
-    var image_data = ziis.sokol.gfx.ImageData{};
+    pub var maybe_journal : ?ziis.undo.Journal = null;
+    pub var image_data = ziis.sokol.gfx.ImageData{};
 
-    var point_buffers: std.MultiArrayList(struct{ x: f32, y: f32 }) = .empty;
+    pub var point_buffers: std.MultiArrayList(struct{ x: f32, y: f32 }) = .empty;
 
     // Fetch buffer for loading JSON file
     // will be created on initialization
-    var json_fetch_query: *app_wrapper.FetchQuery = undefined;
+    pub var json_fetch_query: *app_wrapper.FetchQuery = undefined;
 
     // JSON data storage... gets filled when the FetchQuery gets returned
-    var data_from_json_file: std.MultiArrayList(PieChartSliceData) = .empty;
+    pub var data_from_json_file: std.MultiArrayList(PieChartSliceData) = .empty;
 
     // big text example (this source file)
-    var big_text_query: *app_wrapper.FetchQuery = undefined;
-    var big_text_example: []const u8 = undefined;
+    pub var big_text_query: *app_wrapper.FetchQuery = undefined;
+    pub var big_text_example: []const u8 = undefined;
 
     // Sortable table demo state
-    const TableRowData = struct {
+    pub const TableRowData = struct {
         id: u32,
         name: [:0]const u8,
         quantity: i32,
@@ -90,7 +92,7 @@ const STATE = struct {
     };
 
     // Sample data for the sortable table
-    var table_data = [_]TableRowData{
+    pub var table_data = [_]TableRowData{
         .{
             .id = 1,
             .name = "Apples",
@@ -150,11 +152,11 @@ const STATE = struct {
     };
 
     // Web Worker demo state (WASM only)
-    var worker_pool_initialized: bool = false;
-    var maybe_worker_pool: ?ziis.worker_pool.WorkerPool = null;
-    var worker_counter: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
-    var worker_jobs_submitted: u32 = 0;
-    var worker_jobs_completed: u32 = 0;
+    pub var worker_pool_initialized: bool = false;
+    pub var maybe_worker_pool: ?ziis.worker_pool.WorkerPool = null;
+    pub var worker_counter: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+    pub var worker_jobs_submitted: u32 = 0;
+    pub var worker_jobs_completed: u32 = 0;
 };
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
@@ -162,12 +164,106 @@ const IS_WASM = builtin.target.cpu.arch.isWasm();
 // Emscripten extern function for fetching data via JavaScript
 extern fn emscripten_run_script_string(script: [*:0]const u8) ?[*:0]const u8;
 
+// =========================================================================
+// Activities — each former tab is now a MeshulaLab Activity
+// =========================================================================
+
+const ACTIVITY_NAMES = struct
+{
+    const UNDO_JOURNAL = "UndoJournalDemoActivity";
+    const PLOT = "PlotDemoActivity";
+    const BIG_PLOT = "BigPlotDemoActivity";
+    const STAIRS_PLOT = "StairsPlotDemoActivity";
+    const POLYGON_PLOT = "PolygonPlotDemoActivity";
+    const INFLINES_PIE = "InfLinesPieChartDemoActivity";
+    const TEXTURE = "TextureDemoActivity";
+    const CANVAS = "CanvasDrawingDemoActivity";
+    const JSON_PIE = "JSONPieChartDemoActivity";
+    const BIG_TEXT = "BigTextDemoActivity";
+    const LIST_CLIPPER = "ListClipperDemoActivity";
+    const SORTABLE_TABLE = "SortableTableDemoActivity";
+};
+
+var ACTIVITIES = struct
+{
+    undo_journal: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.UNDO_JOURNAL,
+        .{ .run_ui = &activities.undo_journal.runUI },
+    ),
+    plot: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.PLOT,
+        .{ .run_ui = &activities.plot.runUI },
+    ),
+    big_plot: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.BIG_PLOT,
+        .{ .run_ui = &activities.big_plot.runUI },
+    ),
+    stairs_plot: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.STAIRS_PLOT,
+        .{ .run_ui = &activities.stairs_plot.runUI },
+    ),
+    polygon_plot: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.POLYGON_PLOT,
+        .{ .run_ui = &activities.polygon_plot.runUI },
+    ),
+    inflines_pie: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.INFLINES_PIE,
+        .{ .run_ui = &activities.inflines_pie.runUI },
+    ),
+    texture: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.TEXTURE,
+        .{ .run_ui = &activities.texture.runUI },
+    ),
+    canvas: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.CANVAS,
+        .{ .run_ui = &activities.canvas.runUI },
+    ),
+    json_pie: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.JSON_PIE,
+        .{ .run_ui = &activities.json_pie.runUI },
+    ),
+    big_text: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.BIG_TEXT,
+        .{ .run_ui = &activities.big_text.runUI },
+    ),
+    list_clipper: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.LIST_CLIPPER,
+        .{ .run_ui = &activities.list_clipper.runUI },
+    ),
+    sortable_table: MLZ.Activity = MLZ.Activity.init(
+        ACTIVITY_NAMES.SORTABLE_TABLE,
+        .{ .run_ui = &activities.sortable_table.runUI },
+    ),
+}{};
+
+const STUDIO_CONFIGS = [_]MLZ.ActivityConfig{
+    .{ .name = ACTIVITY_NAMES.UNDO_JOURNAL },
+    .{ .name = ACTIVITY_NAMES.PLOT },
+    .{ .name = ACTIVITY_NAMES.BIG_PLOT },
+    .{ .name = ACTIVITY_NAMES.STAIRS_PLOT },
+    .{ .name = ACTIVITY_NAMES.POLYGON_PLOT },
+    .{ .name = ACTIVITY_NAMES.INFLINES_PIE },
+    .{ .name = ACTIVITY_NAMES.TEXTURE },
+    .{ .name = ACTIVITY_NAMES.CANVAS },
+    .{ .name = ACTIVITY_NAMES.JSON_PIE },
+    .{ .name = ACTIVITY_NAMES.BIG_TEXT },
+    .{ .name = ACTIVITY_NAMES.LIST_CLIPPER },
+    .{ .name = ACTIVITY_NAMES.SORTABLE_TABLE },
+};
+
+var DEMO_STUDIO = MLZ.Studio.init(
+    "ZIIS Demo Studio",
+    &STUDIO_CONFIGS,
+);
+
+var ORCHESTRATOR: MLZ.Orchestrator = undefined;
+
 /// the GPA - useful for detecting leaks, but ONLY works in non EMCC builds
 var debug_allocator = (
     if (IS_WASM) null 
     else std.heap.DebugAllocator(.{}){}
 );
-const allocator = (
+pub const allocator = (
     // @TODO: try the smp_allocator
     if (IS_WASM) std.heap.c_allocator
     else debug_allocator.allocator()
@@ -178,7 +274,7 @@ const allocator = (
 ///
 /// Recomputes the angles and proportions of each slice.  If this is a scaling
 /// issue, those could be precomputed and passed in.
-fn maybe_pie_slice_under_mouse(
+pub fn maybe_pie_slice_under_mouse(
     /// type of the values in the pie chart
     comptime T: type,
     labels: []const [*:0]const u8,
@@ -252,7 +348,7 @@ fn maybe_pie_slice_under_mouse(
     return null;
 }
 
-fn draw_pie_chart(
+pub fn draw_pie_chart(
 ) !void
 {
     const labels = STATE.data_from_json_file.items(.label);
@@ -311,6 +407,12 @@ fn draw_pie_chart(
 
 }
 
+// RunUI callbacks are in src/demo_activities/
+
+// =========================================================================
+// draw — orchestrator-driven frame
+// =========================================================================
+
 /// draw the UI
 fn draw(
 ) !void
@@ -360,6 +462,9 @@ fn draw(
         },
     );
 
+    // Service the orchestrator (handles deferred activations, updates)
+    ORCHESTRATOR.service(0.0);
+
     zgui.setNextWindowPos(.{ .x = 0, .y = 0 });
     zgui.setNextWindowSize(
         .{ 
@@ -387,1113 +492,52 @@ fn draw(
     {
         defer zgui.end();
 
-        var new = STATE.f;
-        if (zgui.dragFloat("texture offset", .{.v = &new})) 
+        // Studio status bar
+        if (ORCHESTRATOR.maybe_current_studio)
+            |studio|
         {
-            const cmd = try ziis.undo.SetValue(f32).init(
-                    allocator,
-                    &STATE.f,
-                    new,
-                    "texture offset",
+            zgui.text(
+                "{s}  —  {d} Activities Loaded",
+                .{
+                    std.mem.span(studio.lab.name),
+                    ORCHESTRATOR.activities.count(),
+                },
             );
-            try cmd.do();
-            try STATE.maybe_journal.?.update_if_new_or_add(cmd);
         }
-
-        for (STATE.maybe_journal.?.entries.items, 0..)
-            |cmd, ind|
+        else
         {
-            zgui.bulletText("{d}: {s}", .{ ind, cmd.message });
+            zgui.text(
+                "No Studio Active  —  {d} Activities Loaded",
+                .{ ORCHESTRATOR.activities.count() },
+            );
         }
 
-        zgui.bulletText(
-            "Head Entry in Journal: {?d}",
-            .{ STATE.maybe_journal.?.maybe_head_entry },
-        );
-
-        if (zgui.beginItemTooltip()) 
-        {
-            zgui.text("Hi, this is a tooltip", .{});
-            zgui.endTooltip();
-        }
-
-        if (zgui.button("undo", .{}))
-        {
-            try STATE.maybe_journal.?.undo();
-        }
-
-        zgui.sameLine(.{});
-
-        if (zgui.button("redo", .{}))
-        {
-            try STATE.maybe_journal.?.redo();
-        }
-
-        if (zgui.button("show gui demo", .{}) )
-        { 
-            STATE.demo_window_gui = ! STATE.demo_window_gui; 
-        }
-        if (zgui.button("show plot demo", .{}))
-        {
-            STATE.demo_window_plot = ! STATE.demo_window_plot; 
-        }
-
-        if (STATE.demo_window_gui) 
-        {
-            zgui.showDemoWindow(&STATE.demo_window_gui);
-        }
-        if (STATE.demo_window_plot) 
-        {
-            zplot.showDemoWindow(&STATE.demo_window_plot);
-        }
+        zgui.separator();
 
         if (zgui.beginTabBar("Panes", .{}))
         {
             defer zgui.endTabBar();
 
-            if (zgui.beginTabItem("PlotTab", .{}))
+            // Iterate active, UI-visible Activities and render each as a tab
+            var it = ORCHESTRATOR.activeUIActivities();
+            while (it.next())
+                |activity|
             {
-                defer zgui.endTabItem();
-
                 if (
-                    zgui.beginChild(
-                        "Plot", 
-                        .{ .w = -1, .h = -1, },
+                    zgui.beginTabItem(
+                        std.mem.span(activity.lab.name),
+                        .{},
                     )
                 )
                 {
-                    defer zgui.endChild();
+                    defer zgui.endTabItem();
 
-                    if (
-                        zgui.plot.beginPlot(
-                            "Test ZPlot Plot",
-                            .{ 
-                                .w = -1.0,
-                                .h = -1.0,
-                                .flags = .{ .equal = true },
-                            },
-                        )
-                    ) 
+                    if (activity.lab.RunUI)
+                        |run_ui|
                     {
-                        defer zgui.plot.endPlot();
-
-                        zgui.plot.setupAxis(
-                            .x1,
-                            .{ .label = "input" },
-                        );
-                        zgui.plot.setupAxis(
-                            .y1,
-                            .{ .label = "output" },
-                        );
-                        zgui.plot.setupLegend(
-                            .{ 
-                                .south = true,
-                                .west = true, 
-                            },
-                            .{},
-                        );
-                        zgui.plot.setupFinish();
-
-                        const xs= [_]f32{0, 1, 2, 3, 4};
-                        const ys= [_]f32{0, 1, 2, 3, 6};
-
-                        zplot.plotText(
-                            "start",
-                            .{
-                                .x = xs[0],
-                                .y = ys[0],
-                                .pix_offset = .{ -15, -10 },
-                            },
-                        );
-                        zplot.plotText(
-                            "end",
-                            .{
-                                .x = xs[xs.len-1],
-                                .y = ys[ys.len-1],
-                                .pix_offset = .{ 15, 0 },
-                            },
-                        );
-
-                        zplot.plotLine(
-                            "example function",
-                            f32,
-                            .{
-                                .xv = &xs,
-                                .yv = &ys,
-                                .flags = .{ .shaded = true },
-                                .fill_alpha = 0.1,
-                            },
-                        );
+                        run_ui(activity.lab.instance, null);
                     }
                 }
-            }
-
-            if (zgui.beginTabItem("Plot with LOTS of items", .{}))
-            {
-                defer zgui.endTabItem();
-
-                if (
-                    zgui.beginChild(
-                        "Big Plot", 
-                        .{ .w = -1, .h = -1, },
-                    )
-                )
-                {
-                    defer zgui.endChild();
-
-                    if (
-                        zgui.plot.beginPlot(
-                            "Lots of items in plot test",
-                            .{ 
-                                .w = -1.0,
-                                .h = -1.0,
-                                .flags = .{ .equal = true },
-                            },
-                        )
-                    ) 
-                    {
-                        defer zgui.plot.endPlot();
-
-                        zgui.plot.setupAxis(
-                            .x1,
-                            .{ .label = "input" },
-                        );
-                        zgui.plot.setupAxis(
-                            .y1,
-                            .{ .label = "output" },
-                        );
-                        zgui.plot.setupLegend(
-                            .{ 
-                                .south = true,
-                                .west = true 
-                            },
-                            .{},
-                        );
-                        zgui.plot.setupFinish();
-
-                        const xs= STATE.point_buffers.items(.x);
-                        const ys= STATE.point_buffers.items(.y);
-
-                        zplot.plotLine(
-                            "Sine wave with lots of samples",
-                            f32,
-                            .{
-                                .xv = xs,
-                                .yv = ys,
-                                .flags = .{ .shaded = true },
-                                .fill_alpha = 0.1,
-                            },
-                        );
-                    }
-                }
-            }
-
-            if (zgui.beginTabItem("Stairs Plot Example", .{}))
-            {
-                defer zgui.endTabItem();
-
-                if (
-                    zgui.beginChild(
-                        "Stairs Plot",
-                        .{ .w = -1, .h = -1, },
-                    )
-                )
-                {
-                    defer zgui.endChild();
-
-                    if (
-                        zgui.plot.beginPlot(
-                            "Stairstep Plot Demo",
-                            .{
-                                .w = -1.0,
-                                .h = -1.0,
-                            },
-                        )
-                    )
-                    {
-                        defer zgui.plot.endPlot();
-
-                        zgui.plot.setupAxis(
-                            .x1,
-                            .{ .label = "Time" },
-                        );
-                        zgui.plot.setupAxis(
-                            .y1,
-                            .{ .label = "Value" },
-                        );
-                        zgui.plot.setupLegend(
-                            .{
-                                .north = true,
-                                .east = true
-                            },
-                            .{},
-                        );
-                        zgui.plot.setupFinish();
-
-                        // Example 1: Simple stairs with values only
-                        const values= (
-                            [_]f32{1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 3.0}
-                        );
-                        zplot.plotStairsValues(
-                            "Auto X-axis",
-                            f32,
-                            .{
-                                .v = &values,
-                            },
-                        );
-
-                        // Example 2: Stairs with explicit X and Y values
-                        const xs= [_]f32{0.0, 1.0, 2.5, 3.5, 5.0, 6.0, 7.5};
-                        const ys= [_]f32{2.0, 4.0, 3.0, 6.0, 5.0, 7.0, 4.0};
-                        zplot.plotStairs(
-                            "Explicit X-Y",
-                            f32,
-                            .{
-                                .xv = &xs,
-                                .yv = &ys,
-                            },
-                        );
-
-                        // Example 3: Pre-step stairs (y value extends left)
-                        const xs2= [_]f32{0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5};
-                        const ys2= [_]f32{1.5, 2.5, 4.5, 3.5, 5.5, 4.5, 6.5};
-                        zplot.plotStairs(
-                            "Pre-step Mode",
-                            f32,
-                            .{
-                                .xv = &xs2,
-                                .yv = &ys2,
-                                .flags = .{ .pre_step = true },
-                            },
-                        );
-
-                        // Example 4: Shaded stairs
-                        const xs3= (
-                            [_]f32{0.25, 1.25, 2.25, 3.25, 4.25, 5.25, 6.25}
-                        );
-                        const ys3= [_]f32{0.5, 1.5, 1.0, 2.5, 2.0, 3.0, 2.5};
-                        zplot.plotStairs(
-                            "Shaded Stairs",
-                            f32,
-                            .{
-                                .xv = &xs3,
-                                .yv = &ys3,
-                                .flags = .{ .shaded = true },
-                            },
-                        );
-                    }
-                }
-            }
-
-            if (zgui.beginTabItem("Polygon Plot", .{}))
-            {
-                defer zgui.endTabItem();
-
-                if (
-                    zgui.beginChild(
-                        "Polygon Plot Child",
-                        .{ .w = -1, .h = -1, },
-                    )
-                )
-                {
-                    defer zgui.endChild();
-
-                    if (
-                        zgui.plot.beginPlot(
-                            "Polygon Plot Demo",
-                            .{
-                                .w = -1.0,
-                                .h = -1.0,
-                                .flags = .{ .equal = true },
-                            },
-                        )
-                    )
-                    {
-                        defer zgui.plot.endPlot();
-
-                        zgui.plot.setupLegend(
-                            .{
-                                .north = true,
-                                .east = true,
-                            },
-                            .{},
-                        );
-                        zgui.plot.setupFinish();
-
-                        // Triangle (convex)
-                        const tri_xs = [_]f32{ 0.5, 1.0, 0.0 };
-                        const tri_ys = [_]f32{ 1.0, 0.0, 0.0 };
-                        zplot.plotPolygon(
-                            "Triangle",
-                            f32,
-                            .{
-                                .xv = &tri_xs,
-                                .yv = &tri_ys,
-                                .fill_alpha = 0.5,
-                            },
-                        );
-
-                        // Pentagon (convex)
-                        const pent_xs = comptime blk: {
-                            var xs: [5]f32 = undefined;
-                            for (0..5)
-                                |i|
-                            {
-                                const angle: f32 = @as(f32, @floatFromInt(i)) * 2.0 * std.math.pi / 5.0 - std.math.pi / 2.0;
-                                xs[i] = 3.0 + 0.8 * @cos(angle);
-                            }
-                            break :blk xs;
-                        };
-                        const pent_ys = comptime blk: {
-                            var ys: [5]f32 = undefined;
-                            for (0..5)
-                                |i|
-                            {
-                                const angle: f32 = @as(f32, @floatFromInt(i)) * 2.0 * std.math.pi / 5.0 - std.math.pi / 2.0;
-                                ys[i] = 0.5 + 0.8 * @sin(angle);
-                            }
-                            break :blk ys;
-                        };
-                        zplot.plotPolygon(
-                            "Pentagon",
-                            f32,
-                            .{
-                                .xv = &pent_xs,
-                                .yv = &pent_ys,
-                                .fill_alpha = 0.5,
-                                .fill_color = .{ 0, 1, 0, 1 },
-                            },
-                        );
-
-                        // Star (concave)
-                        const star_xs = comptime blk: {
-                            var xs: [10]f32 = undefined;
-                            for (0..10)
-                                |i|
-                            {
-                                const angle: f32 = @as(f32, @floatFromInt(i)) * 2.0 * std.math.pi / 10.0 - std.math.pi / 2.0;
-                                const radius: f32 = if (i % 2 == 0) 0.8 else 0.3;
-                                xs[i] = 5.5 + radius * @cos(angle);
-                            }
-                            break :blk xs;
-                        };
-                        const star_ys = comptime blk: {
-                            var ys: [10]f32 = undefined;
-                            for (0..10)
-                                |i|
-                            {
-                                const angle: f32 = @as(f32, @floatFromInt(i)) * 2.0 * std.math.pi / 10.0 - std.math.pi / 2.0;
-                                const radius: f32 = if (i % 2 == 0) 0.8 else 0.3;
-                                ys[i] = 0.5 + radius * @sin(angle);
-                            }
-                            break :blk ys;
-                        };
-                        zplot.plotPolygon(
-                            "Star (Concave)",
-                            f32,
-                            .{
-                                .xv = &star_xs,
-                                .yv = &star_ys,
-                                .fill_alpha = 0.5,
-                                .fill_color = .{ 1, 1, 0, 1 },
-                                .flags = .{ .concave = true },
-                            },
-                        );
-                    }
-                }
-            }
-
-            if (
-                zgui.beginTabItem(
-                    "InfLines & PieChart Example",
-                    .{},
-                )
-            )
-            {
-                defer zgui.endTabItem();
-
-                if (
-                    zgui.beginChild(
-                        "InfLinesPieChartDemo",
-                        .{ .w = -1, .h = -1, },
-                    )
-                )
-                {
-                    defer zgui.endChild();
-
-                    if (
-                        zgui.plot.beginPlot(
-                            "Infinite Lines Demo",
-                            .{
-                                .w = -1.0,
-                                .h = 300.0,
-                            },
-                        )
-                    )
-                    {
-                        defer zgui.plot.endPlot();
-
-                        zgui.plot.setupAxis(
-                            .x1,
-                            .{ .label = "X Axis" }
-                        );
-                        zgui.plot.setupAxis(
-                            .y1,
-                            .{ .label = "Y Axis" }
-                        );
-                        zgui.plot.setupAxisLimits(
-                            .x1,
-                            .{ .min = -1, .max = 10 }
-                        );
-                        zgui.plot.setupAxisLimits(
-                            .y1,
-                            .{ .min = -1, .max = 10 }
-                        );
-                        zgui.plot.setupFinish();
-
-                        // Vertical infinite lines at x positions
-                        const v_lines = [_]f64{1.0, 3.0, 5.0, 7.0};
-                        zplot.plotInfLines(
-                            "Vertical Lines",
-                            f64,
-                            .{ .v = &v_lines }
-                        );
-
-                        // Horizontal infinite lines at y positions
-                        const h_lines = [_]f64{2.0, 4.0, 6.0};
-                        zplot.plotInfLines(
-                            "Horizontal Lines",
-                            f64, .{
-                                .v = &h_lines,
-                                .flags = .{
-                                    .horizontal = true,
-                                },
-                            }
-                        );
-                    }
-
-                    const pie_labels = [_][*:0]const u8{
-                        "Tacos",
-                        "Pizza",
-                        "Pasta",
-                        "Sushi"
-                    };
-                    const pie_values = (
-                        [_]f64{ 30.0, 25.0, 20.0, 15.0 }
-                    );
-
-                    if (
-                        zgui.plot.beginPlot(
-                            "Pie Chart Demo",
-                            .{
-                                .w = -1.0,
-                                .h = -1.0,
-                                .flags = .{ .equal = true },
-                            },
-                        )
-                    )
-                    {
-                        defer zgui.plot.endPlot();
-
-                        zplot.plotPieChart(
-                            f64,
-                            .{
-                                .label_ids = &pie_labels,
-                                .values = &pie_values,
-                                .flags = .{ .normalize = true },
-                            }
-                        );
-
-                        // tooltip on hover/click
-                        if (
-                            maybe_pie_slice_under_mouse(
-                                f64,
-                                &pie_labels,
-                                &pie_values
-                            )
-                        ) |hovered|
-                        {
-                            const mouse_screen_pos = zgui.getMousePos();
-                            zgui.setNextWindowPos(
-                                .{
-                                    .x = mouse_screen_pos[0] + 15,
-                                    .y = mouse_screen_pos[1] + 15,
-                                }
-                            );
-                            zgui.setNextWindowBgAlpha(.{ .alpha = 0.75 });
-
-                            if (
-                                zgui.begin(
-                                    "###PieChartTooltip",
-                                    .{
-                                        .flags = .{
-                                            .no_title_bar = true,
-                                            .no_resize = true,
-                                            .no_move = true,
-                                            .always_auto_resize = true,
-                                            .no_saved_settings = true,
-                                            .no_focus_on_appearing = true,
-                                            .no_nav_inputs = true,
-                                            .no_nav_focus = true,
-                                        },
-                                    },
-                                )
-                            )
-                            {
-                                defer zgui.end();
-
-                                zgui.text(
-                                    "Hovered\n  slice: {s}\n  value: {d}",
-                                    .{hovered.label, hovered.value});
-                            }
-
-                            // print on click as well
-                            if (zgui.isMouseClicked(.left))
-                            {
-                                std.debug.print(
-                                    "Clicked on {s} slice!\n",
-                                    .{hovered.label}
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (zgui.beginTabItem("Texture Example", .{}))
-            {
-                defer zgui.endTabItem();
-
-                const wsize = zgui.getWindowSize();
-
-                ziis.cimgui.igImage(
-                    .{ ._TexID = STATE.texid },
-                    .{ .x = wsize[0], .y = wsize[1]},
-                );
-            }
-
-            if (
-                zgui.beginTabItem("Canvas Drawing Example", .{})
-                and zgui.beginChild(
-                    "GraphView",
-                    .{
-                        .h = -1,
-                        .w = -1,
-                        .child_flags = .{},
-                        .window_flags = .{
-                            .menu_bar = false,
-                        }
-                    },
-                )
-            )
-            {
-                defer zgui.endTabItem();
-                defer zgui.endChild();
-
-                zgui.beginGroup();
-
-                zgui.textUnformatted("hi");
-
-                const dl = zgui.getWindowDrawList();
-
-                dl.addQuad(
-                    .{
-                        .p1 = .{ 170, 420 },
-                        .p2 = .{ 270, 420 },
-                        .p3 = .{ 220, 520 },
-                        .p4 = .{ 120, 520 },
-                        .col = 0xff_00_00_ff,
-                        .thickness = 3.0,
-                    }
-                );
-                dl.addText(
-                    .{ 130, 130 },
-                    0xff_00_00_ff,
-                    "The number is: {}",
-                    .{7}
-                );
-                dl.addCircleFilled(
-                    .{
-                        .p = .{ 200, 600 },
-                        .r = 50,
-                        .col = 0xff_ff_ff_ff 
-                    },
-                );
-                dl.addCircle(
-                    .{
-                        .p = .{ 200, 600 },
-                        .r = 30,
-                        .col = 0xff_00_00_ff,
-                        .thickness = 11,
-                    }
-                );
-                dl.addPolyline(
-                    &.{
-                        .{ 100, 700 },
-                        .{ 200, 600 },
-                        .{ 300, 700 },
-                        .{ 400, 600 },
-                    },
-                    .{
-                        .col = 0xff_00_aa_11,
-                        .thickness = 7,
-                    },
-                );
-
-
-                const c1 = zgui.colorConvertFloat4ToU32(
-                    .{0.8, 0.2, 0.2, 0.4},
-                );
-                const c2 = zgui.colorConvertFloat4ToU32(
-                    .{0.2, 0.8, 0.2, 0.4},
-                );
-                const c3 = zgui.colorConvertFloat4ToU32(
-                    .{0.2, 0.2, 0.8, 0.4},
-                );
-                const c4 = zgui.colorConvertFloat4ToU32(
-                    .{0.8, 0.8, 0.8, 0.9},
-                );
-
-                dl.addRect(
-                    .{
-                        // .col = 0xff_bb_bb_ff,
-                        .col = c4,
-                        .pmin = .{ 200, 200 },
-                        .pmax = .{ 300, 300 },
-                        .rounding = 0.4,
-                    },
-                );
-
-                dl.addCircleFilled(
-                    .{ 
-                        .col = c1,
-                        .p = .{ 100, 100 }, 
-                        .r = 60,
-                    },
-                );
-                dl.addCircleFilled(
-                    .{
-                        .col = c2,
-                        .p = .{ 300, 312 },
-                        .r = 30,
-                    },
-                );
-                dl.addCircleFilled(
-                    .{
-                        .col = c3,
-                        .p = .{ 120, 120 },
-                        .r = 60,
-                    },
-                );
-
-                zgui.endGroup();
-            }
-
-            if (zgui.beginTabItem("JSON Pie Chart", .{}))
-            {
-                defer zgui.endTabItem();
-
-                if (
-                    zgui.beginChild(
-                        "JSON Pie Chart",
-                        .{ .w = -1, .h = -1, },
-                    )
-                )
-                {
-                    defer zgui.endChild();
-
-                    // Display fetch status with colors
-                    switch (STATE.json_fetch_query.state) {
-                        .failed => {
-                            zgui.pushStyleColor4f(
-                                .{
-                                    .idx = .text,
-                                    .c = .{ 1.0, 0.0, 0.0, 1.0 },
-                                },
-                            );
-                            zgui.text(
-                                "Failed to load example.json via sokol.fetch",
-                                .{},
-                            );
-
-                            if (STATE.json_fetch_query.maybe_error != null)
-                            {
-                                zgui.text(
-                                    "  Error: {s}",
-                                    .{STATE.json_fetch_query.error_message()},
-                                );
-                                zgui.text(
-                                    "  Code: {s}",
-                                    .{STATE.json_fetch_query.error_name()},
-                                );
-                                zgui.text(
-                                    "  Path: {s}",
-                                    .{STATE.json_fetch_query.target_path},
-                                );
-                            }
-
-                            zgui.popStyleColor(.{});
-                        },
-                        .loading => {
-                            zgui.pushStyleColor4f(
-                                .{ 
-                                    .idx = .text,
-                                    .c = .{ 0.0, 0.5, 1.0, 1.0 },
-                                },
-                            );
-                            zgui.text(
-                                "Loading example.json... ({s})",
-                                .{
-                                    @tagName(STATE.json_fetch_query.state)
-                                }
-                            );
-                            zgui.popStyleColor(.{});
-                        },
-                        .loaded => {
-                            // Display success message in green
-                            zgui.pushStyleColor4f(
-                                .{
-                                    .idx = .text,
-                                    .c = .{ 0.0, 1.0, 0.0, 1.0 },
-                                }
-                            );
-                            zgui.text(
-                                (
-                                    "JSON data loaded successfully via "
-                                    ++ "sokol.fetch"
-                                ),
-                                .{}
-                            );
-                            zgui.popStyleColor(.{});
-
-                            if (
-                                zgui.plot.beginPlot(
-                                    "Data from example.json",
-                                    .{
-                                        .w = -1.0,
-                                        .h = -1.0,
-                                        .flags = .{ .equal = true },
-                                    },
-                                )
-                            )
-                            {
-                                defer zgui.plot.endPlot();
-
-                                try draw_pie_chart();
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (
-                zgui.beginTabItem("Big Text Test", .{})
-                and zgui.beginChild("Big Child Test",.{})
-            )
-            {
-                defer zgui.endTabItem();
-                defer zgui.endChild();
-
-                switch (STATE.big_text_query.state) {
-                    .loaded => {
-                        zgui.separatorText("Big text embed test");
-
-                        const TEXT = (
-                            STATE.big_text_query.result_data_buffer
-                        );
-
-                        zgui.textUnformatted(TEXT);
-                    },
-                    .failed => {
-                        zgui.pushStyleColor4f(
-                            .{
-                                .idx = .text,
-                                .c = .{ 1.0, 0.0, 0.0, 1.0 },
-                            },
-                        );
-                        zgui.text(
-                            "Failed to load big text file",
-                            .{},
-                        );
-
-                        if (STATE.big_text_query.maybe_error != null)
-                        {
-                            zgui.text(
-                                "  Error: {s}",
-                                .{STATE.big_text_query.error_message()},
-                            );
-                            zgui.text(
-                                "  Code: {s}",
-                                .{STATE.big_text_query.error_name()},
-                            );
-                            zgui.text(
-                                "  Path: {s}",
-                                .{STATE.big_text_query.target_path},
-                            );
-                        }
-
-                        zgui.popStyleColor(.{});
-                    },
-                    .loading => {
-                        zgui.text(
-                            "Loading big data...",
-                            .{},
-                        );
-                    },
-                }
-
-            }
-
-            // ListClipper Demo Tab
-            if (zgui.beginTabItem("ListClipper", .{}))
-            {
-                defer zgui.endTabItem();
-
-                zgui.separatorText("ListClipper Demo");
-
-                zgui.textWrapped(
-                    \\ListClipper efficiently renders only the visible
-                    \\ rows in a large scrollable list. This example
-                    \\ has 10,000 items but only draws the ones on screen.
-                    ,
-                    .{},
-                );
-
-                zgui.spacing();
-
-                const ITEM_COUNT = 10_000;
-
-                if (
-                    zgui.beginChild(
-                        "ClippedList",
-                        .{
-                            .w = -1,
-                            .h = -1,
-                        },
-                    )
-                )
-                {
-                    defer zgui.endChild();
-
-                    var clipper = zgui.ListClipper.init();
-                    clipper.begin(ITEM_COUNT, null);
-
-                    while (clipper.step())
-                    {
-                        var row: i32 = clipper.DisplayStart;
-                        while (row < clipper.DisplayEnd)
-                            : (row += 1)
-                        {
-                            zgui.text(
-                                "Item #{d}: value = {d:.3}",
-                                .{
-                                    row,
-                                    @as(
-                                        f32,
-                                        @floatFromInt(row),
-                                    ) * 0.123,
-                                },
-                            );
-                        }
-                    }
-
-                    clipper.end();
-                }
-            }
-
-            // Sortable Table Demo Tab
-            if (zgui.beginTabItem("Sortable Table", .{}))
-            {
-                defer zgui.endTabItem();
-
-                zgui.separatorText("Sortable Table Demo");
-
-                zgui.textWrapped(
-                    \\Click on column headers to sort. Hold Shift to multi-sort.
-                    \\Columns can be resized and reordered.
-                    ,
-                    .{},
-                );
-
-                zgui.spacing();
-
-                // Begin the table with sorting enabled
-                if (
-                    zgui.beginTable(
-                        "SortableTable",
-                        .{
-                            .column = 5,
-                            .flags = .{
-                                .sortable = true,
-                                .sort_multi = true,
-                                .resizable = true,
-                                .reorderable = true,
-                                .hideable = true,
-                                .row_bg = true,
-                                .borders = .{
-                                    .inner_h = true,
-                                    .inner_v = true,
-                                    .outer_h = true,
-                                    .outer_v = true,
-                                },
-                                .sizing = .stretch_prop,
-                                .scroll_y = true,
-                            },
-                            .outer_size = .{ 0, 300 },
-                        },
-                    )
-                )
-                {
-                    defer zgui.endTable();
-
-                    // Setup columns with sorting preferences
-                    zgui.tableSetupColumn(
-                        "ID",
-                        .{
-                            .flags = .{
-                                .default_sort = true,
-                                .prefer_sort_ascending = true,
-                            },
-                        },
-                    );
-                    zgui.tableSetupColumn(
-                        "Name",
-                        .{
-                            .flags = .{ .prefer_sort_ascending = true },
-                        },
-                    );
-                    zgui.tableSetupColumn(
-                        "Quantity",
-                        .{
-                            .flags = .{ .prefer_sort_descending = true },
-                        },
-                    );
-                    zgui.tableSetupColumn(
-                        "Price",
-                        .{
-                            .flags = .{ .prefer_sort_descending = true },
-                        },
-                    );
-                    zgui.tableSetupColumn(
-                        "Active",
-                        .{
-                            .flags = .{ .no_sort = true },
-                        },
-                    );
-
-                    // Freeze header row
-                    zgui.tableSetupScrollFreeze(0, 1);
-                    zgui.tableHeadersRow();
-
-                    // Handle sorting
-                    if (zgui.tableGetSortSpecs())
-                        |sort_specs|
-                    {
-                        if (sort_specs.dirty)
-                        {
-                            // Sort the data based on specs
-                            const specs = (
-                                sort_specs.specs[0..@intCast(sort_specs.count)]
-                            );
-                            if (specs.len > 0)
-                            {
-                                const spec = specs[0];
-                                const ascending = (
-                                    spec.sort_direction == .ascending
-                                );
-
-                                std.mem.sort(
-                                    STATE.TableRowData,
-                                    &STATE.table_data,
-                                    SortContext{
-                                        .column = spec.index,
-                                        .ascending = ascending,
-                                    },
-                                    SortContext.lessThan,
-                                );
-                            }
-                            sort_specs.dirty = false;
-                        }
-                    }
-
-                    // Draw rows
-                    for (&STATE.table_data)
-                        |*row|
-                    {
-                        zgui.tableNextRow(.{});
-
-                        // ID column
-                        _ = zgui.tableNextColumn();
-                        zgui.text("{d}", .{row.id});
-
-                        // Name column
-                        _ = zgui.tableNextColumn();
-                        zgui.textUnformatted(row.name);
-
-                        // Quantity column
-                        _ = zgui.tableNextColumn();
-                        zgui.text("{d}", .{row.quantity});
-
-                        // Price column
-                        _ = zgui.tableNextColumn();
-                        zgui.text("${d:.2}", .{row.price});
-
-                        // Active column with colored indicator
-                        _ = zgui.tableNextColumn();
-                        if (row.is_active)
-                        {
-                            zgui.pushStyleColor4f(
-                                .{
-                                    .idx = .text,
-                                    .c = .{ 0.0, 1.0, 0.0, 1.0 },
-                                },
-                            );
-                            zgui.textUnformatted("Yes");
-                            zgui.popStyleColor(.{});
-                        }
-                        else
-                        {
-                            zgui.pushStyleColor4f(
-                                .{
-                                    .idx = .text,
-                                    .c = .{ 1.0, 0.3, 0.3, 1.0 },
-                                },
-                            );
-                            zgui.textUnformatted("No");
-                            zgui.popStyleColor(.{});
-                        }
-                    }
-                }
-
-                zgui.spacing();
-                zgui.separator();
-                zgui.spacing();
-
-                // Summary stats
-                var total_quantity: i32 = 0;
-                var total_value: f32 = 0;
-                var active_count: u32 = 0;
-
-                for (&STATE.table_data)
-                    |row|
-                {
-                    total_quantity += row.quantity;
-                    total_value += (
-                        @as(f32, @floatFromInt(row.quantity)) * row.price
-                    );
-                    if (row.is_active)
-                    {
-                        active_count += 1;
-                    }
-                }
-
-                zgui.text("Total Items: {d}", .{STATE.table_data.len});
-                zgui.text("Total Quantity: {d}", .{total_quantity});
-                zgui.text("Total Value: ${d:.2}", .{total_value});
-                zgui.text(
-                    "Active Products: {d}/{d}",
-                    .{ active_count, STATE.table_data.len },
-                );
             }
         }
     }
@@ -1532,6 +576,8 @@ fn cleanup (
     //     }
     // }
     _ = STATE.worker_pool_initialized; // Suppress unused warning
+
+    ORCHESTRATOR.deinit();
 
     if (IS_WASM == false)
     {
@@ -1669,6 +715,25 @@ pub fn init(
         );
         return;
     };
+
+    // Initialize orchestrator and register Activities + Studio
+    ORCHESTRATOR = MLZ.Orchestrator.init(allocator);
+
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.undo_journal);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.plot);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.big_plot);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.stairs_plot);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.polygon_plot);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.inflines_pie);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.texture);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.canvas);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.json_pie);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.big_text);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.list_clipper);
+    ORCHESTRATOR.registerActivity(&ACTIVITIES.sortable_table);
+
+    ORCHESTRATOR.registerStudio(&DEMO_STUDIO);
+    ORCHESTRATOR.activateStudio("ZIIS Demo Studio");
 }
 
 pub fn main(
