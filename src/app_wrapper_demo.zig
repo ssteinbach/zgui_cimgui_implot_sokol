@@ -10,8 +10,7 @@ const sg = ziis.sokol.gfx;
 const app_wrapper = ziis.app_wrapper;
 
 const cimgui = ziis.cimgui;
-const MeshulaLab = @import("MeshulaLab");
-const MLZ = @import("MeshulaLabZig");
+const MeshulaLab = @import("MeshulaLabZig");
 const activities = @import("demo_activities/root.zig");
 
 /// Data read from the example json, designed to be displayed by Zplot
@@ -53,6 +52,7 @@ pub const SortContext = struct {
 };
 
 /// State container
+/// @TODO: break this out into activity-specific states
 pub const STATE = struct {
     pub var f: f32 = 0;
     pub var demo_window_gui = false;
@@ -186,57 +186,57 @@ const ACTIVITY_NAMES = struct
 
 var ACTIVITIES = struct
 {
-    undo_journal: MLZ.Activity = MLZ.Activity.init(
+    undo_journal: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.UNDO_JOURNAL,
         .{ .run_ui = &activities.undo_journal.runUI },
     ),
-    plot: MLZ.Activity = MLZ.Activity.init(
+    plot: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.PLOT,
         .{ .run_ui = &activities.plot.runUI },
     ),
-    big_plot: MLZ.Activity = MLZ.Activity.init(
+    big_plot: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.BIG_PLOT,
         .{ .run_ui = &activities.big_plot.runUI },
     ),
-    stairs_plot: MLZ.Activity = MLZ.Activity.init(
+    stairs_plot: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.STAIRS_PLOT,
         .{ .run_ui = &activities.stairs_plot.runUI },
     ),
-    polygon_plot: MLZ.Activity = MLZ.Activity.init(
+    polygon_plot: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.POLYGON_PLOT,
         .{ .run_ui = &activities.polygon_plot.runUI },
     ),
-    inflines_pie: MLZ.Activity = MLZ.Activity.init(
+    inflines_pie: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.INFLINES_PIE,
         .{ .run_ui = &activities.inflines_pie.runUI },
     ),
-    texture: MLZ.Activity = MLZ.Activity.init(
+    texture: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.TEXTURE,
         .{ .run_ui = &activities.texture.runUI },
     ),
-    canvas: MLZ.Activity = MLZ.Activity.init(
+    canvas: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.CANVAS,
         .{ .run_ui = &activities.canvas.runUI },
     ),
-    json_pie: MLZ.Activity = MLZ.Activity.init(
+    json_pie: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.JSON_PIE,
         .{ .run_ui = &activities.json_pie.runUI },
     ),
-    big_text: MLZ.Activity = MLZ.Activity.init(
+    big_text: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.BIG_TEXT,
         .{ .run_ui = &activities.big_text.runUI },
     ),
-    list_clipper: MLZ.Activity = MLZ.Activity.init(
+    list_clipper: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.LIST_CLIPPER,
         .{ .run_ui = &activities.list_clipper.runUI },
     ),
-    sortable_table: MLZ.Activity = MLZ.Activity.init(
+    sortable_table: MeshulaLab.Activity = MeshulaLab.Activity.init(
         ACTIVITY_NAMES.SORTABLE_TABLE,
         .{ .run_ui = &activities.sortable_table.runUI },
     ),
 }{};
 
-const STUDIO_CONFIGS = [_]MLZ.ActivityConfig{
+const STUDIO_CONFIGS = [_]MeshulaLab.ActivityConfig{
     .{ .name = ACTIVITY_NAMES.UNDO_JOURNAL },
     .{ .name = ACTIVITY_NAMES.PLOT },
     .{ .name = ACTIVITY_NAMES.BIG_PLOT },
@@ -251,12 +251,12 @@ const STUDIO_CONFIGS = [_]MLZ.ActivityConfig{
     .{ .name = ACTIVITY_NAMES.SORTABLE_TABLE },
 };
 
-var DEMO_STUDIO = MLZ.Studio.init(
+var DEMO_STUDIO = MeshulaLab.Studio.init(
     "ZIIS Demo Studio",
     &STUDIO_CONFIGS,
 );
 
-var ORCHESTRATOR: MLZ.Orchestrator = undefined;
+var ORCHESTRATOR: MeshulaLab.Orchestrator = undefined;
 
 /// the GPA - useful for detecting leaks, but ONLY works in non EMCC builds
 var debug_allocator = (
@@ -637,13 +637,6 @@ fn json_parsing_callback(
 pub fn init(
 ) void
 {
-    // Smoke test: verify MeshulaLab types are accessible
-    comptime {
-        _ = @sizeOf(MeshulaLab.ViewDimensions);
-        _ = @sizeOf(MeshulaLab.Activity);
-        _ = @sizeOf(MeshulaLab.Studio);
-    }
-
     // right around the minimum number of points to make the plot disapear
     const BIGCOUNT = if (IS_WASM) 7000 else 75000;
     STATE.point_buffers.ensureUnusedCapacity(
@@ -717,7 +710,7 @@ pub fn init(
     };
 
     // Initialize orchestrator and register Activities + Studio
-    ORCHESTRATOR = MLZ.Orchestrator.init(allocator);
+    ORCHESTRATOR = MeshulaLab.Orchestrator.init(allocator);
 
     ORCHESTRATOR.registerActivity(&ACTIVITIES.undo_journal);
     ORCHESTRATOR.registerActivity(&ACTIVITIES.plot);
