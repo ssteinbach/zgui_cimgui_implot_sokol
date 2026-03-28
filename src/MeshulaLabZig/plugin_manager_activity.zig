@@ -11,6 +11,8 @@ const std = @import("std");
 const MeshulaLab = @import("MeshulaLab");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
+const FundamentalApp = @import("fundamental_app.zig").FundamentalApp;
+const Orchestrator = @import("orchestrator.zig").Orchestrator;
 const plugin_loader_mod = @import("plugin_loader.zig");
 const PluginLoader = plugin_loader_mod.PluginLoader;
 const PluginInfo = plugin_loader_mod.PluginInfo;
@@ -18,26 +20,37 @@ const PluginInfo = plugin_loader_mod.PluginInfo;
 const options = @import("fundamental_app_options");
 const PLUGIN_DIR = options.plugin_dir;
 
+/// Index of the plugin row that was clicked in the table.
+/// When set, the detail section scrolls to this plugin.
+var scroll_to_plugin: ?usize = null;
+
 pub fn runUI(
     instance: ?*anyopaque,
     _: ?*const MeshulaLab.ViewInteraction,
 ) callconv(.c) void
 {
-    const loader: *PluginLoader = if (instance)
+    const app: *FundamentalApp = if (instance)
         |ptr|
         @ptrCast(@alignCast(ptr))
     else
     {
-        zgui.textUnformatted("Plugin loader not available.");
+        zgui.textUnformatted("Plugin manager not available.");
         return;
     };
 
+    const loader = &app.plugin_loader;
     const plugins = loader.plugins.items;
 
     zgui.separatorText("Plugin Manager");
 
-    // Plugin directory
+    // Plugin directory + refresh button
     zgui.text("Plugin directory: {s}", .{PLUGIN_DIR});
+    zgui.sameLine(.{});
+    if (zgui.smallButton("Refresh"))
+    {
+        loader.rescan(PLUGIN_DIR);
+    }
+
     zgui.text(
         "Discovered plugins: {d}",
         .{plugins.len},
@@ -47,6 +60,7 @@ pub fn runUI(
 
     // Summary counts
     var compatible_count: usize = 0;
+    var enabled_count: usize = 0;
     var total_activities: usize = 0;
     var total_providers: usize = 0;
     var total_studios: usize = 0;
@@ -54,14 +68,17 @@ pub fn runUI(
         |info|
     {
         if (info.compatible) compatible_count += 1;
+        if (info.enabled) enabled_count += 1;
         total_activities += info.activity_names.items.len;
         total_providers += info.provider_names.items.len;
         total_studios += info.studio_names.items.len;
     }
     zgui.text(
-        "Compatible: {d}/{d}  |  Activities: {d}  |  Providers: {d}  |  Studios: {d}",
+        "Compatible: {d}/{d}  |  Enabled: {d}/{d}  |  Activities: {d}  |  Providers: {d}  |  Studios: {d}",
         .{
             compatible_count,
+            plugins.len,
+            enabled_count,
             plugins.len,
             total_activities,
             total_providers,
@@ -73,149 +90,57 @@ pub fn runUI(
     zgui.separator();
     zgui.spacing();
 
-    // Plugin table
-    if (
-        zgui.beginTable(
-            "PluginTable",
-            .{
-                .column = 6,
-                .flags = .{
-                    .resizable = true,
-                    .row_bg = true,
-                    .borders = .{
-                        .inner_h = true,
-                        .inner_v = true,
-                        .outer_h = true,
-                        .outer_v = true,
-                    },
-                    .sizing = .stretch_prop,
-                    // .scroll_y = true,
-                },
-                // .outer_size = .{ 0, 0 },
-            },
-        )
-    )
-    {
-        defer zgui.endTable();
-
-        zgui.tableSetupColumn(
-            "Name",
-            .{
-                .flags = .{},
-                .init_width_or_height = 1.2,
-            },
-        );
-        zgui.tableSetupColumn(
-            "Version",
-            .{
-                .flags = .{},
-                .init_width_or_height = 0.6,
-            },
-        );
-        zgui.tableSetupColumn(
-            "ABI",
-            .{
-                .flags = .{},
-                .init_width_or_height = 0.3,
-            },
-        );
-        zgui.tableSetupColumn(
-            "Status",
-            .{
-                .flags = .{},
-                .init_width_or_height = 0.6,
-            },
-        );
-        zgui.tableSetupColumn(
-            "Provenance",
-            .{
-                .flags = .{},
-                .init_width_or_height = 0.8,
-            },
-        );
-        zgui.tableSetupColumn(
-            "Exports",
-            .{
-                .flags = .{},
-                .init_width_or_height = 2.0,
-            },
-        );
-
-        zgui.tableSetupScrollFreeze(0, 1);
-        zgui.tableHeadersRow();
-
-        for (plugins)
-            |info|
-        {
-            zgui.tableNextRow(.{});
-
-            // Name
-            _ = zgui.tableNextColumn();
-            zgui.textUnformatted(sliceOrNone(info.name));
-
-            // Version
-            _ = zgui.tableNextColumn();
-            zgui.textUnformatted(sliceOrNone(info.version));
-
-            // ABI version
-            _ = zgui.tableNextColumn();
-            zgui.text("{d}", .{info.abi_version});
-
-            // Status
-            _ = zgui.tableNextColumn();
-            if (info.compatible)
-            {
-                zgui.pushStyleColor4f(
-                    .{
-                        .idx = .text,
-                        .c = .{ 0.0, 1.0, 0.0, 1.0 },
-                    },
-                );
-                zgui.textUnformatted("Compatible");
-                zgui.popStyleColor(.{});
-            }
-            else
-            {
-                zgui.pushStyleColor4f(
-                    .{
-                        .idx = .text,
-                        .c = .{ 1.0, 0.3, 0.3, 1.0 },
-                    },
-                );
-                zgui.textUnformatted("Incompatible");
-                zgui.popStyleColor(.{});
-            }
-
-            // Provenance
-            _ = zgui.tableNextColumn();
-            zgui.textUnformatted(sliceOrNone(info.provenance));
-
-            // Exports — compact list
-            _ = zgui.tableNextColumn();
-            drawExports(info);
-        }
-    }
+    drawPluginTable(app);
 
     // Per-plugin detail section with collapsible headers
     zgui.spacing();
     zgui.separatorText("Plugin Details");
 
-    for (plugins)
-        |info|
+    for (plugins, 0..)
+        |*info, idx|
     {
         const header = sliceOrNone(info.name);
+        const should_open = if (scroll_to_plugin)
+            |target|
+            target == idx
+        else
+            false;
+
+        if (should_open)
+        {
+            zgui.setNextItemOpen(.{ .is_open = true });
+        }
+
+        zgui.pushIntId(@intCast(idx));
+        defer zgui.popId();
 
         if (zgui.collapsingHeader(toSentinel(header), .{}))
         {
+            if (should_open)
+            {
+                zgui.setScrollHereY(.{});
+                scroll_to_plugin = null;
+            }
+
             zgui.indent(.{});
 
             zgui.text("Path: {s}", .{sliceOrNone(info.path)});
-            zgui.text("Version: {s}", .{sliceOrNone(info.version)});
+            zgui.text(
+                "Version: {s}",
+                .{sliceOrNone(info.version)},
+            );
             zgui.text(
                 "Provenance: {s}",
                 .{sliceOrNone(info.provenance)},
             );
-            zgui.text("ABI Version: {d}", .{info.abi_version});
+            zgui.text(
+                "ABI Version: {d}",
+                .{info.abi_version},
+            );
+            zgui.text(
+                "Enabled: {s}",
+                .{if (info.enabled) "yes" else "no"},
+            );
 
             if (info.activity_names.items.len > 0)
             {
@@ -253,12 +178,233 @@ pub fn runUI(
             zgui.unindent(.{});
             zgui.spacing();
         }
+        else
+        {
+            // Header was not opened — if we wanted to scroll
+            // here, clear the request so we don't loop forever.
+            if (should_open)
+            {
+                scroll_to_plugin = null;
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------
+// Table drawing
+// -----------------------------------------------------------------
+
+fn drawPluginTable(
+    app: *FundamentalApp,
+) void
+{
+    const loader = &app.plugin_loader;
+    const plugins = loader.plugins.items;
+
+    if (
+        zgui.beginTable(
+            "PluginTableFull",
+            .{
+                .column = 7,
+                .flags = .{
+                    .resizable = true,
+                    .row_bg = true,
+                    .borders = .{
+                        .inner_h = true,
+                        .inner_v = true,
+                        .outer_h = true,
+                        .outer_v = true,
+                    },
+                    .sizing = .stretch_prop,
+                },
+            },
+        )
+    )
+    {
+        defer zgui.endTable();
+
+        zgui.tableSetupColumn(
+            "Name",
+            .{
+                .flags = .{},
+                .init_width_or_height = 1.2,
+            },
+        );
+        zgui.tableSetupColumn(
+            "Version",
+            .{
+                .flags = .{},
+                .init_width_or_height = 0.6,
+            },
+        );
+        zgui.tableSetupColumn(
+            "ABI",
+            .{
+                .flags = .{},
+                .init_width_or_height = 0.3,
+            },
+        );
+        zgui.tableSetupColumn(
+            "Status",
+            .{
+                .flags = .{},
+                .init_width_or_height = 0.6,
+            },
+        );
+        zgui.tableSetupColumn(
+            "Exports",
+            .{
+                .flags = .{},
+                .init_width_or_height = 1.0,
+            },
+        );
+        zgui.tableSetupColumn(
+            "Provenance",
+            .{
+                .flags = .{},
+                .init_width_or_height = 0.8,
+            },
+        );
+        zgui.tableSetupColumn(
+            "##Actions",
+            .{
+                .flags = .{ .no_resize = true },
+                .init_width_or_height = 0.5,
+            },
+        );
+
+        zgui.tableSetupScrollFreeze(0, 1);
+        zgui.tableHeadersRow();
+
+        for (plugins, 0..)
+            |*info, idx|
+        {
+            zgui.tableNextRow(.{});
+            zgui.pushIntId(@intCast(idx));
+            defer zgui.popId();
+
+            // Name — clickable to scroll to detail section
+            _ = zgui.tableNextColumn();
+            if (
+                zgui.selectable(
+                    toSentinel(sliceOrNone(info.name)),
+                    .{},
+                )
+            )
+            {
+                scroll_to_plugin = idx;
+            }
+
+            // Version
+            _ = zgui.tableNextColumn();
+            zgui.textUnformatted(sliceOrNone(info.version));
+
+            // ABI version
+            _ = zgui.tableNextColumn();
+            zgui.text("{d}", .{info.abi_version});
+
+            // Status
+            _ = zgui.tableNextColumn();
+            if (!info.enabled)
+            {
+                zgui.textDisabled("Disabled", .{});
+            }
+            else if (info.compatible)
+            {
+                zgui.pushStyleColor4f(
+                    .{
+                        .idx = .text,
+                        .c = .{ 0.0, 1.0, 0.0, 1.0 },
+                    },
+                );
+                zgui.textUnformatted("Compatible");
+                zgui.popStyleColor(.{});
+            }
+            else
+            {
+                zgui.pushStyleColor4f(
+                    .{
+                        .idx = .text,
+                        .c = .{ 1.0, 0.3, 0.3, 1.0 },
+                    },
+                );
+                zgui.textUnformatted("Incompatible");
+                zgui.popStyleColor(.{});
+            }
+
+            // Exports — counts by type
+            _ = zgui.tableNextColumn();
+            drawExportCounts(info);
+
+            // Provenance
+            _ = zgui.tableNextColumn();
+            zgui.textUnformatted(sliceOrNone(info.provenance));
+
+            // Actions — enable/disable button
+            _ = zgui.tableNextColumn();
+            if (info.enabled)
+            {
+                if (zgui.smallButton("Disable"))
+                {
+                    loader.disablePlugin(idx);
+                    deactivatePluginActivities(
+                        &app.orchestrator,
+                        info,
+                    );
+                }
+            }
+            else
+            {
+                if (zgui.smallButton("Enable"))
+                {
+                    loader.enablePlugin(idx);
+                    activatePluginActivities(
+                        &app.orchestrator,
+                        info,
+                    );
+                }
+            }
+        }
     }
 }
 
 // -----------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------
+
+/// Deactivate all activities belonging to a plugin.
+fn deactivatePluginActivities(
+    orchestrator: *Orchestrator,
+    info: *const PluginInfo,
+) void
+{
+    for (info.activity_names.items)
+        |act_name|
+    {
+        var name_buf: [256:0]u8 = undefined;
+        const nlen = @min(act_name.len, name_buf.len - 1);
+        @memcpy(name_buf[0..nlen], act_name[0..nlen]);
+        name_buf[nlen] = 0;
+        orchestrator.deactivateActivity(@ptrCast(&name_buf));
+    }
+}
+
+/// Reactivate all activities belonging to a plugin.
+fn activatePluginActivities(
+    orchestrator: *Orchestrator,
+    info: *const PluginInfo,
+) void
+{
+    for (info.activity_names.items)
+        |act_name|
+    {
+        var name_buf: [256:0]u8 = undefined;
+        const nlen = @min(act_name.len, name_buf.len - 1);
+        @memcpy(name_buf[0..nlen], act_name[0..nlen]);
+        name_buf[nlen] = 0;
+        orchestrator.activateActivity(@ptrCast(&name_buf));
+    }
+}
 
 fn sliceOrNone(
     s: []const u8,
@@ -267,36 +413,42 @@ fn sliceOrNone(
     return if (s.len > 0) s else "(none)";
 }
 
-/// Format the exports column as a compact comma-separated list.
-fn drawExports(
-    info: PluginInfo,
+/// Show export counts by type in a compact format.
+fn drawExportCounts(
+    info: *const PluginInfo,
 ) void
 {
-    var first = true;
-    for (info.activity_names.items)
-        |act_name|
+    const na = info.activity_names.items.len;
+    const np = info.provider_names.items.len;
+    const ns = info.studio_names.items.len;
+    const total = na + np + ns;
+
+    if (total == 0)
     {
-        if (!first) zgui.sameLine(.{});
-        first = false;
-        zgui.textUnformatted(act_name);
+        zgui.textDisabled("0", .{});
+        return;
     }
-    for (info.provider_names.items)
-        |prov_name|
+
+    // If all exports are of one type, just show the count.
+    // Otherwise break down by type.
+    if (np == 0 and ns == 0)
     {
-        if (!first) zgui.sameLine(.{});
-        first = false;
-        zgui.textUnformatted(prov_name);
+        zgui.text("{d} act", .{na});
     }
-    for (info.studio_names.items)
-        |studio_name|
+    else if (na == 0 and ns == 0)
     {
-        if (!first) zgui.sameLine(.{});
-        first = false;
-        zgui.textUnformatted(studio_name);
+        zgui.text("{d} prov", .{np});
     }
-    if (first)
+    else if (na == 0 and np == 0)
     {
-        zgui.textDisabled("(none)", .{});
+        zgui.text("{d} studio", .{ns});
+    }
+    else
+    {
+        zgui.text(
+            "{d} act, {d} prov, {d} studio",
+            .{ na, np, ns },
+        );
     }
 }
 

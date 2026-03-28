@@ -25,6 +25,7 @@ pub const PluginInfo = struct
     provenance: []const u8 = "",
     abi_version: c_int = 0,
     compatible: bool = false,
+    enabled: bool = true,
 
     activity_names: std.ArrayListUnmanaged([]const u8) = .{},
     provider_names: std.ArrayListUnmanaged([]const u8) = .{},
@@ -32,6 +33,15 @@ pub const PluginInfo = struct
 
     /// The raw descriptor pointer, valid as long as the library is loaded.
     maybe_descriptor: ?*const MeshulaLab.PluginDescriptor = null,
+
+    pub fn totalExports(
+        self: *const PluginInfo,
+    ) usize
+    {
+        return self.activity_names.items.len +
+            self.provider_names.items.len +
+            self.studio_names.items.len;
+    }
 
     pub fn deinit(
         self: *PluginInfo,
@@ -137,7 +147,7 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible) continue;
+            if (!info.compatible or !info.enabled) continue;
             const desc = info.maybe_descriptor orelse continue;
             const create_fn = desc.CreateActivity orelse continue;
 
@@ -165,7 +175,7 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible) continue;
+            if (!info.compatible or !info.enabled) continue;
             const desc = info.maybe_descriptor orelse continue;
             const destroy_fn = desc.DestroyActivity orelse continue;
 
@@ -193,7 +203,7 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible) continue;
+            if (!info.compatible or !info.enabled) continue;
             const desc = info.maybe_descriptor orelse continue;
             const create_fn = desc.CreateProvider orelse continue;
 
@@ -209,6 +219,117 @@ pub const PluginLoader = struct
         return null;
     }
 
+    /// Disable a plugin by index. Does not dlclose — just marks it
+    /// so createActivity/createProvider skip it.
+    pub fn disablePlugin(
+        self: *PluginLoader,
+        index: usize,
+    ) void
+    {
+        if (index < self.plugins.items.len)
+        {
+            self.plugins.items[index].enabled = false;
+            log.info(
+                "disabled plugin: {s}",
+                .{self.plugins.items[index].name},
+            );
+        }
+    }
+
+    /// Re-enable a previously disabled plugin by index.
+    pub fn enablePlugin(
+        self: *PluginLoader,
+        index: usize,
+    ) void
+    {
+        if (index < self.plugins.items.len)
+        {
+            self.plugins.items[index].enabled = true;
+            log.info(
+                "enabled plugin: {s}",
+                .{self.plugins.items[index].name},
+            );
+        }
+    }
+
+    /// Re-scan the plugin directory, loading any new plugins that
+    /// were not previously discovered. Existing plugins are kept.
+    pub fn rescan(
+        self: *PluginLoader,
+        dir_path: []const u8,
+    ) void
+    {
+        if (IS_WASM) return;
+
+        var dir = std.fs.cwd().openDir(
+            dir_path,
+            .{ .iterate = true },
+        ) catch |err| {
+            log.info(
+                "plugin directory not found: {s} ({any})",
+                .{ dir_path, err },
+            );
+            return;
+        };
+        defer dir.close();
+
+        var iter = dir.iterate();
+        while (iter.next() catch null)
+            |entry|
+        {
+            if (entry.kind != .file) continue;
+            if (!isPluginExtension(entry.name)) continue;
+
+            // Build full path
+            var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+            const full_path = std.fmt.bufPrint(
+                &path_buf,
+                "{s}/{s}",
+                .{ dir_path, entry.name },
+            ) catch continue;
+
+            // Skip if already loaded
+            if (self.isPathLoaded(full_path)) continue;
+
+            self.loadPlugin(full_path);
+        }
+    }
+
+    /// Check if an activity name belongs to a disabled plugin.
+    pub fn isActivityDisabled(
+        self: *const PluginLoader,
+        activity_name: []const u8,
+    ) bool
+    {
+        for (self.plugins.items)
+            |info|
+        {
+            for (info.activity_names.items)
+                |act_name|
+            {
+                if (std.mem.eql(u8, act_name, activity_name))
+                {
+                    return !info.enabled;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Check if a plugin at the given path is already loaded.
+    fn isPathLoaded(
+        self: *PluginLoader,
+        path: []const u8,
+    ) bool
+    {
+        for (self.plugins.items)
+            |info|
+        {
+            if (std.mem.eql(u8, info.path, path)) return true;
+        }
+        return false;
+    }
+
     /// Destroy a Provider instance via the owning plugin.
     pub fn destroyProvider(
         self: *PluginLoader,
@@ -221,7 +342,7 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible) continue;
+            if (!info.compatible or !info.enabled) continue;
             const desc = info.maybe_descriptor orelse continue;
             const destroy_fn = desc.DestroyProvider orelse continue;
 

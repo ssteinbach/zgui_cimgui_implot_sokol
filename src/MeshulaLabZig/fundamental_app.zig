@@ -546,6 +546,9 @@ pub const FundamentalApp = struct
                     name,
                 ) orelse continue;
 
+                const disabled_by_plugin =
+                    self.plugin_loader.isActivityDisabled(name);
+
                 const is_active =
                     activity.isActive() and activity.isUIVisible();
 
@@ -557,6 +560,7 @@ pub const FundamentalApp = struct
 
                 if (zgui.menuItem(name_z, .{
                     .selected = is_active,
+                    .enabled = !disabled_by_plugin,
                 }))
                 {
                     var act_buf: [256:0]u8 = undefined;
@@ -620,7 +624,7 @@ pub const FundamentalApp = struct
         )
         {
             plugin_manager.runUI(
-                @ptrCast(&self.plugin_loader),
+                @ptrCast(self),
                 null,
             );
         }
