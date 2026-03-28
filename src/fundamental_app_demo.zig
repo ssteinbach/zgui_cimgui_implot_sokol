@@ -160,21 +160,15 @@ fn postInit() void
 }
 
 /// Called before zgui/sokol shut down — free activity state.
+/// Note: debug_allocator must NOT be deinited here because
+/// FundamentalApp.deinit() (orchestrator, csp, plugins) runs
+/// after this callback and still needs the allocator.
 fn preCleanup() void
 {
     activities.json_pie.deinitState(allocator);
     activities.big_text.deinitState(allocator);
     activities.big_plot.deinitState(allocator);
     activities.undo_journal.deinitState();
-
-    if (IS_WASM == false)
-    {
-        const result = debug_allocator.deinit();
-        if (result == .leak)
-        {
-            std.log.debug("leak!", .{});
-        }
-    }
 }
 
 // =========================================================================
@@ -195,4 +189,15 @@ pub fn main() !void
             .maybe_pre_zgui_shutdown_cleanup = &preCleanup,
         },
     );
+
+    // Debug allocator check runs after FundamentalApp has fully
+    // torn down (orchestrator, csp, plugins all deinited).
+    if (!IS_WASM)
+    {
+        const result = debug_allocator.deinit();
+        if (result == .leak)
+        {
+            std.log.debug("leak!", .{});
+        }
+    }
 }

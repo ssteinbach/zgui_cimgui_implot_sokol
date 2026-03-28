@@ -95,23 +95,7 @@ pub const FundamentalApp = struct
         {
             self.plugin_loader.discoverPlugins();
             self.plugin_loader.loadAllPlugins();
-
-            for (self.plugin_loader.plugins.items)
-                |info|
-            {
-                if (!info.compatible) continue;
-
-                for (info.activity_names.items)
-                    |act_name|
-                {
-                    log.info("plugin activity: {s}", .{act_name});
-                }
-                for (info.provider_names.items)
-                    |prov_name|
-                {
-                    log.info("plugin provider: {s}", .{prov_name});
-                }
-            }
+            self.loadPluginActivities();
         }
 
         // Start CSP engine
@@ -190,6 +174,64 @@ pub const FundamentalApp = struct
     ) void
     {
         self.orchestrator.activateStudio(studio_name);
+    }
+
+    // -----------------------------------------------------------------
+    // Plugin loading
+    // -----------------------------------------------------------------
+
+    /// Create Activity instances from discovered plugins and register
+    /// them with the orchestrator.
+    fn loadPluginActivities(
+        self: *FundamentalApp,
+    ) void
+    {
+        for (self.plugin_loader.plugins.items)
+            |info|
+        {
+            if (!info.compatible) continue;
+
+            for (info.activity_names.items)
+                |act_name|
+            {
+                // Need a sentinel-terminated name for createActivity
+                var name_buf: [256:0]u8 = undefined;
+                const nlen = @min(act_name.len, name_buf.len - 1);
+                @memcpy(name_buf[0..nlen], act_name[0..nlen]);
+                name_buf[nlen] = 0;
+                const name_z: [*:0]const u8 = @ptrCast(&name_buf);
+
+                const maybe_c_activity = self.plugin_loader.createActivity(
+                    name_z,
+                );
+                const c_activity = maybe_c_activity orelse {
+                    log.warn(
+                        "plugin failed to create activity: {s}",
+                        .{act_name},
+                    );
+                    continue;
+                };
+
+                // Wrap the C activity in a Zig Activity and register it.
+                // Heap-allocate since the orchestrator stores a pointer.
+                const wrapper = self.allocator.create(
+                    Activity,
+                ) catch {
+                    log.warn(
+                        "alloc failed for plugin activity: {s}",
+                        .{act_name},
+                    );
+                    continue;
+                };
+                wrapper.* = .{ .lab = c_activity.* };
+                self.orchestrator.registerActivity(wrapper);
+
+                log.info(
+                    "registered plugin activity: {s}",
+                    .{act_name},
+                );
+            }
+        }
     }
 
     // -----------------------------------------------------------------
@@ -612,10 +654,18 @@ pub const FundamentalApp = struct
     {
         const viewport = zgui.getMainViewport();
         const vp_size = viewport.getSize();
+        const work_pos = viewport.getWorkPos();
+        const work_size = viewport.getWorkSize();
 
-        // Fullscreen window
-        zgui.setNextWindowPos(.{ .x = 0, .y = 0 });
-        zgui.setNextWindowSize(.{ .w = vp_size[0], .h = vp_size[1] });
+        // Fill the work area (below the main menu bar)
+        zgui.setNextWindowPos(.{
+            .x = work_pos[0],
+            .y = work_pos[1],
+        });
+        zgui.setNextWindowSize(.{
+            .w = work_size[0],
+            .h = work_size[1],
+        });
 
         _ = zgui.begin("##MainWindow", .{
             .flags = .{
@@ -630,10 +680,10 @@ pub const FundamentalApp = struct
         lab_vi.dt = dt;
         lab_vi.view.w = vp_size[0];
         lab_vi.view.h = vp_size[1];
-        lab_vi.view.wx = 0;
-        lab_vi.view.wy = 0;
-        lab_vi.view.ww = vp_size[0];
-        lab_vi.view.wh = vp_size[1];
+        lab_vi.view.wx = work_pos[0];
+        lab_vi.view.wy = work_pos[1];
+        lab_vi.view.ww = work_size[0];
+        lab_vi.view.wh = work_size[1];
 
         // Tab bar with active activities
         if (zgui.beginTabBar("Activities", .{}))

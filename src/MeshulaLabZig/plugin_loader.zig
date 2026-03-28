@@ -255,24 +255,33 @@ pub const PluginLoader = struct
         }
     }
 
-    /// Get the platform-specific default plugin directory.
+    /// Get the default plugin directory relative to the executable.
+    ///
+    /// Layout matches `zig build` output:
+    ///   zig-out/bin/fundamental-demo
+    ///   zig-out/lib/plugins/*.dylib
+    ///
+    /// So the directory is `<exe_dir>/../lib/plugins`.
     pub fn getPluginDirectory() []const u8
     {
-        return switch (builtin.os.tag)
-        {
-            .macos, .linux => blk: {
-                // ~/.config/LabRaven/plugins/
-                if (std.posix.getenv("HOME"))
-                    |home|
-                {
-                    _ = home;
-                }
-                break :blk "~/.config/LabRaven/plugins";
-            },
-            .windows => "%APPDATA%/LabRaven/plugins",
-            else => "plugins",
-        };
+        if (IS_WASM) return "";
+
+        const self_exe_dir = std.fs.selfExeDirPath(
+            &exe_dir_buf,
+        ) catch return "plugins";
+
+        // Build "<exe_dir>/../lib/plugins"
+        const result = std.fmt.bufPrint(
+            &plugin_dir_buf,
+            "{s}/../lib/plugins",
+            .{self_exe_dir},
+        ) catch return "plugins";
+
+        return result;
     }
+
+    var exe_dir_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var plugin_dir_buf: [std.fs.max_path_bytes]u8 = undefined;
 
     // ---------------------------------------------------------------
     // Internal

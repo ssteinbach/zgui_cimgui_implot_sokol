@@ -420,21 +420,61 @@ pub fn build(
             "demo",
             mod_app_wrapper,
             check_step,
+            .{},
         );
         try build_native(
             b,
             "3d-demo",
             mod_3d_demo,
             check_step,
+            .{},
         );
         try build_native(
             b,
             "fundamental-demo",
             mod_fundamental_demo,
             check_step,
+            .{ .rdynamic = true },
         );
+
+        // Plugin shared libraries (native only)
+        const plugin_sources = .{
+            .{ "plugin_undo_journal", "src/plugins/plugin_undo_journal.zig" },
+            .{ "plugin_plot", "src/plugins/plugin_plot.zig" },
+            .{ "plugin_big_plot", "src/plugins/plugin_big_plot.zig" },
+            .{ "plugin_stairs_plot", "src/plugins/plugin_stairs_plot.zig" },
+            .{ "plugin_polygon_plot", "src/plugins/plugin_polygon_plot.zig" },
+            .{ "plugin_inflines_pie", "src/plugins/plugin_inflines_pie.zig" },
+            .{ "plugin_texture", "src/plugins/plugin_texture.zig" },
+            .{ "plugin_canvas", "src/plugins/plugin_canvas.zig" },
+            .{ "plugin_json_pie", "src/plugins/plugin_json_pie.zig" },
+            .{ "plugin_big_text", "src/plugins/plugin_big_text.zig" },
+            .{ "plugin_list_clipper", "src/plugins/plugin_list_clipper.zig" },
+            .{ "plugin_sortable_table", "src/plugins/plugin_sortable_table.zig" },
+        };
+        inline for (plugin_sources)
+            |entry|
+        {
+            build_plugin(
+                b,
+                entry[0],
+                entry[1],
+                target,
+                optimize,
+                mod_ziis,
+                mod_meshulalab,
+                mod_meshulalab_zig,
+            );
+        }
     }
 }
+
+/// Options for native executables.
+const NativeExeOptions = struct
+{
+    /// Export symbols for plugin loading (-rdynamic).
+    rdynamic: bool = false,
+};
 
 /// Build for native (non-wasm) target
 fn build_native(
@@ -442,6 +482,7 @@ fn build_native(
     comptime name: []const u8,
     mod: *std.Build.Module,
     check_step: *std.Build.Step,
+    opts: NativeExeOptions,
 ) !void
 {
     // the executable
@@ -451,6 +492,10 @@ fn build_native(
             .root_module = mod,
         },
     );
+    if (opts.rdynamic)
+    {
+        exe.rdynamic = true;
+    }
     check_step.dependOn(&exe.step);
     b.installArtifact(exe);
 
@@ -472,6 +517,98 @@ fn build_native(
         "Run " ++ name,
     );
     run_step.dependOn(&b.addRunArtifact(exe).step);
+}
+
+/// Build a plugin shared library (.dylib/.so/.dll).
+///
+/// The plugin leaves imgui/sokol symbols unresolved; the host
+/// executable exports them via -rdynamic, and the dynamic linker
+/// resolves them at dlopen time.
+fn build_plugin(
+    b: *std.Build,
+    comptime name: []const u8,
+    comptime source_path: []const u8,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    mod_ziis: *std.Build.Module,
+    mod_meshulalab: *std.Build.Module,
+    mod_meshulalab_zig: *std.Build.Module,
+) void
+{
+    // Shared demo_activities module — allows plugins to import
+    // activity implementations without path escaping.
+    const mod_demo_activities = b.createModule(
+        .{
+            .root_source_file = b.path("src/demo_activities/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "zgui_cimgui_implot_sokol",
+                    .module = mod_ziis,
+                },
+                .{
+                    .name = "MeshulaLab",
+                    .module = mod_meshulalab,
+                },
+                .{
+                    .name = "MeshulaLabZig",
+                    .module = mod_meshulalab_zig,
+                },
+            },
+        },
+    );
+
+    const mod = b.createModule(
+        .{
+            .root_source_file = b.path(source_path),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "zgui_cimgui_implot_sokol",
+                    .module = mod_ziis,
+                },
+                .{
+                    .name = "MeshulaLab",
+                    .module = mod_meshulalab,
+                },
+                .{
+                    .name = "MeshulaLabZig",
+                    .module = mod_meshulalab_zig,
+                },
+                .{
+                    .name = "demo_activities",
+                    .module = mod_demo_activities,
+                },
+            },
+        },
+    );
+
+    const lib = b.addLibrary(
+        .{
+            .linkage = .dynamic,
+            .name = name,
+            .root_module = mod,
+        },
+    );
+
+    // Allow undefined symbols — they resolve against the host at
+    // dlopen time.
+    lib.linker_allow_shlib_undefined = true;
+
+    // Install into lib/plugins/ so the host can discover them.
+    const install = b.addInstallArtifact(
+        lib,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = "lib/plugins",
+                },
+            },
+        },
+    );
+    b.getInstallStep().dependOn(&install.step);
 }
 
 /// Build for WASM
