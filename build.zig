@@ -544,6 +544,35 @@ pub fn build(
             .{ .rdynamic = true },
         );
 
+        // ziis-init scaffolding tool (no deps, just std)
+        {
+            const mod_ziis_init = b.createModule(
+                .{
+                    .root_source_file = b.path("src/ziis_init.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                },
+            );
+            const exe = b.addExecutable(
+                .{
+                    .name = "ziis-init",
+                    .root_module = mod_ziis_init,
+                },
+            );
+            b.installArtifact(exe);
+            var run_step = b.step(
+                "run-ziis-init",
+                "Run ziis-init scaffolding tool",
+            );
+            const run_cmd = b.addRunArtifact(exe);
+            if (b.args)
+                |run_args|
+            {
+                run_cmd.addArgs(run_args);
+            }
+            run_step.dependOn(&run_cmd.step);
+        }
+
         // Plugin shared libraries (native only)
         const plugin_sources = .{
             .{ "plugin_undo_journal", "src/plugins/plugin_undo_journal.zig" },
@@ -558,6 +587,7 @@ pub fn build(
             .{ "plugin_big_text", "src/plugins/plugin_big_text.zig" },
             .{ "plugin_list_clipper", "src/plugins/plugin_list_clipper.zig" },
             .{ "plugin_sortable_table", "src/plugins/plugin_sortable_table.zig" },
+            .{ "plugin_template", "src/plugins/plugin_template.zig" },
         };
         inline for (plugin_sources)
             |entry|
