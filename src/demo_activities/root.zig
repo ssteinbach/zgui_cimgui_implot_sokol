@@ -12,3 +12,4 @@ pub const json_pie = @import("json_pie.zig");
 pub const big_text = @import("big_text.zig");
 pub const list_clipper = @import("list_clipper.zig");
 pub const sortable_table = @import("sortable_table.zig");
+pub const pie_chart_utils = @import("pie_chart_utils.zig");

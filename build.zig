@@ -12,6 +12,12 @@ pub fn build(
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const enable_docking = b.option(
+        bool,
+        "enable_docking",
+        "Build with ImGui docking branch support",
+    ) orelse false;
+
     // Fetch Dependencies
     ///////////////////////////////////////////////////////////////////////////
 
@@ -42,11 +48,7 @@ pub fn build(
     );
     // Get the matching Zig module name, C header search path and C library
     // for vanilla imgui vs the imgui docking branch.
-    const cimgui_conf = cimgui.getConfig(
-        // Currently *not* using the docking version, although not for any big
-        // reason.
-        false,
-    );
+    const cimgui_conf = cimgui.getConfig(enable_docking);
     const lib_cimgui = dep_cimgui.artifact(cimgui_conf.clib_name);
 
     const dep_meshulalab = b.dependency(
@@ -152,11 +154,18 @@ pub fn build(
         },
     );
     lib_imgui.addIncludePath(
-        dep_cimgui.path("src"),
+        dep_cimgui.path(cimgui_conf.include_dir),
     );
     lib_imgui.addIncludePath(
         dep_implot.path("implot.h").dirname(),
     );
+
+    // When docking is enabled, define the C macro so zgui.cpp
+    // compiles the docking wrapper functions.
+    if (enable_docking)
+    {
+        lib_imgui.root_module.addCMacro("ZGUI_ENABLE_DOCKING", "1");
+    }
 
     mod_ziis.linkLibrary(lib_cimgui);
     mod_ziis.linkLibrary(lib_imgui);
@@ -190,6 +199,19 @@ pub fn build(
         );
     }
 
+    // zimq: ZeroMQ bindings (native only, used by CSP engine)
+    const dep_zimq = b.dependency(
+        "zimq",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+
+    // FundamentalApp build options
+    const fundamental_app_options = b.addOptions();
+    fundamental_app_options.addOption(bool, "enable_docking", enable_docking);
+
     // MeshulaLabZig: Zig-ergonomic wrappers for the MeshulaLab architecture
     const mod_meshulalab_zig = b.addModule(
         "MeshulaLabZig",
@@ -202,6 +224,18 @@ pub fn build(
                     .name = "MeshulaLab",
                     .module = mod_meshulalab,
                 },
+                .{
+                    .name = "zgui_cimgui_implot_sokol",
+                    .module = mod_ziis,
+                },
+                .{
+                    .name = "zimq",
+                    .module = dep_zimq.module("zimq"),
+                },
+                .{
+                    .name = "fundamental_app_options",
+                    .module = fundamental_app_options.createModule(),
+                },
             },
         },
     );
@@ -210,6 +244,29 @@ pub fn build(
     const mod_app_wrapper = b.createModule(
         .{
             .root_source_file = b.path("src/app_wrapper_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "zgui_cimgui_implot_sokol",
+                    .module = mod_ziis,
+                },
+                .{
+                    .name = "MeshulaLab",
+                    .module = mod_meshulalab,
+                },
+                .{
+                    .name = "MeshulaLabZig",
+                    .module = mod_meshulalab_zig,
+                },
+            },
+        },
+    );
+
+    // FundamentalApp demo module
+    const mod_fundamental_demo = b.createModule(
+        .{
+            .root_source_file = b.path("src/fundamental_app_demo.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -368,6 +425,12 @@ pub fn build(
             b,
             "3d-demo",
             mod_3d_demo,
+            check_step,
+        );
+        try build_native(
+            b,
+            "fundamental-demo",
+            mod_fundamental_demo,
             check_step,
         );
     }

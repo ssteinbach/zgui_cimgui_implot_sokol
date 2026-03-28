@@ -29,6 +29,10 @@
         .MeshulaLab = .{
             .path = "../../../external_sources/MeshulaLab",
         },
+        .zimq = .{
+            .url = "git+https://github.com/uyha/zimq.git#2ffe63d9bdd41d24525975ce2759b37648ae423c",
+            .hash = "zimq-0.0.0-nw1ioGioAQCf8tyBYFGi7KgrdZBBB06NGNqw2fbzxm87",
+        },
     },
 
     .paths = .{

@@ -1,5 +1,5 @@
 const std = @import("std");
-const demo = @import("../app_wrapper_demo.zig");
+const pie_chart_utils = @import("pie_chart_utils.zig");
 const MeshulaLab = @import("MeshulaLab");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
@@ -104,7 +104,7 @@ pub fn runUI(
 
             // tooltip on hover/click
             if (
-                demo.maybe_pie_slice_under_mouse(
+                pie_chart_utils.maybe_pie_slice_under_mouse(
                     f64,
                     &pie_labels,
                     &pie_values

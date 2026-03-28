@@ -1,8 +1,55 @@
-const demo = @import("../app_wrapper_demo.zig");
+const std = @import("std");
 const MeshulaLab = @import("MeshulaLab");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
 const zplot = zgui.plot;
+
+const builtin = @import("builtin");
+const IS_WASM = builtin.target.cpu.arch.isWasm();
+
+// ---------------------------------------------------------------
+// Activity-local state
+// ---------------------------------------------------------------
+
+pub var point_buffers: std.MultiArrayList(
+    struct { x: f32, y: f32 },
+) = .empty;
+
+pub fn initState(
+    allocator: std.mem.Allocator,
+) void
+{
+    const BIGCOUNT: usize = if (IS_WASM) 7000 else 75000;
+    point_buffers.ensureUnusedCapacity(
+        allocator,
+        BIGCOUNT,
+    ) catch {};
+
+    const inc = 0.01;
+    var cur: f32 = -10.0;
+    for (0..(BIGCOUNT - 1))
+        |_|
+    {
+        point_buffers.appendAssumeCapacity(
+            .{
+                .x = cur,
+                .y = std.math.sin(cur),
+            },
+        );
+        cur += inc;
+    }
+}
+
+pub fn deinitState(
+    allocator: std.mem.Allocator,
+) void
+{
+    point_buffers.deinit(allocator);
+}
+
+// ---------------------------------------------------------------
+// RunUI
+// ---------------------------------------------------------------
 
 pub fn runUI(
     _: ?*anyopaque,
@@ -12,7 +59,7 @@ pub fn runUI(
     if (
         zgui.beginChild(
             "Big Plot",
-            .{ .w = -1, .h = -1, },
+            .{ .w = -1, .h = -1 },
         )
     )
     {
@@ -42,14 +89,14 @@ pub fn runUI(
             zgui.plot.setupLegend(
                 .{
                     .south = true,
-                    .west = true
+                    .west = true,
                 },
                 .{},
             );
             zgui.plot.setupFinish();
 
-            const xs= demo.STATE.point_buffers.items(.x);
-            const ys= demo.STATE.point_buffers.items(.y);
+            const xs = point_buffers.items(.x);
+            const ys = point_buffers.items(.y);
 
             zplot.plotLine(
                 "Sine wave with lots of samples",

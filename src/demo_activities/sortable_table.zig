@@ -1,8 +1,109 @@
 const std = @import("std");
-const demo = @import("../app_wrapper_demo.zig");
 const MeshulaLab = @import("MeshulaLab");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
+
+pub const TableRowData = struct {
+    id: u32,
+    name: [:0]const u8,
+    quantity: i32,
+    price: f32,
+    is_active: bool,
+};
+
+/// Context for sorting table rows
+pub const SortContext = struct {
+    column: i16,
+    ascending: bool,
+
+    /// Compare two TableRowData items based on the sort column
+    /// and direction.
+    pub fn lessThan(
+        ctx: SortContext,
+        a: TableRowData,
+        b: TableRowData,
+    ) bool
+    {
+        const result = switch (ctx.column)
+        {
+            // ID column
+            0 => std.math.order(a.id, b.id),
+            // Name column
+            1 => std.mem.order(u8, a.name, b.name),
+            // Quantity column
+            2 => std.math.order(a.quantity, b.quantity),
+            // Price column
+            3 => std.math.order(a.price, b.price),
+            // Default
+            else => .eq,
+        };
+
+        return if (ctx.ascending)
+            result == .lt
+        else
+            result == .gt;
+    }
+};
+
+// Sample data for the sortable table
+pub var table_data = [_]TableRowData{
+    .{
+        .id = 1,
+        .name = "Apples",
+        .quantity = 150,
+        .price = 1.25,
+        .is_active = true,
+    },
+    .{
+        .id = 2,
+        .name = "Bananas",
+        .quantity = 200,
+        .price = 0.75,
+        .is_active = true,
+    },
+    .{
+        .id = 3,
+        .name = "Cherries",
+        .quantity = 50,
+        .price = 4.50,
+        .is_active = false,
+    },
+    .{
+        .id = 4,
+        .name = "Dates",
+        .quantity = 80,
+        .price = 6.00,
+        .is_active = true,
+    },
+    .{
+        .id = 5,
+        .name = "Elderberries",
+        .quantity = 25,
+        .price = 8.99,
+        .is_active = false,
+    },
+    .{
+        .id = 6,
+        .name = "Figs",
+        .quantity = 120,
+        .price = 3.25,
+        .is_active = true,
+    },
+    .{
+        .id = 7,
+        .name = "Grapes",
+        .quantity = 300,
+        .price = 2.50,
+        .is_active = true,
+    },
+    .{
+        .id = 8,
+        .name = "Honeydew",
+        .quantity = 45,
+        .price = 5.00,
+        .is_active = false,
+    },
+};
 
 pub fn runUI(
     _: ?*anyopaque,
@@ -106,13 +207,13 @@ pub fn runUI(
                     );
 
                     std.mem.sort(
-                        demo.STATE.TableRowData,
-                        &demo.STATE.table_data,
-                        demo.SortContext{
+                        TableRowData,
+                        &table_data,
+                        SortContext{
                             .column = spec.index,
                             .ascending = ascending,
                         },
-                        demo.SortContext.lessThan,
+                        SortContext.lessThan,
                     );
                 }
                 sort_specs.dirty = false;
@@ -120,7 +221,7 @@ pub fn runUI(
         }
 
         // Draw rows
-        for (&demo.STATE.table_data)
+        for (&table_data)
             |*row|
         {
             zgui.tableNextRow(.{});
@@ -177,7 +278,7 @@ pub fn runUI(
     var total_value: f32 = 0;
     var active_count: u32 = 0;
 
-    for (&demo.STATE.table_data)
+    for (&table_data)
         |row|
     {
         total_quantity += row.quantity;
@@ -190,11 +291,11 @@ pub fn runUI(
         }
     }
 
-    zgui.text("Total Items: {d}", .{demo.STATE.table_data.len});
+    zgui.text("Total Items: {d}", .{table_data.len});
     zgui.text("Total Quantity: {d}", .{total_quantity});
     zgui.text("Total Value: ${d:.2}", .{total_value});
     zgui.text(
         "Active Products: {d}/{d}",
-        .{ active_count, demo.STATE.table_data.len },
+        .{ active_count, table_data.len },
     );
 }

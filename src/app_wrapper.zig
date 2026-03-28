@@ -267,6 +267,15 @@ const SokolApp = struct {
     /// Optional logging callback for sokol subsystems.  Off by default.
     /// Pass `ziis.std_log_scoped` to route sokol output through std.log.
     logger: ?LogFn = null,
+
+    /// Enable drag-and-drop file handling.
+    enable_dragndrop: bool = false,
+
+    /// Maximum number of files accepted in a single drop.
+    max_dropped_files: i32 = 1,
+
+    /// Maximum path length (bytes) for each dropped file.
+    max_dropped_file_path_length: i32 = 2048,
 };
 
 pub fn sokol_main(
@@ -296,6 +305,9 @@ pub fn sokol_main(
             .icon = .{ .sokol_default = true },
             .window_title = STATE.app.title,
             .enable_clipboard = true,
+            .enable_dragndrop = STATE.app.enable_dragndrop,
+            .max_dropped_files = STATE.app.max_dropped_files,
+            .max_dropped_file_path_length = STATE.app.max_dropped_file_path_length,
             .html5 = .{
                 .update_document_title = true,
             },

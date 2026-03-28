@@ -172,6 +172,199 @@ pub const Orchestrator = struct
         }
     }
 
+    /// Run the UI for all active, UI-visible Activities, passing
+    /// the current ViewInteraction.
+    pub fn runActivityUIs(
+        self: *Orchestrator,
+        vi: *const MeshulaLab.ViewInteraction,
+    ) void
+    {
+        var it = self.activities.iterator();
+        while (it.next())
+            |entry|
+        {
+            const activity = entry.value_ptr.*;
+            if (activity.lab.active and activity.lab.uiVisible)
+            {
+                if (activity.lab.RunUI)
+                    |run_ui_fn|
+                {
+                    run_ui_fn(activity.lab.instance, vi);
+                }
+            }
+        }
+    }
+
+    /// Run viewport hovering using the bidding system.
+    /// Each active Activity with a ViewportHoverBid callback submits
+    /// a bid; the highest bidder's ViewportHovering callback is invoked.
+    pub fn runViewportHovering(
+        self: *Orchestrator,
+        vi: *const MeshulaLab.ViewInteraction,
+    ) void
+    {
+        var winner: ?*Activity = null;
+        var highest_bid: c_int = -1;
+
+        var it = self.activities.iterator();
+        while (it.next())
+            |entry|
+        {
+            const activity = entry.value_ptr.*;
+            if (activity.lab.active)
+            {
+                if (activity.lab.ViewportHoverBid)
+                    |bid_fn|
+                {
+                    const bid = bid_fn(activity.lab.instance, vi);
+                    if (bid > highest_bid)
+                    {
+                        highest_bid = bid;
+                        winner = activity;
+                    }
+                }
+            }
+        }
+
+        if (winner)
+            |w|
+        {
+            if (w.lab.ViewportHovering)
+                |hovering_fn|
+            {
+                hovering_fn(w.lab.instance, vi);
+            }
+        }
+    }
+
+    /// Run viewport dragging using the bidding system.
+    /// Each active Activity with a ViewportDragBid callback submits
+    /// a bid; the highest bidder's ViewportDragging callback is invoked.
+    pub fn runViewportDragging(
+        self: *Orchestrator,
+        vi: *const MeshulaLab.ViewInteraction,
+    ) void
+    {
+        var winner: ?*Activity = null;
+        var highest_bid: c_int = -1;
+
+        var it = self.activities.iterator();
+        while (it.next())
+            |entry|
+        {
+            const activity = entry.value_ptr.*;
+            if (activity.lab.active)
+            {
+                if (activity.lab.ViewportDragBid)
+                    |bid_fn|
+                {
+                    const bid = bid_fn(activity.lab.instance, vi);
+                    if (bid > highest_bid)
+                    {
+                        highest_bid = bid;
+                        winner = activity;
+                    }
+                }
+            }
+        }
+
+        if (winner)
+            |w|
+        {
+            if (w.lab.ViewportDragging)
+                |dragging_fn|
+            {
+                dragging_fn(w.lab.instance, vi);
+            }
+        }
+    }
+
+    /// Run rendering for all active Activities that have a Render callback.
+    pub fn runActivityRendering(
+        self: *Orchestrator,
+        vi: *const MeshulaLab.ViewInteraction,
+    ) void
+    {
+        var it = self.activities.iterator();
+        while (it.next())
+            |entry|
+        {
+            const activity = entry.value_ptr.*;
+            if (activity.lab.active)
+            {
+                if (activity.lab.Render)
+                    |render_fn|
+                {
+                    render_fn(activity.lab.instance, vi);
+                }
+            }
+        }
+    }
+
+    /// Find an Activity by name.
+    pub fn findActivity(
+        self: *Orchestrator,
+        activity_name: []const u8,
+    ) ?*Activity
+    {
+        return self.activities.get(activity_name);
+    }
+
+    /// Find a Studio by name.
+    pub fn findStudio(
+        self: *Orchestrator,
+        studio_name: []const u8,
+    ) ?*Studio
+    {
+        return self.studios.get(studio_name);
+    }
+
+    /// Get the currently active Studio, if any.
+    pub fn currentStudio(
+        self: *const Orchestrator,
+    ) ?*Studio
+    {
+        return self.maybe_current_studio;
+    }
+
+    /// Iterator over registered Studio names.
+    pub fn studioNames(
+        self: *Orchestrator,
+    ) NameIterator(StudioMap)
+    {
+        return .{ .inner = self.studios.iterator() };
+    }
+
+    /// Iterator over registered Activity names.
+    pub fn activityNames(
+        self: *Orchestrator,
+    ) NameIterator(ActivityMap)
+    {
+        return .{ .inner = self.activities.iterator() };
+    }
+
+    pub fn NameIterator(
+        comptime MapType: type,
+    ) type
+    {
+        return struct
+        {
+            inner: MapType.Iterator,
+
+            pub fn next(
+                self: *@This(),
+            ) ?[]const u8
+            {
+                if (self.inner.next())
+                    |entry|
+                {
+                    return entry.key_ptr.*;
+                }
+                return null;
+            }
+        };
+    }
+
     /// Activate a specific Activity by name.
     pub fn activateActivity(
         self: *Orchestrator,
