@@ -24,7 +24,9 @@ const Activity = @import("activity.zig").Activity;
 const Studio = @import("studio.zig").Studio;
 const ActivityConfig = @import("studio.zig").ActivityConfig;
 const CspEngine = @import("csp.zig").CspEngine;
-const PluginLoader = @import("plugin_loader.zig").PluginLoader;
+const plugin_loader_mod = @import("plugin_loader.zig");
+const PluginLoader = plugin_loader_mod.PluginLoader;
+const PluginInfo = plugin_loader_mod.PluginInfo;
 const plugin_manager = @import("plugin_manager_activity.zig");
 const ViewInteraction = @import("view_interaction.zig").ViewInteraction;
 const ViewDimensions = @import("view_interaction.zig").ViewDimensions;
@@ -193,50 +195,125 @@ pub const FundamentalApp = struct
         for (self.plugin_loader.plugins.items)
             |info|
         {
-            if (!info.compatible) continue;
+            if (!info.loaded or !info.compatible) continue;
+            self.loadActivitiesForPlugin(&info);
+        }
+    }
 
-            for (info.activity_names.items)
-                |act_name|
-            {
-                // Need a sentinel-terminated name for createActivity
-                var name_buf: [256:0]u8 = undefined;
-                const nlen = @min(act_name.len, name_buf.len - 1);
-                @memcpy(name_buf[0..nlen], act_name[0..nlen]);
-                name_buf[nlen] = 0;
-                const name_z: [*:0]const u8 = @ptrCast(&name_buf);
+    /// Create and register Activity instances for a single plugin.
+    pub fn loadActivitiesForPlugin(
+        self: *FundamentalApp,
+        info: *const PluginInfo,
+    ) void
+    {
+        for (info.activity_names.items)
+            |act_name|
+        {
+            // The activity names originate from the plugin's
+            // GetActivityName which returns [*:0]const u8. The
+            // underlying memory is null-terminated even though we
+            // store them as []const u8, so we can recover the
+            // sentinel pointer safely. This pointer is stable for
+            // the lifetime of the loaded dylib, which is critical
+            // because the plugin's CreateActivity may store it.
+            const name_z: [*:0]const u8 =
+                act_name.ptr[0..act_name.len :0];
 
-                const maybe_c_activity = self.plugin_loader.createActivity(
-                    name_z,
+            const maybe_c_activity = self.plugin_loader.createActivity(
+                name_z,
+            );
+            const c_activity = maybe_c_activity orelse {
+                log.warn(
+                    "plugin failed to create activity: {s}",
+                    .{act_name},
                 );
-                const c_activity = maybe_c_activity orelse {
-                    log.warn(
-                        "plugin failed to create activity: {s}",
-                        .{act_name},
-                    );
-                    continue;
-                };
+                continue;
+            };
 
-                // Wrap the C activity in a Zig Activity and register it.
-                // Heap-allocate since the orchestrator stores a pointer.
-                const wrapper = self.allocator.create(
-                    Activity,
-                ) catch {
-                    log.warn(
-                        "alloc failed for plugin activity: {s}",
-                        .{act_name},
+            // Wrap the C activity in a Zig Activity and register it.
+            // Heap-allocate since the orchestrator stores a pointer.
+            const wrapper = self.allocator.create(
+                Activity,
+            ) catch {
+                log.warn(
+                    "alloc failed for plugin activity: {s}",
+                    .{act_name},
+                );
+                continue;
+            };
+            wrapper.* = .{
+                .lab = c_activity.*,
+                .maybe_plugin_activity = c_activity,
+            };
+            self.orchestrator.registerActivity(wrapper);
+
+            log.info(
+                "registered plugin activity: {s}",
+                .{act_name},
+            );
+        }
+    }
+
+    /// Tear down all Activity instances belonging to a plugin:
+    /// deactivate (if active), unregister from orchestrator, destroy
+    /// via plugin, and free the wrapper. Must be called before
+    /// unloading a plugin.
+    pub fn teardownPluginActivities(
+        self: *FundamentalApp,
+        info: *const PluginInfo,
+    ) void
+    {
+        const desc = info.maybe_descriptor orelse return;
+        const destroy_fn = desc.DestroyActivity orelse null;
+
+        for (info.activity_names.items)
+            |act_name|
+        {
+            // Only deactivate if the activity is currently active,
+            // to avoid double-calling the plugin's Deactivate
+            // callback (which may free resources).
+            if (self.orchestrator.findActivity(act_name))
+                |activity|
+            {
+                if (activity.lab.active)
+                {
+                    var name_buf: [256:0]u8 = undefined;
+                    const nlen = @min(
+                        act_name.len,
+                        name_buf.len - 1,
                     );
-                    continue;
-                };
-                wrapper.* = .{ .lab = c_activity.* };
-                self.orchestrator.registerActivity(wrapper);
+                    @memcpy(name_buf[0..nlen], act_name[0..nlen]);
+                    name_buf[nlen] = 0;
+                    self.orchestrator.deactivateActivity(
+                        @ptrCast(&name_buf),
+                    );
+                }
+            }
+
+            // Unregister from orchestrator
+            if (self.orchestrator.unregisterActivity(act_name))
+                |wrapper|
+            {
+                // Destroy via the plugin using the original pointer
+                // that the plugin allocated (not our wrapper copy).
+                if (destroy_fn)
+                    |dfn|
+                {
+                    if (wrapper.maybe_plugin_activity)
+                        |original|
+                    {
+                        dfn(original);
+                    }
+                }
+                // Free the Zig wrapper
+                self.allocator.destroy(wrapper);
 
                 log.info(
-                    "registered plugin activity: {s}",
+                    "torn down plugin activity: {s}",
                     .{act_name},
                 );
             }
         }
-
     }
 
     // -----------------------------------------------------------------
@@ -373,7 +450,11 @@ pub const FundamentalApp = struct
                         "  - {s} v{s}",
                         .{ info.name, info.version },
                     ) catch {};
-                    if (info.compatible)
+                    if (!info.loaded)
+                    {
+                        writer.print(" [UNLOADED]", .{}) catch {};
+                    }
+                    else if (info.compatible)
                     {
                         writer.print(" [LOADED]", .{}) catch {};
                     }

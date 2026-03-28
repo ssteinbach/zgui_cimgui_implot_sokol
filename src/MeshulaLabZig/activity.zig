@@ -16,6 +16,11 @@ pub const Activity = struct
 {
     lab: MeshulaLab.Activity,
 
+    /// For plugin-created activities: the original pointer returned
+    /// by the plugin's CreateActivity, which must be passed back to
+    /// DestroyActivity. Null for built-in activities.
+    maybe_plugin_activity: ?*MeshulaLab.Activity = null,
+
     /// Callback signatures for Activity lifecycle and rendering.
     /// All callbacks are optional — null callbacks are simply not invoked.
     pub const Callbacks = struct

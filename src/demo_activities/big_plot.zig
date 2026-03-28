@@ -45,6 +45,7 @@ pub fn deinitState(
 ) void
 {
     point_buffers.deinit(allocator);
+    point_buffers = .empty;
 }
 
 // ---------------------------------------------------------------

@@ -50,6 +50,7 @@ pub fn deinitState(
 {
     json_fetch_query.deinit();
     allocator.destroy(json_fetch_query);
+    json_fetch_query = undefined;
 
     for (data_from_json_file.items(.label))
         |labels|
@@ -57,6 +58,7 @@ pub fn deinitState(
         allocator.free(std.mem.span(labels));
     }
     data_from_json_file.deinit(allocator);
+    data_from_json_file = .empty;
 }
 
 /// Read the JSON from the parsed file blob and populate state

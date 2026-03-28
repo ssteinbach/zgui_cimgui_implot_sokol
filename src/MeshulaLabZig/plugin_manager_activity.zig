@@ -24,6 +24,12 @@ const PLUGIN_DIR = options.plugin_dir;
 /// When set, the detail section scrolls to this plugin.
 var scroll_to_plugin: ?usize = null;
 
+/// Deferred action to execute after all UI drawing is done,
+/// so we never mutate the plugin list mid-iteration.
+const DeferredAction = enum { none, unload, reload, load };
+var deferred_action: DeferredAction = .none;
+var deferred_index: usize = 0;
+
 pub fn runUI(
     instance: ?*anyopaque,
     _: ?*const MeshulaLab.ViewInteraction,
@@ -39,7 +45,6 @@ pub fn runUI(
     };
 
     const loader = &app.plugin_loader;
-    const plugins = loader.plugins.items;
 
     zgui.separatorText("Plugin Manager");
 
@@ -53,20 +58,22 @@ pub fn runUI(
 
     zgui.text(
         "Discovered plugins: {d}",
-        .{plugins.len},
+        .{loader.plugins.items.len},
     );
 
     zgui.spacing();
 
     // Summary counts
+    var loaded_count: usize = 0;
     var compatible_count: usize = 0;
     var enabled_count: usize = 0;
     var total_activities: usize = 0;
     var total_providers: usize = 0;
     var total_studios: usize = 0;
-    for (plugins)
+    for (loader.plugins.items)
         |info|
     {
+        if (info.loaded) loaded_count += 1;
         if (info.compatible) compatible_count += 1;
         if (info.enabled) enabled_count += 1;
         total_activities += info.activity_names.items.len;
@@ -74,12 +81,12 @@ pub fn runUI(
         total_studios += info.studio_names.items.len;
     }
     zgui.text(
-        "Compatible: {d}/{d}  |  Enabled: {d}/{d}  |  Activities: {d}  |  Providers: {d}  |  Studios: {d}",
+        "Loaded: {d}/{d}  |  Compatible: {d}  |  Enabled: {d}  |  Activities: {d}  |  Providers: {d}  |  Studios: {d}",
         .{
+            loaded_count,
+            loader.plugins.items.len,
             compatible_count,
-            plugins.len,
             enabled_count,
-            plugins.len,
             total_activities,
             total_providers,
             total_studios,
@@ -96,7 +103,7 @@ pub fn runUI(
     zgui.spacing();
     zgui.separatorText("Plugin Details");
 
-    for (plugins, 0..)
+    for (loader.plugins.items, 0..)
         |*info, idx|
     {
         const header = sliceOrNone(info.name);
@@ -138,9 +145,16 @@ pub fn runUI(
                 .{info.abi_version},
             );
             zgui.text(
-                "Enabled: {s}",
-                .{if (info.enabled) "yes" else "no"},
+                "Loaded: {s}",
+                .{if (info.loaded) "yes" else "no"},
             );
+            if (info.loaded)
+            {
+                zgui.text(
+                    "Enabled: {s}",
+                    .{if (info.enabled) "yes" else "no"},
+                );
+            }
 
             if (info.activity_names.items.len > 0)
             {
@@ -188,6 +202,10 @@ pub fn runUI(
             }
         }
     }
+
+    // Execute deferred unload/reload now that all UI drawing
+    // (table + detail section) is complete.
+    executeDeferredAction(app);
 }
 
 // -----------------------------------------------------------------
@@ -199,7 +217,6 @@ fn drawPluginTable(
 ) void
 {
     const loader = &app.plugin_loader;
-    const plugins = loader.plugins.items;
 
     if (
         zgui.beginTable(
@@ -269,14 +286,14 @@ fn drawPluginTable(
             "##Actions",
             .{
                 .flags = .{ .no_resize = true },
-                .init_width_or_height = 0.5,
+                .init_width_or_height = 0.8,
             },
         );
 
         zgui.tableSetupScrollFreeze(0, 1);
         zgui.tableHeadersRow();
 
-        for (plugins, 0..)
+        for (loader.plugins.items, 0..)
             |*info, idx|
         {
             zgui.tableNextRow(.{});
@@ -305,7 +322,11 @@ fn drawPluginTable(
 
             // Status
             _ = zgui.tableNextColumn();
-            if (!info.enabled)
+            if (!info.loaded)
+            {
+                zgui.textDisabled("Unloaded", .{});
+            }
+            else if (!info.enabled)
             {
                 zgui.textDisabled("Disabled", .{});
             }
@@ -340,31 +361,126 @@ fn drawPluginTable(
             _ = zgui.tableNextColumn();
             zgui.textUnformatted(sliceOrNone(info.provenance));
 
-            // Actions — enable/disable button
+            // Actions
             _ = zgui.tableNextColumn();
-            if (info.enabled)
+            if (info.loaded)
             {
-                if (zgui.smallButton("Disable"))
+                // Loaded plugin: Enable/Disable + Unload + Reload
+                if (info.enabled)
                 {
-                    loader.disablePlugin(idx);
-                    deactivatePluginActivities(
-                        &app.orchestrator,
-                        info,
-                    );
+                    if (zgui.smallButton("Disable"))
+                    {
+                        loader.disablePlugin(idx);
+                        deactivatePluginActivities(
+                            &app.orchestrator,
+                            info,
+                        );
+                    }
+                }
+                else
+                {
+                    if (zgui.smallButton("Enable"))
+                    {
+                        loader.enablePlugin(idx);
+                        activatePluginActivities(
+                            &app.orchestrator,
+                            info,
+                        );
+                    }
+                }
+                zgui.sameLine(.{});
+                if (deferred_action == .none)
+                {
+                    if (zgui.smallButton("Unload"))
+                    {
+                        deferred_action = .unload;
+                        deferred_index = idx;
+                    }
+                    zgui.sameLine(.{});
+                    if (zgui.smallButton("Reload"))
+                    {
+                        deferred_action = .reload;
+                        deferred_index = idx;
+                    }
+                }
+                else
+                {
+                    zgui.textDisabled("Unload", .{});
+                    zgui.sameLine(.{});
+                    zgui.textDisabled("Reload", .{});
                 }
             }
             else
             {
-                if (zgui.smallButton("Enable"))
+                // Unloaded plugin: only Load
+                if (deferred_action == .none)
                 {
-                    loader.enablePlugin(idx);
-                    activatePluginActivities(
-                        &app.orchestrator,
-                        info,
-                    );
+                    if (zgui.smallButton("Load"))
+                    {
+                        deferred_action = .load;
+                        deferred_index = idx;
+                    }
+                }
+                else
+                {
+                    zgui.textDisabled("Load", .{});
                 }
             }
         }
+    }
+}
+
+/// Execute the deferred unload/reload/load after all UI drawing
+/// is done.
+fn executeDeferredAction(
+    app: *FundamentalApp,
+) void
+{
+    const action = deferred_action;
+    const idx = deferred_index;
+    deferred_action = .none;
+
+    const loader = &app.plugin_loader;
+    if (idx >= loader.plugins.items.len) return;
+
+    switch (action)
+    {
+        .none => {},
+        .unload =>
+        {
+            app.teardownPluginActivities(
+                &loader.plugins.items[idx],
+            );
+            loader.unloadPlugin(idx);
+        },
+        .reload =>
+        {
+            app.teardownPluginActivities(
+                &loader.plugins.items[idx],
+            );
+            loader.unloadPlugin(idx);
+            if (loader.loadPluginAt(idx))
+            {
+                const info = &loader.plugins.items[idx];
+                app.loadActivitiesForPlugin(info);
+                activatePluginActivities(
+                    &app.orchestrator,
+                    info,
+                );
+            }
+        },
+        .load =>
+        {
+            if (loader.loadPluginAt(idx))
+            {
+                const info = &loader.plugins.items[idx];
+                app.loadActivitiesForPlugin(info);
+                activatePluginActivities(
+                    &app.orchestrator,
+                    info,
+                );
+            }
+        },
     }
 }
 
@@ -373,6 +489,9 @@ fn drawPluginTable(
 // -----------------------------------------------------------------
 
 /// Deactivate all activities belonging to a plugin.
+/// Only calls deactivate on activities that are currently active,
+/// to avoid calling the plugin's Deactivate callback on
+/// uninitialized state.
 fn deactivatePluginActivities(
     orchestrator: *Orchestrator,
     info: *const PluginInfo,
@@ -381,6 +500,11 @@ fn deactivatePluginActivities(
     for (info.activity_names.items)
         |act_name|
     {
+        const activity = orchestrator.findActivity(
+            act_name,
+        ) orelse continue;
+        if (!activity.lab.active) continue;
+
         var name_buf: [256:0]u8 = undefined;
         const nlen = @min(act_name.len, name_buf.len - 1);
         @memcpy(name_buf[0..nlen], act_name[0..nlen]);
@@ -390,6 +514,9 @@ fn deactivatePluginActivities(
 }
 
 /// Reactivate all activities belonging to a plugin.
+/// Only calls activate on activities that are not currently active,
+/// to avoid double-calling the plugin's Activate callback
+/// (which may allocate resources).
 fn activatePluginActivities(
     orchestrator: *Orchestrator,
     info: *const PluginInfo,
@@ -398,6 +525,11 @@ fn activatePluginActivities(
     for (info.activity_names.items)
         |act_name|
     {
+        const activity = orchestrator.findActivity(
+            act_name,
+        ) orelse continue;
+        if (activity.lab.active) continue;
+
         var name_buf: [256:0]u8 = undefined;
         const nlen = @min(act_name.len, name_buf.len - 1);
         @memcpy(name_buf[0..nlen], act_name[0..nlen]);

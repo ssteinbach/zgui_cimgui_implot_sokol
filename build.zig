@@ -430,21 +430,31 @@ pub fn build(
     }
     else
     {
-        // Native: run full tests
-        const test_mod = b.createModule(
+        // Plugin lifecycle tests (orchestrator + activity wrappers)
+        const lifecycle_test_mod = b.createModule(
             .{
-                .root_source_file = b.path("src/thread_test.zig"),
+                .root_source_file = b.path(
+                    "src/MeshulaLabZig/lifecycle_test.zig",
+                ),
                 .target = target,
                 .optimize = optimize,
+                .imports = &.{
+                    .{
+                        .name = "MeshulaLab",
+                        .module = mod_meshulalab,
+                    },
+                },
             },
         );
 
-        const unit_tests = b.addTest(
+        const lifecycle_tests = b.addTest(
             .{
-                .root_module = test_mod,
+                .root_module = lifecycle_test_mod,
             },
         );
-        test_step.dependOn(&b.addRunArtifact(unit_tests).step);
+        test_step.dependOn(
+            &b.addRunArtifact(lifecycle_tests).step,
+        );
     }
 
     // Dispatch to build function based on target

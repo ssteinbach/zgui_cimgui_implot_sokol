@@ -33,6 +33,7 @@ pub fn deinitState() void
     {
         definitely_journal.deinit();
     }
+    maybe_journal = null;
 }
 
 // ---------------------------------------------------------------

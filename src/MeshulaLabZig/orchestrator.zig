@@ -301,6 +301,21 @@ pub const Orchestrator = struct
         }
     }
 
+    /// Unregister an Activity by name, removing it from the map.
+    /// Returns the Activity pointer so the caller can destroy it.
+    pub fn unregisterActivity(
+        self: *Orchestrator,
+        activity_name: []const u8,
+    ) ?*Activity
+    {
+        if (self.activities.fetchRemove(activity_name))
+            |kv|
+        {
+            return kv.value;
+        }
+        return null;
+    }
+
     /// Find an Activity by name.
     pub fn findActivity(
         self: *Orchestrator,
@@ -366,6 +381,8 @@ pub const Orchestrator = struct
     }
 
     /// Activate a specific Activity by name.
+    /// No-op if the Activity is already active, to avoid
+    /// double-calling the plugin's Activate callback.
     pub fn activateActivity(
         self: *Orchestrator,
         activity_name: [*:0]const u8,
@@ -375,6 +392,7 @@ pub const Orchestrator = struct
         if (self.activities.get(key))
             |activity|
         {
+            if (activity.lab.active) return;
             activity.lab.active = true;
             activity.lab.uiVisible = true;
             if (activity.lab.Activate)
@@ -386,6 +404,8 @@ pub const Orchestrator = struct
     }
 
     /// Deactivate a specific Activity by name.
+    /// No-op if the Activity is already inactive, to avoid
+    /// double-calling the plugin's Deactivate callback.
     pub fn deactivateActivity(
         self: *Orchestrator,
         activity_name: [*:0]const u8,
@@ -395,6 +415,7 @@ pub const Orchestrator = struct
         if (self.activities.get(key))
             |activity|
         {
+            if (!activity.lab.active) return;
             activity.lab.active = false;
             activity.lab.uiVisible = false;
             if (activity.lab.Deactivate)

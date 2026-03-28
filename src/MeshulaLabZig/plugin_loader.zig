@@ -16,6 +16,9 @@ const IS_WASM = builtin.target.cpu.arch.isWasm();
 
 const log = std.log.scoped(.plugin_loader);
 
+/// Handle type for loaded shared libraries (void on WASM).
+const LibHandle = if (IS_WASM) void else *anyopaque;
+
 /// Metadata about a discovered plugin.
 pub const PluginInfo = struct
 {
@@ -26,6 +29,7 @@ pub const PluginInfo = struct
     abi_version: c_int = 0,
     compatible: bool = false,
     enabled: bool = true,
+    loaded: bool = false,
 
     activity_names: std.ArrayListUnmanaged([]const u8) = .{},
     provider_names: std.ArrayListUnmanaged([]const u8) = .{},
@@ -33,6 +37,16 @@ pub const PluginInfo = struct
 
     /// The raw descriptor pointer, valid as long as the library is loaded.
     maybe_descriptor: ?*const MeshulaLab.PluginDescriptor = null,
+
+    /// The dlopen handle, valid while the library is loaded.
+    maybe_handle: if (IS_WASM) void else ?LibHandle =
+        if (IS_WASM) {} else null,
+
+    /// Strings that we heap-duplicated and must free ourselves.
+    /// Strings obtained from the plugin descriptor point into the
+    /// dylib and become invalid after dlclose, so on unload we
+    /// copy them to the heap and track them here.
+    owned_strings: std.ArrayListUnmanaged([]const u8) = .{},
 
     pub fn totalExports(
         self: *const PluginInfo,
@@ -43,11 +57,13 @@ pub const PluginInfo = struct
             self.studio_names.items.len;
     }
 
+    /// Free all resources. Called during full teardown.
     pub fn deinit(
         self: *PluginInfo,
         allocator: std.mem.Allocator,
     ) void
     {
+        self.freeOwnedStrings(allocator);
         if (self.path.len > 0)
         {
             allocator.free(self.path);
@@ -55,6 +71,37 @@ pub const PluginInfo = struct
         self.activity_names.deinit(allocator);
         self.provider_names.deinit(allocator);
         self.studio_names.deinit(allocator);
+        self.owned_strings.deinit(allocator);
+    }
+
+    /// Free heap-duplicated strings tracked in owned_strings.
+    fn freeOwnedStrings(
+        self: *PluginInfo,
+        allocator: std.mem.Allocator,
+    ) void
+    {
+        for (self.owned_strings.items)
+            |s|
+        {
+            allocator.free(s);
+        }
+        self.owned_strings.clearRetainingCapacity();
+    }
+
+    /// Duplicate a string to the heap and track it so it gets freed.
+    fn dupeAndOwn(
+        self: *PluginInfo,
+        allocator: std.mem.Allocator,
+        s: []const u8,
+    ) []const u8
+    {
+        const copy = allocator.dupe(u8, s) catch return "";
+        self.owned_strings.append(allocator, copy) catch
+        {
+            allocator.free(copy);
+            return "";
+        };
+        return copy;
     }
 };
 
@@ -62,9 +109,6 @@ pub const PluginInfo = struct
 pub const PluginLoader = struct
 {
     plugins: std.ArrayListUnmanaged(PluginInfo) = .{},
-    loaded_libs: std.ArrayListUnmanaged(
-        if (IS_WASM) void else *anyopaque,
-    ) = .{},
     allocator: std.mem.Allocator,
 
     pub fn init(
@@ -81,19 +125,17 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |*info|
         {
+            if (!IS_WASM)
+            {
+                if (info.maybe_handle)
+                    |handle|
+                {
+                    _ = std.c.dlclose(handle);
+                }
+            }
             info.deinit(self.allocator);
         }
         self.plugins.deinit(self.allocator);
-
-        if (!IS_WASM)
-        {
-            for (self.loaded_libs.items)
-                |handle|
-            {
-                _ = std.c.dlclose(handle);
-            }
-        }
-        self.loaded_libs.deinit(self.allocator);
     }
 
     /// Scan a specific directory for plugin shared libraries.
@@ -236,6 +278,98 @@ pub const PluginLoader = struct
         }
     }
 
+    /// Fully unload a plugin: dlclose the library and clear its
+    /// live metadata. The PluginInfo stays in the list with
+    /// loaded=false so the UI can still display it and offer a
+    /// Load button. The caller must first unregister/destroy any
+    /// Activity or Provider instances that were created from this
+    /// plugin, since their function pointers become invalid after
+    /// dlclose.
+    pub fn unloadPlugin(
+        self: *PluginLoader,
+        index: usize,
+    ) void
+    {
+        if (IS_WASM) return;
+        if (index >= self.plugins.items.len) return;
+
+        var info = &self.plugins.items[index];
+        if (!info.loaded) return;
+
+        log.info(
+            "unloading plugin: {s}",
+            .{info.name},
+        );
+
+        // Copy name/version/provenance to the heap before dlclose
+        // invalidates the dylib-owned strings.
+        if (info.name.len > 0)
+        {
+            info.name = info.dupeAndOwn(
+                self.allocator,
+                info.name,
+            );
+        }
+        if (info.version.len > 0)
+        {
+            info.version = info.dupeAndOwn(
+                self.allocator,
+                info.version,
+            );
+        }
+        if (info.provenance.len > 0)
+        {
+            info.provenance = info.dupeAndOwn(
+                self.allocator,
+                info.provenance,
+            );
+        }
+
+        // dlclose the library
+        if (info.maybe_handle)
+            |handle|
+        {
+            _ = std.c.dlclose(handle);
+        }
+
+        // Clear live state but keep path, name, version, provenance
+        info.maybe_handle = null;
+        info.maybe_descriptor = null;
+        info.loaded = false;
+        info.enabled = false;
+        info.compatible = false;
+        info.activity_names.clearRetainingCapacity();
+        info.provider_names.clearRetainingCapacity();
+        info.studio_names.clearRetainingCapacity();
+    }
+
+    /// Load (or reload) a plugin at the given index. The entry
+    /// must already exist in the plugins list with a valid path.
+    /// Returns true on success.
+    pub fn loadPluginAt(
+        self: *PluginLoader,
+        index: usize,
+    ) bool
+    {
+        if (IS_WASM) return false;
+        if (index >= self.plugins.items.len) return false;
+
+        var info = &self.plugins.items[index];
+
+        // If already loaded, unload first (caller is responsible
+        // for tearing down activities before calling this).
+        if (info.loaded)
+        {
+            self.unloadPlugin(index);
+            info = &self.plugins.items[index];
+        }
+
+        // Free any heap-owned strings from the previous load
+        info.freeOwnedStrings(self.allocator);
+
+        return self.doLoad(info);
+    }
+
     /// Re-enable a previously disabled plugin by index.
     pub fn enablePlugin(
         self: *PluginLoader,
@@ -252,8 +386,8 @@ pub const PluginLoader = struct
         }
     }
 
-    /// Re-scan the plugin directory, loading any new plugins that
-    /// were not previously discovered. Existing plugins are kept.
+    /// Re-scan the plugin directory. New plugins are added to the
+    /// list (unloaded). Already-known paths are left as-is.
     pub fn rescan(
         self: *PluginLoader,
         dir_path: []const u8,
@@ -288,14 +422,25 @@ pub const PluginLoader = struct
                 .{ dir_path, entry.name },
             ) catch continue;
 
-            // Skip if already loaded
-            if (self.isPathLoaded(full_path)) continue;
+            // Skip if already known (loaded or unloaded)
+            if (self.isPathKnown(full_path)) continue;
 
-            self.loadPlugin(full_path);
+            // Add as a new unloaded entry so it shows in the UI.
+            const owned_path = self.allocator.dupe(
+                u8,
+                full_path,
+            ) catch continue;
+
+            self.plugins.append(self.allocator, .{
+                .path = owned_path,
+            }) catch {
+                self.allocator.free(owned_path);
+            };
         }
     }
 
-    /// Check if an activity name belongs to a disabled plugin.
+    /// Check if an activity name belongs to a disabled or unloaded
+    /// plugin.
     pub fn isActivityDisabled(
         self: *const PluginLoader,
         activity_name: []const u8,
@@ -304,6 +449,7 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
+            if (!info.loaded) continue;
             for (info.activity_names.items)
                 |act_name|
             {
@@ -316,8 +462,9 @@ pub const PluginLoader = struct
         return false;
     }
 
-    /// Check if a plugin at the given path is already loaded.
-    fn isPathLoaded(
+    /// Check if a plugin at the given path is already known
+    /// (loaded or unloaded).
+    fn isPathKnown(
         self: *PluginLoader,
         path: []const u8,
     ) bool
@@ -362,6 +509,7 @@ pub const PluginLoader = struct
     // Internal
     // ---------------------------------------------------------------
 
+    /// Add a new plugin entry and attempt to load it.
     fn loadPlugin(
         self: *PluginLoader,
         path: []const u8,
@@ -369,15 +517,35 @@ pub const PluginLoader = struct
     {
         if (IS_WASM) return;
 
+        const owned_path = self.allocator.dupe(
+            u8,
+            path,
+        ) catch return;
+
+        var info = PluginInfo{ .path = owned_path };
+
+        _ = self.doLoad(&info);
+
+        self.plugins.append(self.allocator, info) catch
+        {
+            info.deinit(self.allocator);
+        };
+    }
+
+    /// dlopen a plugin, extract its descriptor, and populate the
+    /// info's live fields. The info must already have a valid path.
+    /// Returns true on success.
+    fn doLoad(
+        self: *PluginLoader,
+        info: *PluginInfo,
+    ) bool
+    {
         // Need a sentinel-terminated path for dlopen
         var path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
-        if (path.len >= path_buf.len) return;
-        @memcpy(path_buf[0..path.len], path);
-        path_buf[path.len] = 0;
+        if (info.path.len >= path_buf.len) return false;
+        @memcpy(path_buf[0..info.path.len], info.path);
+        path_buf[info.path.len] = 0;
 
-        // Use RTLD_GLOBAL so the host's symbols (imgui context,
-        // sokol_gfx state, etc.) are visible to the plugin. Without
-        // this the plugin gets its own uninitialized copies.
         const handle = std.c.dlopen(
             @ptrCast(&path_buf),
             .{ .LAZY = true, .GLOBAL = true },
@@ -388,17 +556,17 @@ pub const PluginLoader = struct
             {
                 log.warn(
                     "failed to load plugin {s}: {s}",
-                    .{ path, msg },
+                    .{ info.path, msg },
                 );
             }
             else
             {
                 log.warn(
                     "failed to load plugin {s}: unknown error",
-                    .{path},
+                    .{info.path},
                 );
             }
-            return;
+            return false;
         };
 
         // Look up the entry point symbol
@@ -410,33 +578,26 @@ pub const PluginLoader = struct
         {
             log.warn(
                 "plugin {s} missing LabGetPluginDescriptor symbol",
-                .{path},
+                .{info.path},
             );
             _ = std.c.dlclose(handle);
-            return;
+            return false;
         };
 
         const maybe_desc = get_descriptor();
         const desc = maybe_desc orelse {
             log.warn(
                 "plugin {s} returned null descriptor",
-                .{path},
+                .{info.path},
             );
             _ = std.c.dlclose(handle);
-            return;
+            return false;
         };
 
-        // Build PluginInfo — heap-duplicate the path since the
-        // caller's buffer is stack-local and will be overwritten.
-        const owned_path = self.allocator.dupe(
-            u8,
-            path,
-        ) catch return;
-
-        var info = PluginInfo{
-            .path = owned_path,
-            .maybe_descriptor = desc,
-        };
+        info.maybe_handle = handle;
+        info.maybe_descriptor = desc;
+        info.loaded = true;
+        info.enabled = true;
 
         if (desc.GetPluginName)
             |name_fn|
@@ -549,8 +710,7 @@ pub const PluginLoader = struct
             );
         }
 
-        self.plugins.append(self.allocator, info) catch return;
-        self.loaded_libs.append(self.allocator, handle) catch return;
+        return true;
     }
 
     fn isPluginExtension(
