@@ -11,7 +11,7 @@ const app_wrapper = ziis.app_wrapper;
 
 const cimgui = ziis.cimgui;
 const MeshulaLab = @import("MeshulaLabZig");
-const activities = @import("demo_activities/root.zig");
+const activities = @import("demo/activities/root.zig");
 
 /// State container — only fields that are not owned by individual
 /// activities remain here.

@@ -363,7 +363,7 @@ pub fn build(
     // FundamentalApp demo module
     const mod_fundamental_demo = b.createModule(
         .{
-            .root_source_file = b.path("src/fundamental_app_demo.zig"),
+            .root_source_file = b.path("src/demo/app.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -548,7 +548,7 @@ pub fn build(
         {
             const mod_ziis_init = b.createModule(
                 .{
-                    .root_source_file = b.path("src/ziis_init.zig"),
+                    .root_source_file = b.path("src/tools/ziis_init.zig"),
                     .target = target,
                     .optimize = optimize,
                 },
@@ -575,19 +575,19 @@ pub fn build(
 
         // Plugin shared libraries (native only)
         const plugin_sources = .{
-            .{ "plugin_undo_journal", "src/plugins/plugin_undo_journal.zig" },
-            .{ "plugin_plot", "src/plugins/plugin_plot.zig" },
-            .{ "plugin_big_plot", "src/plugins/plugin_big_plot.zig" },
-            .{ "plugin_stairs_plot", "src/plugins/plugin_stairs_plot.zig" },
-            .{ "plugin_polygon_plot", "src/plugins/plugin_polygon_plot.zig" },
-            .{ "plugin_inflines_pie", "src/plugins/plugin_inflines_pie.zig" },
-            .{ "plugin_texture", "src/plugins/plugin_texture.zig" },
-            .{ "plugin_canvas", "src/plugins/plugin_canvas.zig" },
-            .{ "plugin_json_pie", "src/plugins/plugin_json_pie.zig" },
-            .{ "plugin_big_text", "src/plugins/plugin_big_text.zig" },
-            .{ "plugin_list_clipper", "src/plugins/plugin_list_clipper.zig" },
-            .{ "plugin_sortable_table", "src/plugins/plugin_sortable_table.zig" },
-            .{ "plugin_template", "src/plugins/plugin_template.zig" },
+            .{ "plugin_undo_journal", "src/demo/plugins/plugin_undo_journal.zig" },
+            .{ "plugin_plot", "src/demo/plugins/plugin_plot.zig" },
+            .{ "plugin_big_plot", "src/demo/plugins/plugin_big_plot.zig" },
+            .{ "plugin_stairs_plot", "src/demo/plugins/plugin_stairs_plot.zig" },
+            .{ "plugin_polygon_plot", "src/demo/plugins/plugin_polygon_plot.zig" },
+            .{ "plugin_inflines_pie", "src/demo/plugins/plugin_inflines_pie.zig" },
+            .{ "plugin_texture", "src/demo/plugins/plugin_texture.zig" },
+            .{ "plugin_canvas", "src/demo/plugins/plugin_canvas.zig" },
+            .{ "plugin_json_pie", "src/demo/plugins/plugin_json_pie.zig" },
+            .{ "plugin_big_text", "src/demo/plugins/plugin_big_text.zig" },
+            .{ "plugin_list_clipper", "src/demo/plugins/plugin_list_clipper.zig" },
+            .{ "plugin_sortable_table", "src/demo/plugins/plugin_sortable_table.zig" },
+            .{ "plugin_template", "src/demo/plugins/plugin_template.zig" },
         };
         inline for (plugin_sources)
             |entry|
@@ -676,7 +676,7 @@ fn build_plugin(
     // activity implementations without path escaping.
     const mod_demo_activities = b.createModule(
         .{
-            .root_source_file = b.path("src/demo_activities/root.zig"),
+            .root_source_file = b.path("src/demo/activities/root.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
