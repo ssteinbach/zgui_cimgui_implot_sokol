@@ -1,7 +1,7 @@
 //! Zig-native Orchestrator
 //!
 //! Manages the lifecycle of Studios and Activities, mirroring the
-//! patterns of the C++ LabRaven Orchestrator but operating directly
+//! patterns of the C++ MeshulaLab Orchestrator but operating directly
 //! on the Zig wrapper types.
 
 const std = @import("std");

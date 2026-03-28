@@ -1,6 +1,6 @@
 //! Dynamic plugin discovery and loading
 //!
-//! Discovers and loads LabRaven-compatible plugin shared libraries
+//! Discovers and loads MeshulaLab-compatible plugin shared libraries
 //! at runtime using std.DynLib on native platforms. On WASM this
 //! module is a no-op stub.
 //!
@@ -38,6 +38,10 @@ pub const PluginInfo = struct
         allocator: std.mem.Allocator,
     ) void
     {
+        if (self.path.len > 0)
+        {
+            allocator.free(self.path);
+        }
         self.activity_names.deinit(allocator);
         self.provider_names.deinit(allocator);
         self.studio_names.deinit(allocator);
@@ -49,7 +53,7 @@ pub const PluginLoader = struct
 {
     plugins: std.ArrayListUnmanaged(PluginInfo) = .{},
     loaded_libs: std.ArrayListUnmanaged(
-        if (IS_WASM) void else std.DynLib,
+        if (IS_WASM) void else *anyopaque,
     ) = .{},
     allocator: std.mem.Allocator,
 
@@ -74,23 +78,12 @@ pub const PluginLoader = struct
         if (!IS_WASM)
         {
             for (self.loaded_libs.items)
-                |*lib|
+                |handle|
             {
-                lib.close();
+                _ = std.c.dlclose(handle);
             }
         }
         self.loaded_libs.deinit(self.allocator);
-    }
-
-    /// Scan the default platform-specific plugin directory.
-    pub fn discoverPlugins(
-        self: *PluginLoader,
-    ) void
-    {
-        if (IS_WASM) return;
-
-        const dir = getPluginDirectory();
-        self.discoverPluginsInDirectory(dir);
     }
 
     /// Scan a specific directory for plugin shared libraries.
@@ -130,17 +123,6 @@ pub const PluginLoader = struct
 
             self.loadPlugin(full_path);
         }
-    }
-
-    /// Load all discovered plugins (called after discoverPlugins).
-    /// Currently discovery and loading happen together in
-    /// discoverPluginsInDirectory, so this is provided for API
-    /// compatibility with the C++ PluginLoader.
-    pub fn loadAllPlugins(
-        _: *PluginLoader,
-    ) void
-    {
-        // Loading happens during discovery in this implementation.
     }
 
     /// Create an Activity instance by name via the owning plugin.
@@ -255,34 +237,6 @@ pub const PluginLoader = struct
         }
     }
 
-    /// Get the default plugin directory relative to the executable.
-    ///
-    /// Layout matches `zig build` output:
-    ///   zig-out/bin/fundamental-demo
-    ///   zig-out/lib/plugins/*.dylib
-    ///
-    /// So the directory is `<exe_dir>/../lib/plugins`.
-    pub fn getPluginDirectory() []const u8
-    {
-        if (IS_WASM) return "";
-
-        const self_exe_dir = std.fs.selfExeDirPath(
-            &exe_dir_buf,
-        ) catch return "plugins";
-
-        // Build "<exe_dir>/../lib/plugins"
-        const result = std.fmt.bufPrint(
-            &plugin_dir_buf,
-            "{s}/../lib/plugins",
-            .{self_exe_dir},
-        ) catch return "plugins";
-
-        return result;
-    }
-
-    var exe_dir_buf: [std.fs.max_path_bytes]u8 = undefined;
-    var plugin_dir_buf: [std.fs.max_path_bytes]u8 = undefined;
-
     // ---------------------------------------------------------------
     // Internal
     // ---------------------------------------------------------------
@@ -294,28 +248,50 @@ pub const PluginLoader = struct
     {
         if (IS_WASM) return;
 
-        // Need a sentinel-terminated path for DynLib
+        // Need a sentinel-terminated path for dlopen
         var path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
         if (path.len >= path_buf.len) return;
         @memcpy(path_buf[0..path.len], path);
         path_buf[path.len] = 0;
-        const path_z: [:0]const u8 = path_buf[0..path.len :0];
 
-        var lib = std.DynLib.open(path_z) catch |err| {
-            log.warn("failed to load plugin {s}: {any}", .{ path, err });
+        // Use RTLD_GLOBAL so the host's symbols (imgui context,
+        // sokol_gfx state, etc.) are visible to the plugin. Without
+        // this the plugin gets its own uninitialized copies.
+        const handle = std.c.dlopen(
+            @ptrCast(&path_buf),
+            .{ .LAZY = true, .GLOBAL = true },
+        ) orelse {
+            const err_msg = std.c.dlerror();
+            if (err_msg)
+                |msg|
+            {
+                log.warn(
+                    "failed to load plugin {s}: {s}",
+                    .{ path, msg },
+                );
+            }
+            else
+            {
+                log.warn(
+                    "failed to load plugin {s}: unknown error",
+                    .{path},
+                );
+            }
             return;
         };
 
         // Look up the entry point symbol
-        const get_descriptor = lib.lookup(
-            MeshulaLab.GetPluginDescriptor,
-            "LabGetPluginDescriptor",
-        ) orelse {
+        const raw_sym = std.c.dlsym(handle, "LabGetPluginDescriptor");
+        const get_descriptor: MeshulaLab.GetPluginDescriptor = if (raw_sym)
+            |sym|
+            @ptrCast(@alignCast(sym))
+        else
+        {
             log.warn(
                 "plugin {s} missing LabGetPluginDescriptor symbol",
                 .{path},
             );
-            lib.close();
+            _ = std.c.dlclose(handle);
             return;
         };
 
@@ -325,13 +301,19 @@ pub const PluginLoader = struct
                 "plugin {s} returned null descriptor",
                 .{path},
             );
-            lib.close();
+            _ = std.c.dlclose(handle);
             return;
         };
 
-        // Build PluginInfo
+        // Build PluginInfo — heap-duplicate the path since the
+        // caller's buffer is stack-local and will be overwritten.
+        const owned_path = self.allocator.dupe(
+            u8,
+            path,
+        ) catch return;
+
         var info = PluginInfo{
-            .path = path,
+            .path = owned_path,
             .maybe_descriptor = desc,
         };
 
@@ -447,7 +429,7 @@ pub const PluginLoader = struct
         }
 
         self.plugins.append(self.allocator, info) catch return;
-        self.loaded_libs.append(self.allocator, lib) catch return;
+        self.loaded_libs.append(self.allocator, handle) catch return;
     }
 
     fn isPluginExtension(

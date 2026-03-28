@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const MeshulaLab = @import("MeshulaLab");
+const ziis = @import("zgui_cimgui_implot_sokol");
 const activities = @import("demo_activities");
 const activity_mod = activities.texture;
 
@@ -26,10 +27,18 @@ fn getActivityName(
     return null;
 }
 
+fn activate(
+    _: ?*anyopaque,
+) callconv(.c) void
+{
+    activity_mod.initState();
+}
+
 fn createActivity(
     _: [*c]const u8,
 ) callconv(.c) [*c]MeshulaLab.Activity
 {
+    ziis.zgui.initNoContext(std.heap.c_allocator);
     const act = std.heap.c_allocator.create(
         MeshulaLab.Activity,
     ) catch return null;
@@ -37,6 +46,7 @@ fn createActivity(
     act.name = ACTIVITY_NAME;
     act.RunUI = &activity_mod.runUI;
     act.Update = &activity_mod.update;
+    act.Activate = &activate;
     return act;
 }
 

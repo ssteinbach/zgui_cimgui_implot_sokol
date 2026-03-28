@@ -170,6 +170,69 @@ pub fn build(
     mod_ziis.linkLibrary(lib_cimgui);
     mod_ziis.linkLibrary(lib_imgui);
 
+    // Declarations-only modules for plugins — same Zig source files
+    // as the real modules, but WITHOUT linking C libraries.  Extern
+    // function symbols stay unresolved in the plugin .dylib and the
+    // dynamic linker resolves them against the host at dlopen time.
+
+    // sokol declarations-only: same Zig bindings, no sokol_clib
+    const mod_sokol_plugin = b.addModule(
+        "sokol_plugin",
+        .{
+            .root_source_file = dep_sokol.path("src/sokol/sokol.zig"),
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+
+    // cimgui declarations-only: translate the same header, no cimgui_clib
+    const cimgui_translate = b.addTranslateC(
+        .{
+            .root_source_file = dep_cimgui.path(
+                b.fmt("{s}/cimgui.h", .{cimgui_conf.include_dir}),
+            ),
+            .target = b.graph.host,
+            .optimize = optimize,
+        },
+    );
+    const mod_cimgui_plugin = b.addModule(
+        "cimgui_plugin",
+        .{
+            .root_source_file = cimgui_translate.getOutput(),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .link_libcpp = true,
+        },
+    );
+
+    const mod_ziis_plugin = b.addModule(
+        "zgui_cimgui_implot_sokol_plugin",
+        .{
+            .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "sokol",
+                    .module = mod_sokol_plugin,
+                },
+                .{
+                    .name = "cimgui",
+                    .module = mod_cimgui_plugin,
+                },
+                .{
+                    .name = "undo",
+                    .module = dep_undo_journal.module("do_undo_journal"),
+                },
+                .{
+                    .name = "zgui_options",
+                    .module = zgui_options.createModule(),
+                },
+            },
+        },
+    );
+
     // Web Worker C interop library (WASM only)
     const lib_worker_interop = b.addLibrary(
         .{
@@ -211,6 +274,11 @@ pub fn build(
     // FundamentalApp build options
     const fundamental_app_options = b.addOptions();
     fundamental_app_options.addOption(bool, "enable_docking", enable_docking);
+    fundamental_app_options.addOption(
+        []const u8,
+        "plugin_dir",
+        b.getInstallPath(.{ .custom = "lib/plugins" }, ""),
+    );
 
     // MeshulaLabZig: Zig-ergonomic wrappers for the MeshulaLab architecture
     const mod_meshulalab_zig = b.addModule(
@@ -227,6 +295,35 @@ pub fn build(
                 .{
                     .name = "zgui_cimgui_implot_sokol",
                     .module = mod_ziis,
+                },
+                .{
+                    .name = "zimq",
+                    .module = dep_zimq.module("zimq"),
+                },
+                .{
+                    .name = "fundamental_app_options",
+                    .module = fundamental_app_options.createModule(),
+                },
+            },
+        },
+    );
+
+    // Plugin-variant of MeshulaLabZig — uses mod_ziis_plugin to
+    // avoid pulling C libraries into plugin shared libraries.
+    const mod_meshulalab_zig_plugin = b.addModule(
+        "MeshulaLabZig_plugin",
+        .{
+            .root_source_file = b.path("src/MeshulaLabZig/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{
+                    .name = "MeshulaLab",
+                    .module = mod_meshulalab,
+                },
+                .{
+                    .name = "zgui_cimgui_implot_sokol",
+                    .module = mod_ziis_plugin,
                 },
                 .{
                     .name = "zimq",
@@ -461,9 +558,9 @@ pub fn build(
                 entry[1],
                 target,
                 optimize,
-                mod_ziis,
+                mod_ziis_plugin,
                 mod_meshulalab,
-                mod_meshulalab_zig,
+                mod_meshulalab_zig_plugin,
             );
         }
     }
@@ -596,6 +693,7 @@ fn build_plugin(
     // Allow undefined symbols — they resolve against the host at
     // dlopen time.
     lib.linker_allow_shlib_undefined = true;
+
 
     // Install into lib/plugins/ so the host can discover them.
     const install = b.addInstallArtifact(

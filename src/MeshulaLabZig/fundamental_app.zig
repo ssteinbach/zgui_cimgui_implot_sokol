@@ -1,6 +1,6 @@
 //! FundamentalApp — Zig port of MeshulaLab's App.h/App.cpp
 //!
-//! Provides the main application class for LabRaven-style applications:
+//! Provides the main application class for MeshulaLab-style applications:
 //! plugin discovery, orchestrator lifecycle, main menu system, DockSpace
 //! viewport (optional), viewport interaction with hover/drag bidding,
 //! power save, and file drop handling.
@@ -25,11 +25,13 @@ const Studio = @import("studio.zig").Studio;
 const ActivityConfig = @import("studio.zig").ActivityConfig;
 const CspEngine = @import("csp.zig").CspEngine;
 const PluginLoader = @import("plugin_loader.zig").PluginLoader;
+const plugin_manager = @import("plugin_manager_activity.zig");
 const ViewInteraction = @import("view_interaction.zig").ViewInteraction;
 const ViewDimensions = @import("view_interaction.zig").ViewDimensions;
 
 const options = @import("fundamental_app_options");
 const ENABLE_DOCKING = options.enable_docking;
+const PLUGIN_DIR = options.plugin_dir;
 
 const IS_WASM = builtin.target.cpu.arch.isWasm();
 
@@ -49,6 +51,7 @@ pub const FundamentalApp = struct
     suspend_power_save: i32 = 0,
     should_terminate: bool = false,
     was_dragging: bool = false,
+    show_plugin_manager: bool = false,
     allocator: std.mem.Allocator,
 
     // User-provided callbacks
@@ -62,7 +65,7 @@ pub const FundamentalApp = struct
     /// Configuration for `run()`.
     pub const RunConfig = struct
     {
-        title: [:0]const u8 = "LabRaven",
+        title: [:0]const u8 = "MeshulaLab",
         dimensions: [2]i32 = .{ 1280, 800 },
         logger: ?app_wrapper.LogFn = null,
         max_vertices: i32 =
@@ -90,12 +93,13 @@ pub const FundamentalApp = struct
             .allocator = allocator,
         };
 
-        // Discover and load plugins (native only)
+        // Discover plugins (native only). Activity creation is
+        // deferred to postZguiInit so sokol/imgui are available
+        // for stateful activities.
         if (!IS_WASM)
         {
-            self.plugin_loader.discoverPlugins();
-            self.plugin_loader.loadAllPlugins();
-            self.loadPluginActivities();
+            log.info("plugin directory: {s}", .{PLUGIN_DIR});
+            self.plugin_loader.discoverPluginsInDirectory(PLUGIN_DIR);
         }
 
         // Start CSP engine
@@ -232,6 +236,7 @@ pub const FundamentalApp = struct
                 );
             }
         }
+
     }
 
     // -----------------------------------------------------------------
@@ -274,7 +279,7 @@ pub const FundamentalApp = struct
         writer.print(
             \\
             \\=======================================================
-            \\LabRaven Framework Status Report (Zig)
+            \\MeshulaLab Framework Status Report (Zig)
             \\=======================================================
             \\
             \\
@@ -433,6 +438,12 @@ pub const FundamentalApp = struct
         {
             self.drawTabBarWorkspace(dt);
         }
+
+        // --- Floating windows ---
+        if (self.show_plugin_manager)
+        {
+            self.drawPluginManagerWindow();
+        }
     }
 
     // -----------------------------------------------------------------
@@ -502,6 +513,15 @@ pub const FundamentalApp = struct
                 }
             }
 
+            zgui.separator();
+            if (zgui.menuItem(
+                "Plugin Manager",
+                .{ .selected = self.show_plugin_manager },
+            ))
+            {
+                self.show_plugin_manager =
+                    !self.show_plugin_manager;
+            }
             zgui.separator();
             if (zgui.menuItem("Quit", .{}))
             {
@@ -573,6 +593,38 @@ pub const FundamentalApp = struct
             }
             zgui.endMenu();
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Floating windows
+    // -----------------------------------------------------------------
+
+    fn drawPluginManagerWindow(
+        self: *FundamentalApp,
+    ) void
+    {
+        zgui.setNextWindowSize(
+            .{
+                .w = 800,
+                .h = 500,
+                .cond = .first_use_ever,
+            },
+        );
+        if (
+            zgui.begin(
+                "Plugin Manager###PluginMgr",
+                .{
+                    .popen = &self.show_plugin_manager,
+                },
+            )
+        )
+        {
+            plugin_manager.runUI(
+                @ptrCast(&self.plugin_loader),
+                null,
+            );
+        }
+        zgui.end();
     }
 
     // -----------------------------------------------------------------
@@ -829,6 +881,15 @@ pub const FundamentalApp = struct
     fn postZguiInitThunk() void
     {
         const self = INSTANCE orelse return;
+
+        // Create and register Activities from discovered plugins.
+        // This runs after zgui/sokol init, so Activate callbacks
+        // can safely create GPU resources.
+        if (!IS_WASM)
+        {
+            self.loadPluginActivities();
+        }
+
         if (self.maybe_post_zgui_init)
             |init_fn|
         {
