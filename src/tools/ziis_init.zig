@@ -70,9 +70,7 @@ pub fn create_activity(
     }
 
     // Create directory
-    std.fs.cwd().makePath(dest_dir) catch
-        |err|
-    {
+    std.fs.cwd().makePath(dest_dir) catch |err| {
         try stderr.print(
             "error: could not create {s}: {}\n",
             .{ dest_dir, err },
@@ -118,7 +116,7 @@ pub fn create_activity(
         \\    .{{ .name = "{s}Activity" }},
         \\
         \\
-    ,
+        ,
         .{
             activity_path,
             plugin_path,
@@ -185,9 +183,7 @@ pub fn create_studio(
     }
 
     // Create directory
-    std.fs.cwd().makePath(dest_dir) catch
-        |err|
-    {
+    std.fs.cwd().makePath(dest_dir) catch |err| {
         try stderr.print(
             "error: could not create {s}: {}\n",
             .{ dest_dir, err },
@@ -221,7 +217,7 @@ pub fn create_studio(
         \\    .{{ "studio_{s}", "{s}" }},
         \\
         \\
-    ,
+        ,
         .{
             plugin_path,
             studio_name,
@@ -231,7 +227,8 @@ pub fn create_studio(
     try stdout.flush();
 }
 
-pub fn main() !void
+pub fn main(
+) !void
 {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
     defer _ = gpa.deinit();
@@ -257,8 +254,10 @@ pub fn main() !void
     while (i < args.len)
         : (i += 1)
     {
-        if (std.mem.eql(u8, args[i], "--help") or
-            std.mem.eql(u8, args[i], "-h"))
+        if (
+            std.mem.eql(u8, args[i], "--help")
+            or std.mem.eql(u8, args[i], "-h")
+        )
         {
             try stdout.print(HELP_TEXT, .{});
             try stdout.flush();
@@ -355,7 +354,9 @@ fn fatal(
     std.process.exit(1);
 }
 
-fn dirExists(path: []const u8) bool
+fn dirExists(
+    path: []const u8,
+) bool
 {
     const stat = std.fs.cwd().statFile(path) catch return false;
     return stat.kind == .directory;
@@ -402,7 +403,8 @@ fn snakeToPascal(
     return try result.toOwnedSlice(allocator);
 }
 
-// ── Help / Templates ───────────────────────────────────────────────────
+// TEMPLATES
+// ---------
 
 const HELP_TEXT =
     \\Usage:

@@ -10,8 +10,7 @@ const Activity = @import("activity.zig").Activity;
 const Studio = @import("studio.zig").Studio;
 const ActivityConfig = @import("studio.zig").ActivityConfig;
 
-pub const Orchestrator = struct
-{
+pub const Orchestrator = struct {
     activities: ActivityMap,
     studios: StudioMap,
     maybe_current_studio: ?*Studio = null,
@@ -129,8 +128,7 @@ pub const Orchestrator = struct
         };
     }
 
-    pub const ActivityIterator = struct
-    {
+    pub const ActivityIterator = struct {
         inner: ActivityMap.Iterator,
 
         /// Returns the next active, UI-visible Activity, or null.
@@ -362,8 +360,7 @@ pub const Orchestrator = struct
         comptime MapType: type,
     ) type
     {
-        return struct
-        {
+        return struct {
             inner: MapType.Iterator,
 
             pub fn next(
@@ -392,7 +389,10 @@ pub const Orchestrator = struct
         if (self.activities.get(key))
             |activity|
         {
-            if (activity.lab.active) return;
+            if (activity.lab.active)
+            {
+                return;
+            }
             activity.lab.active = true;
             activity.lab.uiVisible = true;
             if (activity.lab.Activate)
@@ -415,7 +415,10 @@ pub const Orchestrator = struct
         if (self.activities.get(key))
             |activity|
         {
-            if (!activity.lab.active) return;
+            if (!activity.lab.active)
+            {
+                return;
+            }
             activity.lab.active = false;
             activity.lab.uiVisible = false;
             if (activity.lab.Deactivate)

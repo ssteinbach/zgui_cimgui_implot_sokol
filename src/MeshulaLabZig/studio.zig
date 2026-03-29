@@ -7,8 +7,7 @@ const std = @import("std");
 const MeshulaLab = @import("MeshulaLab");
 
 /// Configuration for one Activity within a Studio.
-pub const ActivityConfig = struct
-{
+pub const ActivityConfig = struct {
     name: [*:0]const u8,
     ui_initially_visible: bool = true,
 };
@@ -18,8 +17,7 @@ pub const ActivityConfig = struct
 /// Create one with `init()`, passing the name and a static
 /// slice of ActivityConfig entries. Register it with an
 /// Orchestrator to make it available for activation.
-pub const Studio = struct
-{
+pub const Studio = struct {
     lab: MeshulaLab.Studio,
     configs: []const ActivityConfig,
 
@@ -92,13 +90,15 @@ pub const Studio = struct
     {
         const studio = studioFromInstance(instance) orelse return null;
         const i: usize = @intCast(index);
-        if (i >= studio.configs.len) return null;
+        if (i >= studio.configs.len)
+        {
+            return null;
+        }
 
         // Return a pointer to a static LabActivityConfig.
         // This is safe because the configs slice has static lifetime.
         const cfg = &studio.configs[i];
-        const S = struct
-        {
+        const S = struct {
             var c_cfg: MeshulaLab.ActivityConfig = undefined;
         };
         S.c_cfg.name = cfg.name;

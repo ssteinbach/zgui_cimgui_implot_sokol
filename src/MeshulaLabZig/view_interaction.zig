@@ -7,8 +7,7 @@
 const MeshulaLab = @import("MeshulaLab");
 
 /// Dimensions of the viewport within the main window.
-pub const ViewDimensions = struct
-{
+pub const ViewDimensions = struct {
     /// Full view width and height.
     w: f32 = 0,
     h: f32 = 0,
@@ -49,8 +48,7 @@ pub const ViewDimensions = struct
 };
 
 /// Per-frame interaction state for viewport rendering and input.
-pub const ViewInteraction = struct
-{
+pub const ViewInteraction = struct {
     view: ViewDimensions = .{},
 
     /// Mouse position relative to the viewport.

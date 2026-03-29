@@ -12,8 +12,7 @@ const MeshulaLab = @import("MeshulaLab");
 /// Create one with `init()`, passing the name and callbacks.
 /// Register it with an Orchestrator to participate in the
 /// Studio lifecycle.
-pub const Activity = struct
-{
+pub const Activity = struct {
     lab: MeshulaLab.Activity,
 
     /// For plugin-created activities: the original pointer returned
@@ -23,8 +22,7 @@ pub const Activity = struct
 
     /// Callback signatures for Activity lifecycle and rendering.
     /// All callbacks are optional — null callbacks are simply not invoked.
-    pub const Callbacks = struct
-    {
+    pub const Callbacks = struct {
         /// Draw UI content for this Activity.
         run_ui: ?RunUIFn = null,
 

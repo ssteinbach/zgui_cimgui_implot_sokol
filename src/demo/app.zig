@@ -21,7 +21,8 @@ var APP: MeshulaLab.FundamentalApp = undefined;
 
 /// Called after zgui/sokol are initialised and plugin activities/studios
 /// have been created+registered. Activate the DemoStudio.
-fn postInit() void
+fn postInit(
+) void
 {
     APP.activateStudio("DemoStudio");
 }
@@ -30,7 +31,8 @@ fn postInit() void
 // Entry point
 // =========================================================================
 
-pub fn main() !void
+pub fn main(
+) !void
 {
     APP = MeshulaLab.FundamentalApp.init(std.heap.c_allocator);
 

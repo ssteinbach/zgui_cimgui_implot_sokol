@@ -11,8 +11,7 @@ const builtin = @import("builtin");
 const IS_WASM = builtin.target.cpu.arch.isWasm();
 
 /// A named behavior that can be triggered as an event.
-pub const CspProcess = struct
-{
+pub const CspProcess = struct {
     /// Assigned by the engine during module registration.
     id: i32 = -1,
 
@@ -25,8 +24,7 @@ pub const CspProcess = struct
 
 /// A collection of CspProcess instances forming a logical group.
 /// Typically corresponds to a state machine or subsystem.
-pub const CspModule = struct
-{
+pub const CspModule = struct {
     name: []const u8,
     processes: std.ArrayListUnmanaged(*CspProcess) = .{},
     maybe_engine: ?*CspEngine = null,
@@ -70,8 +68,7 @@ pub const CspModule = struct
 };
 
 /// Timed event with a target timestamp (used for delayed events).
-const TimedEvent = struct
-{
+const TimedEvent = struct {
     process_id: i32,
     send_time_ns: i128,
 };
@@ -82,8 +79,7 @@ const TimedEvent = struct
 /// events are promoted to the immediate queue during processAll(),
 /// which should be called once per frame. On WASM the behaviour
 /// is identical — no ZMQ or threads are used on any platform.
-pub const CspEngine = struct
-{
+pub const CspEngine = struct {
     modules: std.StringHashMapUnmanaged(*CspModule) = .{},
     processes: std.AutoHashMapUnmanaged(i32, *CspProcess) = .{},
     timed_queue: std.ArrayListUnmanaged(TimedEvent) = .{},
@@ -163,8 +159,9 @@ pub const CspEngine = struct
         if (ms_delay > 0)
         {
             const now_ns = std.time.nanoTimestamp();
-            const delay_ns: i128 =
-                @as(i128, ms_delay) * std.time.ns_per_ms;
+            const delay_ns: i128 = (
+                @as(i128, ms_delay) * std.time.ns_per_ms
+            );
             self.timed_queue.append(
                 self.allocator,
                 .{

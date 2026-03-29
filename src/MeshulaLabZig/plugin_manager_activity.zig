@@ -35,14 +35,15 @@ pub fn runUI(
     _: ?*const MeshulaLab.ViewInteraction,
 ) callconv(.c) void
 {
-    const app: *FundamentalApp = if (instance)
-        |ptr|
-        @ptrCast(@alignCast(ptr))
-    else
-    {
-        zgui.textUnformatted("Plugin manager not available.");
-        return;
-    };
+    const app: *FundamentalApp = (
+        if (instance)
+            |ptr| @ptrCast(@alignCast(ptr))
+            else
+        {
+            zgui.textUnformatted("Plugin manager not available.");
+            return;
+        }
+    );
 
     const loader = &app.plugin_loader;
 
@@ -73,15 +74,27 @@ pub fn runUI(
     for (loader.plugins.items)
         |info|
     {
-        if (info.loaded) loaded_count += 1;
-        if (info.compatible) compatible_count += 1;
-        if (info.enabled) enabled_count += 1;
+        if (info.loaded)
+        {
+            loaded_count += 1;
+        }
+        if (info.compatible)
+        {
+            compatible_count += 1;
+        }
+        if (info.enabled)
+        {
+            enabled_count += 1;
+        }
         total_activities += info.activity_names.items.len;
         total_providers += info.provider_names.items.len;
         total_studios += info.studio_names.items.len;
     }
     zgui.text(
-        "Loaded: {d}/{d}  |  Compatible: {d}  |  Enabled: {d}  |  Activities: {d}  |  Providers: {d}  |  Studios: {d}",
+        (
+            "Loaded: {d}/{d}  |  Compatible: {d}  |  Enabled: {d}  |  "
+            ++ "Activities: {d}  |  Providers: {d}  |  Studios: {d}"
+        ),
         .{
             loaded_count,
             loader.plugins.items.len,
@@ -107,11 +120,10 @@ pub fn runUI(
         |*info, idx|
     {
         const header = sliceOrNone(info.name);
-        const should_open = if (scroll_to_plugin)
-            |target|
-            target == idx
-        else
-            false;
+        const should_open = (
+            if (scroll_to_plugin) |target| target == idx
+            else false
+        );
 
         if (should_open)
         {
@@ -441,10 +453,12 @@ fn executeDeferredAction(
     deferred_action = .none;
 
     const loader = &app.plugin_loader;
-    if (idx >= loader.plugins.items.len) return;
-
-    switch (action)
+    if (idx >= loader.plugins.items.len)
     {
+        return;
+    }
+
+    switch (action) {
         .none => {},
         .unload =>
         {
@@ -503,7 +517,10 @@ fn deactivatePluginActivities(
         const activity = orchestrator.findActivity(
             act_name,
         ) orelse continue;
-        if (!activity.lab.active) continue;
+        if (!activity.lab.active)
+        {
+            continue;
+        }
 
         var name_buf: [256:0]u8 = undefined;
         const nlen = @min(act_name.len, name_buf.len - 1);
@@ -528,7 +545,10 @@ fn activatePluginActivities(
         const activity = orchestrator.findActivity(
             act_name,
         ) orelse continue;
-        if (activity.lab.active) continue;
+        if (activity.lab.active)
+        {
+            continue;
+        }
 
         var name_buf: [256:0]u8 = undefined;
         const nlen = @min(act_name.len, name_buf.len - 1);

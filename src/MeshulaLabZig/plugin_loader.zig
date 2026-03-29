@@ -20,8 +20,7 @@ const log = std.log.scoped(.plugin_loader);
 const LibHandle = if (IS_WASM) void else *anyopaque;
 
 /// Metadata about a discovered plugin.
-pub const PluginInfo = struct
-{
+pub const PluginInfo = struct {
     name: []const u8 = "",
     version: []const u8 = "",
     path: []const u8 = "",
@@ -39,8 +38,11 @@ pub const PluginInfo = struct
     maybe_descriptor: ?*const MeshulaLab.PluginDescriptor = null,
 
     /// The dlopen handle, valid while the library is loaded.
-    maybe_handle: if (IS_WASM) void else ?LibHandle =
-        if (IS_WASM) {} else null,
+    maybe_handle: (
+        if (IS_WASM) void else ?LibHandle
+    ) = (
+        if (IS_WASM) {} else null
+    ),
 
     /// Strings that we heap-duplicated and must free ourselves.
     /// Strings obtained from the plugin descriptor point into the
@@ -52,9 +54,11 @@ pub const PluginInfo = struct
         self: *const PluginInfo,
     ) usize
     {
-        return self.activity_names.items.len +
-            self.provider_names.items.len +
-            self.studio_names.items.len;
+        return (
+            self.activity_names.items.len 
+            + self.provider_names.items.len 
+            + self.studio_names.items.len
+        );
     }
 
     /// Free all resources. Called during full teardown.
@@ -96,8 +100,7 @@ pub const PluginInfo = struct
     ) []const u8
     {
         const copy = allocator.dupe(u8, s) catch return "";
-        self.owned_strings.append(allocator, copy) catch
-        {
+        self.owned_strings.append(allocator, copy) catch {
             allocator.free(copy);
             return "";
         };
@@ -106,8 +109,7 @@ pub const PluginInfo = struct
 };
 
 /// Plugin loader — discovers and loads .dylib/.so/.dll plugins at runtime.
-pub const PluginLoader = struct
-{
+pub const PluginLoader = struct {
     plugins: std.ArrayListUnmanaged(PluginInfo) = .{},
     allocator: std.mem.Allocator,
 
@@ -144,7 +146,10 @@ pub const PluginLoader = struct
         dir_path: []const u8,
     ) void
     {
-        if (IS_WASM) return;
+        if (IS_WASM)
+        {
+            return;
+        }
 
         var dir = std.fs.cwd().openDir(
             dir_path,
@@ -162,8 +167,14 @@ pub const PluginLoader = struct
         while (iter.next() catch null)
             |entry|
         {
-            if (entry.kind != .file) continue;
-            if (!isPluginExtension(entry.name)) continue;
+            if (entry.kind != .file)
+            {
+                continue;
+            }
+            if (!isPluginExtension(entry.name))
+            {
+                continue;
+            }
 
             // Build full path
             var path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -183,13 +194,19 @@ pub const PluginLoader = struct
         activity_name: [*:0]const u8,
     ) ?*MeshulaLab.Activity
     {
-        if (IS_WASM) return null;
+        if (IS_WASM)
+        {
+            return null;
+        }
         const name_slice = std.mem.span(activity_name);
 
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible or !info.enabled) continue;
+            if (!info.compatible or !info.enabled)
+            {
+                continue;
+            }
             const desc = info.maybe_descriptor orelse continue;
             const create_fn = desc.CreateActivity orelse continue;
 
@@ -211,13 +228,19 @@ pub const PluginLoader = struct
         activity: *MeshulaLab.Activity,
     ) void
     {
-        if (IS_WASM) return;
+        if (IS_WASM)
+        {
+            return;
+        }
         const name_slice = std.mem.span(activity.name);
 
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible or !info.enabled) continue;
+            if (!info.compatible or !info.enabled)
+            {
+                continue;
+            }
             const desc = info.maybe_descriptor orelse continue;
             const destroy_fn = desc.DestroyActivity orelse continue;
 
@@ -239,13 +262,19 @@ pub const PluginLoader = struct
         provider_name: [*:0]const u8,
     ) ?*MeshulaLab.Provider
     {
-        if (IS_WASM) return null;
+        if (IS_WASM)
+        {
+            return null;
+        }
         const name_slice = std.mem.span(provider_name);
 
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible or !info.enabled) continue;
+            if (!info.compatible or !info.enabled)
+            {
+                continue;
+            }
             const desc = info.maybe_descriptor orelse continue;
             const create_fn = desc.CreateProvider orelse continue;
 
@@ -267,13 +296,19 @@ pub const PluginLoader = struct
         studio_name: [*:0]const u8,
     ) ?*MeshulaLab.Studio
     {
-        if (IS_WASM) return null;
+        if (IS_WASM)
+        {
+            return null;
+        }
         const name_slice = std.mem.span(studio_name);
 
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible or !info.enabled) continue;
+            if (!info.compatible or !info.enabled)
+            {
+                continue;
+            }
             const desc = info.maybe_descriptor orelse continue;
             const create_fn = desc.CreateStudio orelse continue;
 
@@ -295,13 +330,19 @@ pub const PluginLoader = struct
         studio: *MeshulaLab.Studio,
     ) void
     {
-        if (IS_WASM) return;
+        if (IS_WASM)
+        {
+            return;
+        }
         const name_slice = std.mem.span(studio.name);
 
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible or !info.enabled) continue;
+            if (!info.compatible or !info.enabled)
+            {
+                continue;
+            }
             const desc = info.maybe_descriptor orelse continue;
             const destroy_fn = desc.DestroyStudio orelse continue;
 
@@ -346,11 +387,20 @@ pub const PluginLoader = struct
         index: usize,
     ) void
     {
-        if (IS_WASM) return;
-        if (index >= self.plugins.items.len) return;
+        if (IS_WASM)
+        {
+            return;
+        }
+        if (index >= self.plugins.items.len)
+        {
+            return;
+        }
 
         var info = &self.plugins.items[index];
-        if (!info.loaded) return;
+        if (!info.loaded)
+        {
+            return;
+        }
 
         log.info(
             "unloading plugin: {s}",
@@ -407,8 +457,14 @@ pub const PluginLoader = struct
         index: usize,
     ) bool
     {
-        if (IS_WASM) return false;
-        if (index >= self.plugins.items.len) return false;
+        if (IS_WASM)
+        {
+            return false;
+        }
+        if (index >= self.plugins.items.len)
+        {
+            return false;
+        }
 
         var info = &self.plugins.items[index];
 
@@ -449,7 +505,10 @@ pub const PluginLoader = struct
         dir_path: []const u8,
     ) void
     {
-        if (IS_WASM) return;
+        if (IS_WASM)
+        {
+            return;
+        }
 
         var dir = std.fs.cwd().openDir(
             dir_path,
@@ -467,8 +526,14 @@ pub const PluginLoader = struct
         while (iter.next() catch null)
             |entry|
         {
-            if (entry.kind != .file) continue;
-            if (!isPluginExtension(entry.name)) continue;
+            if (entry.kind != .file)
+            {
+                continue;
+            }
+            if (!isPluginExtension(entry.name))
+            {
+                continue;
+            }
 
             // Build full path
             var path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -479,7 +544,10 @@ pub const PluginLoader = struct
             ) catch continue;
 
             // Skip if already known (loaded or unloaded)
-            if (self.isPathKnown(full_path)) continue;
+            if (self.isPathKnown(full_path))
+            {
+                continue;
+            }
 
             // Add as a new unloaded entry so it shows in the UI.
             const owned_path = self.allocator.dupe(
@@ -487,9 +555,12 @@ pub const PluginLoader = struct
                 full_path,
             ) catch continue;
 
-            self.plugins.append(self.allocator, .{
-                .path = owned_path,
-            }) catch {
+            self.plugins.append(
+                self.allocator,
+                .{
+                    .path = owned_path,
+                },
+            ) catch {
                 self.allocator.free(owned_path);
             };
         }
@@ -505,7 +576,10 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
-            if (!info.loaded) continue;
+            if (!info.loaded)
+            {
+                continue;
+            }
             for (info.activity_names.items)
                 |act_name|
             {
@@ -528,7 +602,10 @@ pub const PluginLoader = struct
         for (self.plugins.items)
             |info|
         {
-            if (std.mem.eql(u8, info.path, path)) return true;
+            if (std.mem.eql(u8, info.path, path))
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -539,13 +616,19 @@ pub const PluginLoader = struct
         provider: *MeshulaLab.Provider,
     ) void
     {
-        if (IS_WASM) return;
+        if (IS_WASM)
+        {
+            return;
+        }
         const name_slice = std.mem.span(provider.name);
 
         for (self.plugins.items)
             |info|
         {
-            if (!info.compatible or !info.enabled) continue;
+            if (!info.compatible or !info.enabled)
+            {
+                continue;
+            }
             const desc = info.maybe_descriptor orelse continue;
             const destroy_fn = desc.DestroyProvider orelse continue;
 
@@ -571,7 +654,10 @@ pub const PluginLoader = struct
         path: []const u8,
     ) void
     {
-        if (IS_WASM) return;
+        if (IS_WASM)
+        {
+            return;
+        }
 
         const owned_path = self.allocator.dupe(
             u8,
@@ -582,8 +668,7 @@ pub const PluginLoader = struct
 
         _ = self.doLoad(&info);
 
-        self.plugins.append(self.allocator, info) catch
-        {
+        self.plugins.append(self.allocator, info) catch {
             info.deinit(self.allocator);
         };
     }
@@ -598,7 +683,10 @@ pub const PluginLoader = struct
     {
         // Need a sentinel-terminated path for dlopen
         var path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
-        if (info.path.len >= path_buf.len) return false;
+        if (info.path.len >= path_buf.len)
+        {
+            return false;
+        }
         @memcpy(path_buf[0..info.path.len], info.path);
         path_buf[info.path.len] = 0;
 
@@ -627,18 +715,20 @@ pub const PluginLoader = struct
 
         // Look up the entry point symbol
         const raw_sym = std.c.dlsym(handle, "LabGetPluginDescriptor");
-        const get_descriptor: MeshulaLab.GetPluginDescriptor = if (raw_sym)
-            |sym|
-            @ptrCast(@alignCast(sym))
-        else
-        {
-            log.warn(
-                "plugin {s} missing LabGetPluginDescriptor symbol",
-                .{info.path},
-            );
-            _ = std.c.dlclose(handle);
-            return false;
-        };
+        const get_descriptor: MeshulaLab.GetPluginDescriptor = (
+            if (raw_sym) 
+                |sym| 
+                @ptrCast(@alignCast(sym)) 
+            else
+            {
+                log.warn(
+                    "plugin {s} missing LabGetPluginDescriptor symbol",
+                    .{info.path},
+                );
+                _ = std.c.dlclose(handle);
+                return false;
+            }
+        );
 
         const maybe_desc = get_descriptor();
         const desc = maybe_desc orelse {
@@ -691,7 +781,8 @@ pub const PluginLoader = struct
                 |name_fn|
             {
                 var i: c_int = 0;
-                while (i < count) : (i += 1)
+                while (i < count)
+                    : (i += 1)
                 {
                     const n = name_fn(i);
                     if (n != null)
@@ -714,7 +805,8 @@ pub const PluginLoader = struct
                 |name_fn|
             {
                 var i: c_int = 0;
-                while (i < count) : (i += 1)
+                while (i < count)
+                    : (i += 1)
                 {
                     const n = name_fn(i);
                     if (n != null)
@@ -737,7 +829,8 @@ pub const PluginLoader = struct
                 |name_fn|
             {
                 var i: c_int = 0;
-                while (i < count) : (i += 1)
+                while (i < count)
+                    : (i += 1)
                 {
                     const n = name_fn(i);
                     if (n != null)
@@ -773,8 +866,7 @@ pub const PluginLoader = struct
         name: []const u8,
     ) bool
     {
-        return switch (builtin.os.tag)
-        {
+        return switch (builtin.os.tag) {
             .macos => std.mem.endsWith(u8, name, ".dylib"),
             .linux => std.mem.endsWith(u8, name, ".so"),
             .windows => std.mem.endsWith(u8, name, ".dll"),

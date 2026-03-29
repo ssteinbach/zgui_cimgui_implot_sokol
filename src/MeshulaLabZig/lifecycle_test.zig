@@ -14,12 +14,12 @@ const Orchestrator = @import("orchestrator.zig").Orchestrator;
 // or big_plot.
 // ---------------------------------------------------------------
 
-const MockState = struct
-{
+const MockState = struct {
     var init_count: u32 = 0;
     var deinit_count: u32 = 0;
 
-    fn reset() void
+    fn reset(
+    ) void
     {
         init_count = 0;
         deinit_count = 0;
@@ -330,8 +330,7 @@ test "Orchestrator: teardown inactive activity skips deactivate"
 // ---------------------------------------------------------------
 
 /// Per-activity call counters (one set per concurrent mock).
-const CallCounters = struct
-{
+const CallCounters = struct {
     activate_count: u32 = 0,
     deactivate_count: u32 = 0,
     update_count: u32 = 0,
@@ -339,8 +338,7 @@ const CallCounters = struct
 };
 
 /// Describes the callback shape of a plugin activity.
-const ActivityVariant = enum
-{
+const ActivityVariant = enum {
     /// RunUI only — no Activate/Deactivate (e.g. PlotDemoActivity)
     stateless,
     /// Activate + Deactivate + RunUI (e.g. BigPlotDemoActivity)
@@ -350,8 +348,7 @@ const ActivityVariant = enum
 };
 
 /// All plugin activities in the repo, with their callback variant.
-const ActivitySpec = struct
-{
+const ActivitySpec = struct {
     name: [*:0]const u8,
     variant: ActivityVariant,
 };
@@ -425,8 +422,7 @@ fn createVariantCActivity(
     act.instance = @ptrCast(counters);
     act.RunUI = &mockCountingRunUI;
 
-    switch (variant)
-    {
+    switch (variant) {
         .stateless => {},
         .stateful =>
         {
@@ -467,8 +463,7 @@ fn runLifecycleForSpec(
     try std.testing.expect(wrapper.lab.active);
     try std.testing.expect(wrapper.lab.uiVisible);
 
-    switch (spec.variant)
-    {
+    switch (spec.variant) {
         .stateless =>
         {
             try std.testing.expectEqual(@as(u32, 0), counters.activate_count);
@@ -481,8 +476,7 @@ fn runLifecycleForSpec(
 
     // --- Double activate is idempotent ---
     orch.activateActivity(spec.name);
-    switch (spec.variant)
-    {
+    switch (spec.variant) {
         .stateless => {},
         .stateful, .stateful_update =>
         {
@@ -532,10 +526,14 @@ fn runLifecycleForSpec(
 
     // --- Unregister then re-register (simulate plugin reload) ---
     _ = orch.unregisterActivity(std.mem.span(spec.name));
-    try std.testing.expect(orch.findActivity(std.mem.span(spec.name)) == null);
+    try std.testing.expect(
+        orch.findActivity(std.mem.span(spec.name)) == null,
+    );
 
     orch.registerActivity(wrapper);
-    try std.testing.expect(orch.findActivity(std.mem.span(spec.name)) != null);
+    try std.testing.expect(
+        orch.findActivity(std.mem.span(spec.name)) != null,
+    );
 
     // Activate after reload
     orch.activateActivity(spec.name);
@@ -612,8 +610,7 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         try std.testing.expect(wrapper.lab.active);
         try std.testing.expect(wrapper.lab.uiVisible);
 
-        const expect_activate: u32 = switch (spec.variant)
-        {
+        const expect_activate: u32 = switch (spec.variant) {
             .stateless => 0,
             .stateful, .stateful_update => 1,
         };
@@ -624,19 +621,24 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         try std.testing.expect(!wrapper.lab.active);
         try std.testing.expect(!wrapper.lab.uiVisible);
 
-        const expect_deactivate: u32 = switch (spec.variant)
-        {
+        const expect_deactivate: u32 = switch (spec.variant) {
             .stateful => 1,
             .stateless, .stateful_update => 0,
         };
-        try std.testing.expectEqual(expect_deactivate, counters.deactivate_count);
+        try std.testing.expectEqual(
+            expect_deactivate,
+            counters.deactivate_count,
+        );
 
         // --- Re-activate ---
         orch.activateActivity(spec.name);
         try std.testing.expect(wrapper.lab.active);
         try std.testing.expect(wrapper.lab.uiVisible);
 
-        try std.testing.expectEqual(expect_activate * 2, counters.activate_count);
+        try std.testing.expectEqual(
+            expect_activate * 2,
+            counters.activate_count,
+        );
 
         // --- Service tick (verifies Update fires when active) ---
         orch.service(0.016);
@@ -652,11 +654,17 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         // --- Final deactivate ---
         orch.deactivateActivity(spec.name);
         try std.testing.expect(!wrapper.lab.active);
-        try std.testing.expectEqual(expect_deactivate * 2, counters.deactivate_count);
+        try std.testing.expectEqual(
+            expect_deactivate * 2,
+            counters.deactivate_count,
+        );
 
         // --- Teardown (already inactive, should not fire deactivate) ---
         teardownWrapper(allocator, &orch, wrapper, c_act);
-        try std.testing.expectEqual(expect_deactivate * 2, counters.deactivate_count);
+        try std.testing.expectEqual(
+            expect_deactivate * 2,
+            counters.deactivate_count,
+        );
     }
 }
 
@@ -669,7 +677,9 @@ test "Orchestrator: all activities coexist in one orchestrator"
     // Track counters and wrappers for each activity
     var counters: [ALL_ACTIVITY_SPECS.len]CallCounters = undefined;
     var wrappers: [ALL_ACTIVITY_SPECS.len]*Activity = undefined;
-    var c_activities: [ALL_ACTIVITY_SPECS.len]*MeshulaLab.Activity = undefined;
+    var c_activities: [ALL_ACTIVITY_SPECS.len]*MeshulaLab.Activity = (
+        undefined
+    );
 
     // Register all
     for (ALL_ACTIVITY_SPECS, 0..)
@@ -703,8 +713,7 @@ test "Orchestrator: all activities coexist in one orchestrator"
     for (ALL_ACTIVITY_SPECS, 0..)
         |spec, i|
     {
-        switch (spec.variant)
-        {
+        switch (spec.variant) {
             .stateless =>
             {
                 try std.testing.expectEqual(

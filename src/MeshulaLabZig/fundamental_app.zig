@@ -43,8 +43,7 @@ const log = std.log.scoped(.fundamental_app);
 /// comptime function pointers with no user-data parameter.
 var INSTANCE: ?*FundamentalApp = null;
 
-pub const FundamentalApp = struct
-{
+pub const FundamentalApp = struct {
     orchestrator: Orchestrator,
     csp_engine: CspEngine,
     plugin_loader: PluginLoader,
@@ -65,13 +64,12 @@ pub const FundamentalApp = struct
     ) void = null,
 
     /// Configuration for `run()`.
-    pub const RunConfig = struct
-    {
+    pub const RunConfig = struct {
         title: [:0]const u8 = "MeshulaLab",
         dimensions: [2]i32 = .{ 1280, 800 },
         logger: ?app_wrapper.LogFn = null,
         max_vertices: i32 =
-            if (IS_WASM) 64 * 1024 else 256 * 1024 * 1024,
+        if (IS_WASM) 64 * 1024 else 256 * 1024 * 1024,
         maybe_post_zgui_init: ?*const fn () void = null,
         maybe_pre_zgui_shutdown_cleanup: ?*const fn () void = null,
         maybe_file_drop: ?*const fn (
@@ -117,7 +115,10 @@ pub const FundamentalApp = struct
         self.csp_engine.deinit();
         self.plugin_loader.deinit();
         self.orchestrator.deinit();
-        if (INSTANCE == self) INSTANCE = null;
+        if (INSTANCE == self)
+        {
+            INSTANCE = null;
+        }
     }
 
     /// Launch the sokol application loop. This function does not
@@ -133,7 +134,7 @@ pub const FundamentalApp = struct
         INSTANCE = self;
         self.maybe_post_zgui_init = config.maybe_post_zgui_init;
         self.maybe_pre_zgui_shutdown_cleanup =
-            config.maybe_pre_zgui_shutdown_cleanup;
+        config.maybe_pre_zgui_shutdown_cleanup;
         self.maybe_file_drop = config.maybe_file_drop;
 
         app_wrapper.sokol_main(
@@ -145,7 +146,7 @@ pub const FundamentalApp = struct
                 .max_vertices = config.max_vertices,
                 .maybe_post_zgui_init = &postZguiInitThunk,
                 .maybe_pre_zgui_shutdown_cleanup =
-                    &preZguiShutdownThunk,
+                &preZguiShutdownThunk,
                 .event = &eventThunk,
                 .enable_dragndrop = true,
                 .max_dropped_files = 8,
@@ -195,7 +196,10 @@ pub const FundamentalApp = struct
         for (self.plugin_loader.plugins.items)
             |info|
         {
-            if (!info.loaded or !info.compatible) continue;
+            if (!info.loaded or !info.compatible)
+            {
+                continue;
+            }
             self.loadActivitiesForPlugin(&info);
         }
     }
@@ -216,8 +220,9 @@ pub const FundamentalApp = struct
             // sentinel pointer safely. This pointer is stable for
             // the lifetime of the loaded dylib, which is critical
             // because the plugin's CreateActivity may store it.
-            const name_z: [*:0]const u8 =
-                act_name.ptr[0..act_name.len :0];
+            const name_z: [*:0]const u8 = (
+                act_name.ptr[0..act_name.len :0]
+            );
 
             const maybe_c_activity = self.plugin_loader.createActivity(
                 name_z,
@@ -263,7 +268,10 @@ pub const FundamentalApp = struct
         for (self.plugin_loader.plugins.items)
             |info|
         {
-            if (!info.loaded or !info.compatible) continue;
+            if (!info.loaded or !info.compatible)
+            {
+                continue;
+            }
             self.loadStudiosForPlugin(&info);
         }
     }
@@ -277,8 +285,9 @@ pub const FundamentalApp = struct
         for (info.studio_names.items)
             |st_name|
         {
-            const name_z: [*:0]const u8 =
-                st_name.ptr[0..st_name.len :0];
+            const name_z: [*:0]const u8 = (
+                st_name.ptr[0..st_name.len :0]
+            );
 
             const maybe_c_studio = self.plugin_loader.createStudio(
                 name_z,
@@ -335,7 +344,10 @@ pub const FundamentalApp = struct
         const config_fn = c_studio.GetActivityConfig orelse return null;
 
         const count: usize = @intCast(count_fn(c_studio.instance));
-        if (count == 0) return &.{};
+        if (count == 0)
+        {
+            return &.{};
+        }
 
         const configs = self.allocator.alloc(
             ActivityConfig,
@@ -461,13 +473,15 @@ pub const FundamentalApp = struct
         const writer = std.io.getStdOut().writer();
 
         writer.print(
-            \\
-            \\=======================================================
-            \\MeshulaLab Framework Status Report (Zig)
-            \\=======================================================
-            \\
-            \\
-        , .{}) catch {};
+                \\
+                \\=======================================================
+                \\MeshulaLab Framework Status Report (Zig)
+                \\=======================================================
+                \\
+                \\
+            ,
+            .{},
+        ) catch {};
 
         // Studios
         writer.print("Registered Studios:\n", .{}) catch {};
@@ -482,15 +496,17 @@ pub const FundamentalApp = struct
             while (it.next())
                 |name|
             {
-                const active = if (orch.currentStudio())
-                    |cs|
-                blk: {
-                    break :blk std.mem.eql(u8, cs.name(), name);
-                }
-                else
-                    false;
+                const active = (
+                    if (orch.currentStudio())
+                        |cs|
+                        std.mem.eql(u8, cs.name(), name)
+                    else false
+                );
                 writer.print("  - {s}", .{name}) catch {};
-                if (active) writer.print(" (ACTIVE)", .{}) catch {};
+                if (active)
+                {
+                    writer.print(" (ACTIVE)", .{}) catch {};
+                }
                 writer.print("\n", .{}) catch {};
                 count += 1;
             }
@@ -582,7 +598,9 @@ pub const FundamentalApp = struct
             \\=======================================================
             \\
             \\
-        , .{}) catch {};
+            ,
+            .{},
+        ) catch {};
     }
 
     // -----------------------------------------------------------------
@@ -613,7 +631,10 @@ pub const FundamentalApp = struct
             self.drawStudioMenu();
             self.drawActivitiesMenu();
             self.orchestrator.runMainMenu();
-            if (ENABLE_DOCKING) self.drawWindowMenu();
+            if (ENABLE_DOCKING)
+            {
+                self.drawWindowMenu();
+            }
             zgui.endMainMenuBar();
         }
 
@@ -643,11 +664,10 @@ pub const FundamentalApp = struct
     ) void
     {
         // Build the menu title from the current studio name
-        const current_name = if (self.orchestrator.currentStudio())
-            |cs|
-            cs.name()
-        else
-            "Welcome";
+        const current_name = (
+            if (self.orchestrator.currentStudio()) |cs| cs.name()
+            else "Welcome"
+        );
 
         // We need a sentinel-terminated string for zgui
         var title_buf: [256:0]u8 = undefined;
@@ -660,8 +680,9 @@ pub const FundamentalApp = struct
             suffix,
         );
         title_buf[title_len + suffix.len] = 0;
-        const menu_title: [:0]const u8 =
-            title_buf[0 .. title_len + suffix.len :0];
+        const menu_title: [:0]const u8 = (
+            title_buf[0 .. title_len + suffix.len :0]
+        );
 
         if (zgui.beginMenu(menu_title, true))
         {
@@ -681,9 +702,14 @@ pub const FundamentalApp = struct
                     name,
                     current_name,
                 );
-                if (zgui.menuItem(name_z, .{
-                    .selected = is_active,
-                }))
+                if (
+                    zgui.menuItem(
+                        name_z,
+                        .{
+                            .selected = is_active,
+                        },
+                    )
+                )
                 {
                     if (!is_active)
                     {
@@ -702,13 +728,14 @@ pub const FundamentalApp = struct
             }
 
             zgui.separator();
-            if (zgui.menuItem(
-                "Plugin Manager",
-                .{ .selected = self.show_plugin_manager },
-            ))
+            if (
+                zgui.menuItem(
+                    "Plugin Manager",
+                    .{ .selected = self.show_plugin_manager },
+                )
+            )
             {
-                self.show_plugin_manager =
-                    !self.show_plugin_manager;
+                self.show_plugin_manager = !self.show_plugin_manager;
             }
             zgui.separator();
             if (zgui.menuItem("Quit", .{}))
@@ -734,11 +761,13 @@ pub const FundamentalApp = struct
                     name,
                 ) orelse continue;
 
-                const disabled_by_plugin =
-                    self.plugin_loader.isActivityDisabled(name);
+                const disabled_by_plugin = (
+                    self.plugin_loader.isActivityDisabled(name)
+                );
 
-                const is_active =
-                    activity.isActive() and activity.isUIVisible();
+                const is_active = (
+                    activity.isActive() and activity.isUIVisible()
+                );
 
                 var name_buf: [256:0]u8 = undefined;
                 const nlen = @min(name.len, name_buf.len - 1);
@@ -746,10 +775,15 @@ pub const FundamentalApp = struct
                 name_buf[nlen] = 0;
                 const name_z: [:0]const u8 = name_buf[0..nlen :0];
 
-                if (zgui.menuItem(name_z, .{
-                    .selected = is_active,
-                    .enabled = !disabled_by_plugin,
-                }))
+                if (
+                    zgui.menuItem(
+                        name_z,
+                        .{
+                            .selected = is_active,
+                            .enabled = !disabled_by_plugin,
+                        },
+                    )
+                )
                 {
                     var act_buf: [256:0]u8 = undefined;
                     @memcpy(act_buf[0..nlen], name[0..nlen]);
@@ -776,7 +810,10 @@ pub const FundamentalApp = struct
         _: *FundamentalApp,
     ) void
     {
-        if (!ENABLE_DOCKING) return;
+        if (!ENABLE_DOCKING)
+        {
+            return;
+        }
         if (zgui.beginMenu("Window", true))
         {
             if (zgui.menuItem("Reset Layout", .{}))
@@ -828,7 +865,10 @@ pub const FundamentalApp = struct
         dt: f32,
     ) void
     {
-        if (!ENABLE_DOCKING) return;
+        if (!ENABLE_DOCKING)
+        {
+            return;
+        }
 
         const viewport = zgui.getMainViewport();
         const vp_size = viewport.getSize();
@@ -844,13 +884,16 @@ pub const FundamentalApp = struct
         zgui.pushStyleVar(.{ .window_border_size = 0.0 });
         zgui.pushStyleVar(.{ .window_padding = .{ 0.0, 0.0 } });
 
-        _ = zgui.begin("DockSpaceHost", .{
-            .flags = .{
-                .no_title_bar = true,
-                .no_collapse = true,
-                .no_background = true,
+        _ = zgui.begin(
+            "DockSpaceHost",
+            .{
+                .flags = .{
+                    .no_title_bar = true,
+                    .no_collapse = true,
+                    .no_background = true,
+                },
             },
-        });
+        );
         zgui.popStyleVar(.{ .count = 3 });
 
         const dockspace_id = zgui.DockSpace(
@@ -861,8 +904,9 @@ pub const FundamentalApp = struct
         zgui.end();
 
         // Get the central node for viewport rendering
-        const maybe_central_node =
-            zgui.dockBuilderGetCentralNode(dockspace_id);
+        const maybe_central_node = (
+            zgui.dockBuilderGetCentralNode(dockspace_id)
+        );
 
         var lab_vi = self.vi.toLab();
         lab_vi.dt = dt;
@@ -902,23 +946,30 @@ pub const FundamentalApp = struct
         const work_size = viewport.getWorkSize();
 
         // Fill the work area (below the main menu bar)
-        zgui.setNextWindowPos(.{
-            .x = work_pos[0],
-            .y = work_pos[1],
-        });
-        zgui.setNextWindowSize(.{
-            .w = work_size[0],
-            .h = work_size[1],
-        });
-
-        _ = zgui.begin("##MainWindow", .{
-            .flags = .{
-                .no_title_bar = true,
-                .no_resize = true,
-                .no_move = true,
-                .no_collapse = true,
+        zgui.setNextWindowPos(
+            .{
+                .x = work_pos[0],
+                .y = work_pos[1],
             },
-        });
+        );
+        zgui.setNextWindowSize(
+            .{
+                .w = work_size[0],
+                .h = work_size[1],
+            },
+        );
+
+        _ = zgui.begin(
+            "##MainWindow",
+            .{
+                .flags = .{
+                    .no_title_bar = true,
+                    .no_resize = true,
+                    .no_move = true,
+                    .no_collapse = true,
+                },
+            },
+        );
 
         var lab_vi = self.vi.toLab();
         lab_vi.dt = dt;
@@ -941,8 +992,9 @@ pub const FundamentalApp = struct
                 const nlen = @min(act_name.len, name_buf.len - 1);
                 @memcpy(name_buf[0..nlen], act_name[0..nlen]);
                 name_buf[nlen] = 0;
-                const name_z: [:0]const u8 =
-                    name_buf[0..nlen :0];
+                const name_z: [:0]const u8 = (
+                    name_buf[0..nlen :0]
+                );
 
                 if (zgui.beginTabItem(name_z, .{}))
                 {
@@ -978,8 +1030,8 @@ pub const FundamentalApp = struct
         lab_vi.y = mouse_pos[1] - lab_vi.view.wy;
 
         const viewport_hovered = zgui.isWindowHovered(.{});
-        const is_dragging = viewport_hovered and
-            zgui.isMouseDown(.left);
+        const is_dragging = viewport_hovered
+        and zgui.isMouseDown(.left);
 
         if (is_dragging)
         {
@@ -1017,8 +1069,7 @@ pub const FundamentalApp = struct
     {
         _ = sokol.imgui.handleEvent(ev.*);
 
-        switch (ev.*.type)
-        {
+        switch (ev.*.type) {
             .KEY_DOWN =>
             {
                 if (ev.*.key_code == .ESCAPE)
@@ -1039,7 +1090,8 @@ pub const FundamentalApp = struct
                         @min(count, @as(i32, @intCast(paths_buf.len))),
                     );
                     var i: usize = 0;
-                    while (i < n) : (i += 1)
+                    while (i < n)
+                        : (i += 1)
                     {
                         paths_buf[i] = sapp.getDroppedFilePath(
                             @intCast(i),
@@ -1056,7 +1108,8 @@ pub const FundamentalApp = struct
     // Static thunks — bridge comptime callbacks to instance methods
     // -----------------------------------------------------------------
 
-    fn drawThunk() anyerror!void
+    fn drawThunk(
+    ) anyerror!void
     {
         const self = INSTANCE orelse return;
         try self.draw();
@@ -1070,7 +1123,8 @@ pub const FundamentalApp = struct
         self.handleEvent(ev);
     }
 
-    fn postZguiInitThunk() void
+    fn postZguiInitThunk(
+    ) void
     {
         const self = INSTANCE orelse return;
 
@@ -1090,7 +1144,8 @@ pub const FundamentalApp = struct
         }
     }
 
-    fn preZguiShutdownThunk() void
+    fn preZguiShutdownThunk(
+    ) void
     {
         const self = INSTANCE orelse return;
         if (self.maybe_pre_zgui_shutdown_cleanup)
