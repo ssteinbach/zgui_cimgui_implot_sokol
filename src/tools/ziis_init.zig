@@ -8,69 +8,14 @@
 
 const std = @import("std");
 
-pub fn main() !void
+pub fn create_activity(
+    allocator: std.mem.Allocator,
+    activity_name: []const u8,
+    output_dir: []const u8,
+    stdout: *std.Io.Writer,
+    stderr: *std.Io.Writer,
+) !void
 {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
-
-    var stdout_buf: [4096]u8 = undefined;
-    var stdout_w = std.fs.File.stdout().writer(&stdout_buf);
-    const stdout = &stdout_w.interface;
-
-    var stderr_buf: [4096]u8 = undefined;
-    var stderr_w = std.fs.File.stderr().writer(&stderr_buf);
-    const stderr = &stderr_w.interface;
-
-    // Parse --activity <name>
-    var maybe_activity_name: ?[]const u8 = null;
-    var i: usize = 1;
-    while (i < args.len) : (i += 1)
-    {
-        if (std.mem.eql(u8, args[i], "--help") or
-            std.mem.eql(u8, args[i], "-h"))
-        {
-            try stdout.print(HELP_TEXT, .{});
-            try stdout.flush();
-            return;
-        }
-        else if (std.mem.eql(u8, args[i], "--activity"))
-        {
-            i += 1;
-            if (i >= args.len)
-            {
-                try stderr.print(
-                    "error: --activity requires a name argument\n",
-                    .{},
-                );
-                fatal(stderr);
-            }
-            maybe_activity_name = args[i];
-        }
-        else
-        {
-            try stderr.print(
-                "error: unknown argument: {s}\n",
-                .{args[i]},
-            );
-            fatal(stderr);
-        }
-    }
-
-    const activity_name = maybe_activity_name orelse
-    {
-        try stderr.print(
-            "usage: ziis-init --activity <name>\n" ++
-            "\n" ++
-            "  <name>  snake_case activity name (e.g. my_widget)\n",
-            .{},
-        );
-        fatal(stderr);
-    };
-
     // Validate: must be non-empty, snake_case (lowercase + underscores)
     if (activity_name.len == 0)
     {
@@ -95,11 +40,11 @@ pub fn main() !void
     const pascal_name = try snakeToPascal(allocator, activity_name);
     defer allocator.free(pascal_name);
 
-    // Output directory: src/activities/<name>/
+    // Output directory: <output_dir>/src/activities/<name>/
     const dest_dir = try std.fmt.allocPrint(
         allocator,
-        "src/activities/{s}",
-        .{activity_name},
+        "{s}/src/activities/{s}",
+        .{ output_dir, activity_name },
     );
     defer allocator.free(dest_dir);
 
@@ -185,8 +130,225 @@ pub fn main() !void
     try stdout.flush();
 }
 
+pub fn create_studio(
+    allocator: std.mem.Allocator,
+    studio_name: []const u8,
+    output_dir: []const u8,
+    stdout: *std.Io.Writer,
+    stderr: *std.Io.Writer,
+) !void
+{
+    // Validate: must be non-empty, snake_case (lowercase + underscores)
+    if (studio_name.len == 0)
+    {
+        try stderr.print("error: studio name must not be empty\n", .{});
+        fatal(stderr);
+    }
+    for (studio_name)
+        |c|
+    {
+        if (!std.ascii.isLower(c) and c != '_' and !std.ascii.isDigit(c))
+        {
+            try stderr.print(
+                "error: studio name must be snake_case " ++
+                "(lowercase letters, digits, underscores). got: '{s}'\n",
+                .{studio_name},
+            );
+            fatal(stderr);
+        }
+    }
+
+    // Derive PascalCase name: my_studio -> MyStudio
+    const pascal_name = try snakeToPascal(allocator, studio_name);
+    defer allocator.free(pascal_name);
+
+    // Output directory: <output_dir>/src/studios/<name>/
+    const dest_dir = try std.fmt.allocPrint(
+        allocator,
+        "{s}/src/studios/{s}",
+        .{ output_dir, studio_name },
+    );
+    defer allocator.free(dest_dir);
+
+    const plugin_path = try std.fmt.allocPrint(
+        allocator,
+        "{s}/plugin.zig",
+        .{dest_dir},
+    );
+    defer allocator.free(plugin_path);
+
+    // Check destination doesn't already exist
+    if (dirExists(dest_dir))
+    {
+        try stderr.print("error: {s} already exists\n", .{dest_dir});
+        fatal(stderr);
+    }
+
+    // Create directory
+    std.fs.cwd().makePath(dest_dir) catch
+        |err|
+    {
+        try stderr.print(
+            "error: could not create {s}: {}\n",
+            .{ dest_dir, err },
+        );
+        fatal(stderr);
+    };
+
+    // Generate and write plugin file
+    const plugin_content = try std.fmt.allocPrint(
+        allocator,
+        STUDIO_PLUGIN_FMT,
+        .{
+            pascal_name, // doc comment
+            pascal_name, // PLUGIN_NAME
+            pascal_name, // STUDIO_NAME const
+            pascal_name, // getStudioName return
+            pascal_name, // createStudio name field
+        },
+    );
+    defer allocator.free(plugin_content);
+    try writeFile(plugin_path, plugin_content);
+
+    // Print success and build.zig instructions
+    try stdout.print(
+        \\
+        \\Created:
+        \\  {s}
+        \\
+        \\Add to build.zig plugin_sources:
+        \\
+        \\    .{{ "studio_{s}", "{s}" }},
+        \\
+        \\
+    ,
+        .{
+            plugin_path,
+            studio_name,
+            plugin_path,
+        },
+    );
+    try stdout.flush();
+}
+
+pub fn main() !void
+{
+    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout_w = std.fs.File.stdout().writer(&stdout_buf);
+    const stdout = &stdout_w.interface;
+
+    var stderr_buf: [4096]u8 = undefined;
+    var stderr_w = std.fs.File.stderr().writer(&stderr_buf);
+    const stderr = &stderr_w.interface;
+
+    // Parse arguments
+    var maybe_activity_name: ?[]const u8 = null;
+    var maybe_studio_name: ?[]const u8 = null;
+    var output_dir: []const u8 = ".";
+
+    var i: usize = 1;
+    while (i < args.len)
+        : (i += 1)
+    {
+        if (std.mem.eql(u8, args[i], "--help") or
+            std.mem.eql(u8, args[i], "-h"))
+        {
+            try stdout.print(HELP_TEXT, .{});
+            try stdout.flush();
+            return;
+        }
+        else if (std.mem.eql(u8, args[i], "--activity"))
+        {
+            i += 1;
+            if (i >= args.len)
+            {
+                try stderr.print(
+                    "error: --activity requires a name argument\n",
+                    .{},
+                );
+                fatal(stderr);
+            }
+            maybe_activity_name = args[i];
+        }
+        else if (std.mem.eql(u8, args[i], "--studio"))
+        {
+            i += 1;
+            if (i >= args.len)
+            {
+                try stderr.print(
+                    "error: --studio requires a name argument\n",
+                    .{},
+                );
+                fatal(stderr);
+            }
+            maybe_studio_name = args[i];
+        }
+        else if (std.mem.eql(u8, args[i], "--output-dir"))
+        {
+            i += 1;
+            if (i >= args.len)
+            {
+                try stderr.print(
+                    "error: --output-dir requires a path argument\n",
+                    .{},
+                );
+                fatal(stderr);
+            }
+            output_dir = args[i];
+        }
+        else
+        {
+            try stderr.print(
+                "error: unknown argument: {s}\n",
+                .{args[i]},
+            );
+            fatal(stderr);
+        }
+    }
+
+    if (maybe_studio_name != null and maybe_activity_name != null)
+    {
+        try stderr.print(
+            "Only one command argument (--studio or --activity) allowed\n",
+            .{},
+        );
+        fatal(stderr);
+    }
+
+    if (maybe_activity_name)
+        |activity_name|
+    {
+        try create_activity(
+            allocator,
+            activity_name,
+            output_dir,
+            stdout,
+            stderr,
+        );
+    }
+
+    if (maybe_studio_name)
+        |studio_name|
+    {
+        try create_studio(
+            allocator,
+            studio_name,
+            output_dir,
+            stdout,
+            stderr,
+        );
+    }
+}
+
 fn fatal(
-    w: anytype,
+    w: *std.Io.Writer,
 ) noreturn
 {
     w.flush() catch {};
@@ -245,12 +407,13 @@ fn snakeToPascal(
 const HELP_TEXT =
     \\Usage:
     \\  ziis-init --activity <name>
+    \\  ziis-init --studio <name>
     \\
-    \\Scaffold a new ZIIS activity plugin.
+    \\Scaffold new ZIIS components.
     \\
-    \\  <name>  snake_case activity name (e.g. my_widget)
+    \\  <name>  snake_case name (e.g. my_widget, my_studio)
     \\
-    \\This creates src/activities/<name>/ with two files:
+    \\--activity creates src/activities/<name>/ with two files:
     \\  activity.zig  — the activity implementation (edit this)
     \\  plugin.zig    — the plugin boilerplate (typically untouched)
     \\
@@ -258,12 +421,17 @@ const HELP_TEXT =
     \\import) rather than going through demo_activities/root.zig, so new
     \\activities are self-contained.
     \\
-    \\After running, add the printed lines to build.zig plugin_sources
-    \\and to your studio config.
+    \\--studio creates src/studios/<name>/ with one file:
+    \\  plugin.zig  — a studio plugin that registers a Studio and its
+    \\                activity configs via the LabPluginDescriptor
+    \\
+    \\After running, add the printed lines to build.zig plugin_sources.
     \\
     \\Options:
-    \\  --activity <name>  Create a new activity with the given name
-    \\  --help, -h         Show this help message
+    \\  --activity <name>    Create a new activity plugin
+    \\  --studio <name>      Create a new studio plugin
+    \\  --output-dir <path>  Write files under <path> instead of cwd
+    \\  --help, -h           Show this help message
     \\
 ;
 
@@ -347,6 +515,139 @@ const PLUGIN_FMT =
     \\    .GetActivityName = &getActivityName,
     \\    .CreateActivity = &createActivity,
     \\    .DestroyActivity = &destroyActivity,
+    \\}};
+    \\
+    \\export fn LabGetPluginDescriptor() ?*const MeshulaLab.PluginDescriptor
+    \\{{
+    \\    return &DESCRIPTOR;
+    \\}}
+    \\
+;
+
+const STUDIO_PLUGIN_FMT =
+    \\//! Studio Plugin: {s}Studio
+    \\//!
+    \\//! Exports a LabPluginDescriptor providing one Studio.
+    \\//! Edit STUDIO_ACTIVITIES to declare which activities belong
+    \\//! in this studio.
+    \\
+    \\const std = @import("std");
+    \\const MeshulaLab = @import("MeshulaLab");
+    \\
+    \\const PLUGIN_NAME = "{s}StudioPlugin";
+    \\const PLUGIN_VERSION = "1.0.0";
+    \\const PROVENANCE = "ZIIS";
+    \\const STUDIO_NAME: [*c]const u8 = "{s}Studio";
+    \\
+    \\// -----------------------------------------------------------------
+    \\// Studio activity configuration — add your activities here
+    \\// -----------------------------------------------------------------
+    \\
+    \\const STUDIO_ACTIVITIES = [_]MeshulaLab.ActivityConfig{{
+    \\    // .{{ .name = "MyActivity", .uiInitiallyVisible = true }},
+    \\}};
+    \\
+    \\// -----------------------------------------------------------------
+    \\// Descriptor callbacks
+    \\// -----------------------------------------------------------------
+    \\
+    \\fn getABIVersion() callconv(.c) c_int
+    \\{{
+    \\    return 1;
+    \\}}
+    \\
+    \\fn getProvenance() callconv(.c) [*c]const u8
+    \\{{
+    \\    return PROVENANCE;
+    \\}}
+    \\
+    \\fn getPluginName() callconv(.c) [*c]const u8
+    \\{{
+    \\    return PLUGIN_NAME;
+    \\}}
+    \\
+    \\fn getPluginVersion() callconv(.c) [*c]const u8
+    \\{{
+    \\    return PLUGIN_VERSION;
+    \\}}
+    \\
+    \\fn getStudioCount() callconv(.c) c_int
+    \\{{
+    \\    return 1;
+    \\}}
+    \\
+    \\fn getStudioName(
+    \\    index: c_int,
+    \\) callconv(.c) [*c]const u8
+    \\{{
+    \\    if (index == 0) return "{s}Studio";
+    \\    return null;
+    \\}}
+    \\
+    \\fn createStudio(
+    \\    _: [*c]const u8,
+    \\) callconv(.c) [*c]MeshulaLab.Studio
+    \\{{
+    \\    const studio = std.heap.c_allocator.create(
+    \\        MeshulaLab.Studio,
+    \\    ) catch return null;
+    \\    studio.* = std.mem.zeroes(MeshulaLab.Studio);
+    \\    studio.name = "{s}Studio";
+    \\    studio.GetActivityCount = &studioGetActivityCount;
+    \\    studio.GetActivityConfig = &studioGetActivityConfig;
+    \\    studio.MustDeactivateUnrelatedActivities = &studioMustDeactivate;
+    \\    return studio;
+    \\}}
+    \\
+    \\fn destroyStudio(
+    \\    studio: [*c]MeshulaLab.Studio,
+    \\) callconv(.c) void
+    \\{{
+    \\    if (studio != null)
+    \\    {{
+    \\        std.heap.c_allocator.destroy(
+    \\            @as(*MeshulaLab.Studio, @ptrCast(studio)),
+    \\        );
+    \\    }}
+    \\}}
+    \\
+    \\fn studioGetActivityCount(
+    \\    _: ?*anyopaque,
+    \\) callconv(.c) c_int
+    \\{{
+    \\    return @intCast(STUDIO_ACTIVITIES.len);
+    \\}}
+    \\
+    \\fn studioGetActivityConfig(
+    \\    _: ?*anyopaque,
+    \\    index: c_int,
+    \\) callconv(.c) ?*const MeshulaLab.ActivityConfig
+    \\{{
+    \\    const i: usize = @intCast(index);
+    \\    if (i >= STUDIO_ACTIVITIES.len) return null;
+    \\    return &STUDIO_ACTIVITIES[i];
+    \\}}
+    \\
+    \\fn studioMustDeactivate(
+    \\    _: ?*anyopaque,
+    \\) callconv(.c) bool
+    \\{{
+    \\    return true;
+    \\}}
+    \\
+    \\// -----------------------------------------------------------------
+    \\// Plugin descriptor
+    \\// -----------------------------------------------------------------
+    \\
+    \\const DESCRIPTOR = MeshulaLab.PluginDescriptor{{
+    \\    .GetABIVersion = &getABIVersion,
+    \\    .GetProvenance = &getProvenance,
+    \\    .GetPluginName = &getPluginName,
+    \\    .GetPluginVersion = &getPluginVersion,
+    \\    .GetStudioCount = &getStudioCount,
+    \\    .GetStudioName = &getStudioName,
+    \\    .CreateStudio = &createStudio,
+    \\    .DestroyStudio = &destroyStudio,
     \\}};
     \\
     \\export fn LabGetPluginDescriptor() ?*const MeshulaLab.PluginDescriptor

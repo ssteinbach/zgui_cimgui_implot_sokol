@@ -360,8 +360,8 @@ pub fn build(
         },
     );
 
-    // FundamentalApp demo module
-    const mod_fundamental_demo = b.createModule(
+    // Demo Studio module
+    const mod_demo_studio = b.createModule(
         .{
             .root_source_file = b.path("src/demo/app.zig"),
             .target = target,
@@ -538,8 +538,8 @@ pub fn build(
         );
         try build_native(
             b,
-            "fundamental-demo",
-            mod_fundamental_demo,
+            "demo-studio",
+            mod_demo_studio,
             check_step,
             .{ .rdynamic = true },
         );
