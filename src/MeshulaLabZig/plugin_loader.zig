@@ -261,6 +261,62 @@ pub const PluginLoader = struct
         return null;
     }
 
+    /// Create a Studio instance by name via the owning plugin.
+    pub fn createStudio(
+        self: *PluginLoader,
+        studio_name: [*:0]const u8,
+    ) ?*MeshulaLab.Studio
+    {
+        if (IS_WASM) return null;
+        const name_slice = std.mem.span(studio_name);
+
+        for (self.plugins.items)
+            |info|
+        {
+            if (!info.compatible or !info.enabled) continue;
+            const desc = info.maybe_descriptor orelse continue;
+            const create_fn = desc.CreateStudio orelse continue;
+
+            for (info.studio_names.items)
+                |st_name|
+            {
+                if (std.mem.eql(u8, st_name, name_slice))
+                {
+                    return create_fn(studio_name);
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Destroy a Studio instance via the owning plugin.
+    pub fn destroyStudio(
+        self: *PluginLoader,
+        studio: *MeshulaLab.Studio,
+    ) void
+    {
+        if (IS_WASM) return;
+        const name_slice = std.mem.span(studio.name);
+
+        for (self.plugins.items)
+            |info|
+        {
+            if (!info.compatible or !info.enabled) continue;
+            const desc = info.maybe_descriptor orelse continue;
+            const destroy_fn = desc.DestroyStudio orelse continue;
+
+            for (info.studio_names.items)
+                |st_name|
+            {
+                if (std.mem.eql(u8, st_name, name_slice))
+                {
+                    destroy_fn(studio);
+                    return;
+                }
+            }
+        }
+    }
+
     /// Disable a plugin by index. Does not dlclose — just marks it
     /// so createActivity/createProvider skip it.
     pub fn disablePlugin(

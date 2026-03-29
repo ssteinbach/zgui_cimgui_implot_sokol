@@ -544,7 +544,7 @@ const STUDIO_PLUGIN_FMT =
     \\// -----------------------------------------------------------------
     \\
     \\const STUDIO_ACTIVITIES = [_]MeshulaLab.ActivityConfig{{
-    \\    // .{{ .name = "MyActivity", .uiInitiallyVisible = true }},
+    \\    // .{{ .name = "MyActivity", .uiInitiallyVisible = true }},  // C struct: must set explicitly
     \\}};
     \\
     \\// -----------------------------------------------------------------

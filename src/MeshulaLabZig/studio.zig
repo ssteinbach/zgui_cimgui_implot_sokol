@@ -23,6 +23,11 @@ pub const Studio = struct
     lab: MeshulaLab.Studio,
     configs: []const ActivityConfig,
 
+    /// For plugin-created studios: the original pointer returned
+    /// by the plugin's CreateStudio, which must be passed back to
+    /// DestroyStudio. Null for built-in studios.
+    maybe_plugin_studio: ?*MeshulaLab.Studio = null,
+
     /// Create a new Studio with the given name and Activity configuration.
     /// Both `name` and `configs` must have static lifetime (pointers are
     /// stored, not copied).

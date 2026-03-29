@@ -588,6 +588,7 @@ pub fn build(
             .{ "plugin_list_clipper", "src/demo/plugins/plugin_list_clipper.zig" },
             .{ "plugin_sortable_table", "src/demo/plugins/plugin_sortable_table.zig" },
             .{ "plugin_template", "src/demo/plugins/plugin_template.zig" },
+            .{ "studio_demo", "src/studios/demo/plugin.zig" },
         };
         inline for (plugin_sources)
             |entry|

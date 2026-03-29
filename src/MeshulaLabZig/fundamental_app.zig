@@ -254,6 +254,113 @@ pub const FundamentalApp = struct
         }
     }
 
+    /// Create Studio instances from discovered plugins and register
+    /// them with the orchestrator.
+    fn loadPluginStudios(
+        self: *FundamentalApp,
+    ) void
+    {
+        for (self.plugin_loader.plugins.items)
+            |info|
+        {
+            if (!info.loaded or !info.compatible) continue;
+            self.loadStudiosForPlugin(&info);
+        }
+    }
+
+    /// Create and register Studio instances for a single plugin.
+    pub fn loadStudiosForPlugin(
+        self: *FundamentalApp,
+        info: *const PluginInfo,
+    ) void
+    {
+        for (info.studio_names.items)
+            |st_name|
+        {
+            const name_z: [*:0]const u8 =
+                st_name.ptr[0..st_name.len :0];
+
+            const maybe_c_studio = self.plugin_loader.createStudio(
+                name_z,
+            );
+            const c_studio = maybe_c_studio orelse {
+                log.warn(
+                    "plugin failed to create studio: {s}",
+                    .{st_name},
+                );
+                continue;
+            };
+
+            // Read configs from the C studio's vtable callbacks
+            const configs = self.readStudioConfigs(c_studio) orelse {
+                log.warn(
+                    "failed to read configs for studio: {s}",
+                    .{st_name},
+                );
+                continue;
+            };
+
+            // Wrap in a Zig Studio and register
+            const wrapper = self.allocator.create(
+                Studio,
+            ) catch {
+                log.warn(
+                    "alloc failed for plugin studio: {s}",
+                    .{st_name},
+                );
+                continue;
+            };
+            wrapper.* = .{
+                .lab = c_studio.*,
+                .configs = configs,
+                .maybe_plugin_studio = c_studio,
+            };
+            self.orchestrator.registerStudio(wrapper);
+
+            log.info(
+                "registered plugin studio: {s}",
+                .{st_name},
+            );
+        }
+    }
+
+    /// Read ActivityConfig entries from a C studio's vtable callbacks,
+    /// returning a heap-allocated slice of Zig ActivityConfigs.
+    fn readStudioConfigs(
+        self: *FundamentalApp,
+        c_studio: *MeshulaLab.Studio,
+    ) ?[]const ActivityConfig
+    {
+        const count_fn = c_studio.GetActivityCount orelse return null;
+        const config_fn = c_studio.GetActivityConfig orelse return null;
+
+        const count: usize = @intCast(count_fn(c_studio.instance));
+        if (count == 0) return &.{};
+
+        const configs = self.allocator.alloc(
+            ActivityConfig,
+            count,
+        ) catch return null;
+
+        for (0..count)
+            |i|
+        {
+            const maybe_c_cfg = config_fn(
+                c_studio.instance,
+                @intCast(i),
+            );
+            const c_cfg = maybe_c_cfg orelse {
+                self.allocator.free(configs);
+                return null;
+            };
+            configs[i] = .{
+                .name = @ptrCast(c_cfg.*.name),
+                .ui_initially_visible = c_cfg.*.uiInitiallyVisible,
+            };
+        }
+        return configs;
+    }
+
     /// Tear down all Activity instances belonging to a plugin:
     /// deactivate (if active), unregister from orchestrator, destroy
     /// via plugin, and free the wrapper. Must be called before
@@ -967,12 +1074,13 @@ pub const FundamentalApp = struct
     {
         const self = INSTANCE orelse return;
 
-        // Create and register Activities from discovered plugins.
-        // This runs after zgui/sokol init, so Activate callbacks
-        // can safely create GPU resources.
+        // Create and register Activities and Studios from discovered
+        // plugins. This runs after zgui/sokol init, so Activate
+        // callbacks can safely create GPU resources.
         if (!IS_WASM)
         {
             self.loadPluginActivities();
+            self.loadPluginStudios();
         }
 
         if (self.maybe_post_zgui_init)
