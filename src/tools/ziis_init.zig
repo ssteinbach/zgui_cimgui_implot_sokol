@@ -37,7 +37,7 @@ pub fn create_activity(
     }
 
     // Derive PascalCase name: my_widget -> MyWidget
-    const pascal_name = try snakeToPascal(allocator, activity_name);
+    const pascal_name = try snake_to_pascal(allocator, activity_name);
     defer allocator.free(pascal_name);
 
     // Output directory: <output_dir>/src/activities/<name>/
@@ -63,7 +63,7 @@ pub fn create_activity(
     defer allocator.free(plugin_path);
 
     // Check destination doesn't already exist
-    if (dirExists(dest_dir))
+    if (dir_exists(dest_dir))
     {
         try stderr.print("error: {s} already exists\n", .{dest_dir});
         fatal(stderr);
@@ -85,7 +85,7 @@ pub fn create_activity(
         .{ pascal_name, pascal_name },
     );
     defer allocator.free(activity_content);
-    try writeFile(activity_path, activity_content);
+    try write_file(activity_path, activity_content);
 
     // Generate and write plugin file
     const plugin_content = try std.fmt.allocPrint(
@@ -98,7 +98,7 @@ pub fn create_activity(
         },
     );
     defer allocator.free(plugin_content);
-    try writeFile(plugin_path, plugin_content);
+    try write_file(plugin_path, plugin_content);
 
     // Print success and build.zig instructions
     try stdout.print(
@@ -157,7 +157,7 @@ pub fn create_studio(
     }
 
     // Derive PascalCase name: my_studio -> MyStudio
-    const pascal_name = try snakeToPascal(allocator, studio_name);
+    const pascal_name = try snake_to_pascal(allocator, studio_name);
     defer allocator.free(pascal_name);
 
     // Output directory: <output_dir>/src/studios/<name>/
@@ -176,7 +176,7 @@ pub fn create_studio(
     defer allocator.free(plugin_path);
 
     // Check destination doesn't already exist
-    if (dirExists(dest_dir))
+    if (dir_exists(dest_dir))
     {
         try stderr.print("error: {s} already exists\n", .{dest_dir});
         fatal(stderr);
@@ -204,7 +204,7 @@ pub fn create_studio(
         },
     );
     defer allocator.free(plugin_content);
-    try writeFile(plugin_path, plugin_content);
+    try write_file(plugin_path, plugin_content);
 
     // Print success and build.zig instructions
     try stdout.print(
@@ -354,7 +354,7 @@ fn fatal(
     std.process.exit(1);
 }
 
-fn dirExists(
+fn dir_exists(
     path: []const u8,
 ) bool
 {
@@ -362,7 +362,7 @@ fn dirExists(
     return stat.kind == .directory;
 }
 
-fn writeFile(
+fn write_file(
     path: []const u8,
     content: []const u8,
 ) !void
@@ -373,7 +373,7 @@ fn writeFile(
 }
 
 /// Convert snake_case to PascalCase: "my_widget" -> "MyWidget"
-fn snakeToPascal(
+fn snake_to_pascal(
     allocator: std.mem.Allocator,
     snake: []const u8,
 ) ![]u8

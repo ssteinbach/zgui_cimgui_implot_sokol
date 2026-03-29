@@ -110,7 +110,7 @@ pub fn runUI(
     zgui.separator();
     zgui.spacing();
 
-    drawPluginTable(app);
+    draw_plugin_table(app);
 
     // Per-plugin detail section with collapsible headers
     zgui.spacing();
@@ -119,7 +119,7 @@ pub fn runUI(
     for (loader.plugins.items, 0..)
         |*info, idx|
     {
-        const header = sliceOrNone(info.name);
+        const header = slice_or_none(info.name);
         const should_open = (
             if (scroll_to_plugin) |target| target == idx
             else false
@@ -133,7 +133,7 @@ pub fn runUI(
         zgui.pushIntId(@intCast(idx));
         defer zgui.popId();
 
-        if (zgui.collapsingHeader(toSentinel(header), .{}))
+        if (zgui.collapsingHeader(to_sentinel(header), .{}))
         {
             if (should_open)
             {
@@ -143,14 +143,14 @@ pub fn runUI(
 
             zgui.indent(.{});
 
-            zgui.text("Path: {s}", .{sliceOrNone(info.path)});
+            zgui.text("Path: {s}", .{slice_or_none(info.path)});
             zgui.text(
                 "Version: {s}",
-                .{sliceOrNone(info.version)},
+                .{slice_or_none(info.version)},
             );
             zgui.text(
                 "Provenance: {s}",
-                .{sliceOrNone(info.provenance)},
+                .{slice_or_none(info.provenance)},
             );
             zgui.text(
                 "ABI Version: {d}",
@@ -217,14 +217,14 @@ pub fn runUI(
 
     // Execute deferred unload/reload now that all UI drawing
     // (table + detail section) is complete.
-    executeDeferredAction(app);
+    execute_deferred_action(app);
 }
 
 // -----------------------------------------------------------------
 // Table drawing
 // -----------------------------------------------------------------
 
-fn drawPluginTable(
+fn draw_plugin_table(
     app: *FundamentalApp,
 ) void
 {
@@ -316,7 +316,7 @@ fn drawPluginTable(
             _ = zgui.tableNextColumn();
             if (
                 zgui.selectable(
-                    toSentinel(sliceOrNone(info.name)),
+                    to_sentinel(slice_or_none(info.name)),
                     .{},
                 )
             )
@@ -326,7 +326,7 @@ fn drawPluginTable(
 
             // Version
             _ = zgui.tableNextColumn();
-            zgui.textUnformatted(sliceOrNone(info.version));
+            zgui.textUnformatted(slice_or_none(info.version));
 
             // ABI version
             _ = zgui.tableNextColumn();
@@ -367,11 +367,11 @@ fn drawPluginTable(
 
             // Exports — counts by type
             _ = zgui.tableNextColumn();
-            drawExportCounts(info);
+            draw_export_counts(info);
 
             // Provenance
             _ = zgui.tableNextColumn();
-            zgui.textUnformatted(sliceOrNone(info.provenance));
+            zgui.textUnformatted(slice_or_none(info.provenance));
 
             // Actions
             _ = zgui.tableNextColumn();
@@ -382,8 +382,8 @@ fn drawPluginTable(
                 {
                     if (zgui.smallButton("Disable"))
                     {
-                        loader.disablePlugin(idx);
-                        deactivatePluginActivities(
+                        loader.disable_plugin(idx);
+                        deactivate_plugin_activities(
                             &app.orchestrator,
                             info,
                         );
@@ -393,8 +393,8 @@ fn drawPluginTable(
                 {
                     if (zgui.smallButton("Enable"))
                     {
-                        loader.enablePlugin(idx);
-                        activatePluginActivities(
+                        loader.enable_plugin(idx);
+                        activate_plugin_activities(
                             &app.orchestrator,
                             info,
                         );
@@ -444,7 +444,7 @@ fn drawPluginTable(
 
 /// Execute the deferred unload/reload/load after all UI drawing
 /// is done.
-fn executeDeferredAction(
+fn execute_deferred_action(
     app: *FundamentalApp,
 ) void
 {
@@ -462,22 +462,22 @@ fn executeDeferredAction(
         .none => {},
         .unload =>
         {
-            app.teardownPluginActivities(
+            app.teardown_plugin_activities(
                 &loader.plugins.items[idx],
             );
-            loader.unloadPlugin(idx);
+            loader.unload_plugin(idx);
         },
         .reload =>
         {
-            app.teardownPluginActivities(
+            app.teardown_plugin_activities(
                 &loader.plugins.items[idx],
             );
-            loader.unloadPlugin(idx);
-            if (loader.loadPluginAt(idx))
+            loader.unload_plugin(idx);
+            if (loader.load_plugin_at(idx))
             {
                 const info = &loader.plugins.items[idx];
-                app.loadActivitiesForPlugin(info);
-                activatePluginActivities(
+                app.load_activities_for_plugin(info);
+                activate_plugin_activities(
                     &app.orchestrator,
                     info,
                 );
@@ -485,11 +485,11 @@ fn executeDeferredAction(
         },
         .load =>
         {
-            if (loader.loadPluginAt(idx))
+            if (loader.load_plugin_at(idx))
             {
                 const info = &loader.plugins.items[idx];
-                app.loadActivitiesForPlugin(info);
-                activatePluginActivities(
+                app.load_activities_for_plugin(info);
+                activate_plugin_activities(
                     &app.orchestrator,
                     info,
                 );
@@ -506,7 +506,7 @@ fn executeDeferredAction(
 /// Only calls deactivate on activities that are currently active,
 /// to avoid calling the plugin's Deactivate callback on
 /// uninitialized state.
-fn deactivatePluginActivities(
+fn deactivate_plugin_activities(
     orchestrator: *Orchestrator,
     info: *const PluginInfo,
 ) void
@@ -514,7 +514,7 @@ fn deactivatePluginActivities(
     for (info.activity_names.items)
         |act_name|
     {
-        const activity = orchestrator.findActivity(
+        const activity = orchestrator.find_activity(
             act_name,
         ) orelse continue;
         if (!activity.lab.active)
@@ -526,7 +526,7 @@ fn deactivatePluginActivities(
         const nlen = @min(act_name.len, name_buf.len - 1);
         @memcpy(name_buf[0..nlen], act_name[0..nlen]);
         name_buf[nlen] = 0;
-        orchestrator.deactivateActivity(@ptrCast(&name_buf));
+        orchestrator.deactivate_activity(@ptrCast(&name_buf));
     }
 }
 
@@ -534,7 +534,7 @@ fn deactivatePluginActivities(
 /// Only calls activate on activities that are not currently active,
 /// to avoid double-calling the plugin's Activate callback
 /// (which may allocate resources).
-fn activatePluginActivities(
+fn activate_plugin_activities(
     orchestrator: *Orchestrator,
     info: *const PluginInfo,
 ) void
@@ -542,7 +542,7 @@ fn activatePluginActivities(
     for (info.activity_names.items)
         |act_name|
     {
-        const activity = orchestrator.findActivity(
+        const activity = orchestrator.find_activity(
             act_name,
         ) orelse continue;
         if (activity.lab.active)
@@ -554,11 +554,11 @@ fn activatePluginActivities(
         const nlen = @min(act_name.len, name_buf.len - 1);
         @memcpy(name_buf[0..nlen], act_name[0..nlen]);
         name_buf[nlen] = 0;
-        orchestrator.activateActivity(@ptrCast(&name_buf));
+        orchestrator.activate_activity(@ptrCast(&name_buf));
     }
 }
 
-fn sliceOrNone(
+fn slice_or_none(
     s: []const u8,
 ) []const u8
 {
@@ -566,7 +566,7 @@ fn sliceOrNone(
 }
 
 /// Show export counts by type in a compact format.
-fn drawExportCounts(
+fn draw_export_counts(
     info: *const PluginInfo,
 ) void
 {
@@ -606,7 +606,7 @@ fn drawExportCounts(
 
 /// Convert a Zig slice to a sentinel-terminated pointer using a
 /// static buffer. Only valid until the next call.
-fn toSentinel(
+fn to_sentinel(
     s: []const u8,
 ) [:0]const u8
 {

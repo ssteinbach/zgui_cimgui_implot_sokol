@@ -21,10 +21,10 @@ var APP: MeshulaLab.FundamentalApp = undefined;
 
 /// Called after zgui/sokol are initialised and plugin activities/studios
 /// have been created+registered. Activate the DemoStudio.
-fn postInit(
+fn post_init(
 ) void
 {
-    APP.activateStudio("DemoStudio");
+    APP.activate_studio("DemoStudio");
 }
 
 // =========================================================================
@@ -40,7 +40,7 @@ pub fn main(
         .{
             .title = "ZIIS Demo Studio",
             .logger = ziis.std_log_scoped,
-            .maybe_post_zgui_init = &postInit,
+            .maybe_post_zgui_init = &post_init,
         },
     );
 }

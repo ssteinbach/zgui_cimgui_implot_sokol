@@ -50,7 +50,7 @@ pub const PluginInfo = struct {
     /// copy them to the heap and track them here.
     owned_strings: std.ArrayListUnmanaged([]const u8) = .{},
 
-    pub fn totalExports(
+    pub fn total_exports(
         self: *const PluginInfo,
     ) usize
     {
@@ -67,7 +67,7 @@ pub const PluginInfo = struct {
         allocator: std.mem.Allocator,
     ) void
     {
-        self.freeOwnedStrings(allocator);
+        self.free_owned_strings(allocator);
         if (self.path.len > 0)
         {
             allocator.free(self.path);
@@ -79,7 +79,7 @@ pub const PluginInfo = struct {
     }
 
     /// Free heap-duplicated strings tracked in owned_strings.
-    fn freeOwnedStrings(
+    fn free_owned_strings(
         self: *PluginInfo,
         allocator: std.mem.Allocator,
     ) void
@@ -93,7 +93,7 @@ pub const PluginInfo = struct {
     }
 
     /// Duplicate a string to the heap and track it so it gets freed.
-    fn dupeAndOwn(
+    fn dupe_and_own(
         self: *PluginInfo,
         allocator: std.mem.Allocator,
         s: []const u8,
@@ -141,7 +141,7 @@ pub const PluginLoader = struct {
     }
 
     /// Scan a specific directory for plugin shared libraries.
-    pub fn discoverPluginsInDirectory(
+    pub fn discover_plugins_in_directory(
         self: *PluginLoader,
         dir_path: []const u8,
     ) void
@@ -171,7 +171,7 @@ pub const PluginLoader = struct {
             {
                 continue;
             }
-            if (!isPluginExtension(entry.name))
+            if (!is_plugin_extension(entry.name))
             {
                 continue;
             }
@@ -184,12 +184,12 @@ pub const PluginLoader = struct {
                 .{ dir_path, entry.name },
             ) catch continue;
 
-            self.loadPlugin(full_path);
+            self.load_plugin(full_path);
         }
     }
 
     /// Create an Activity instance by name via the owning plugin.
-    pub fn createActivity(
+    pub fn create_activity(
         self: *PluginLoader,
         activity_name: [*:0]const u8,
     ) ?*MeshulaLab.Activity
@@ -223,7 +223,7 @@ pub const PluginLoader = struct {
     }
 
     /// Destroy an Activity instance via the owning plugin.
-    pub fn destroyActivity(
+    pub fn destroy_activity(
         self: *PluginLoader,
         activity: *MeshulaLab.Activity,
     ) void
@@ -257,7 +257,7 @@ pub const PluginLoader = struct {
     }
 
     /// Create a Provider instance by name via the owning plugin.
-    pub fn createProvider(
+    pub fn create_provider(
         self: *PluginLoader,
         provider_name: [*:0]const u8,
     ) ?*MeshulaLab.Provider
@@ -291,7 +291,7 @@ pub const PluginLoader = struct {
     }
 
     /// Create a Studio instance by name via the owning plugin.
-    pub fn createStudio(
+    pub fn create_studio(
         self: *PluginLoader,
         studio_name: [*:0]const u8,
     ) ?*MeshulaLab.Studio
@@ -325,7 +325,7 @@ pub const PluginLoader = struct {
     }
 
     /// Destroy a Studio instance via the owning plugin.
-    pub fn destroyStudio(
+    pub fn destroy_studio(
         self: *PluginLoader,
         studio: *MeshulaLab.Studio,
     ) void
@@ -359,8 +359,8 @@ pub const PluginLoader = struct {
     }
 
     /// Disable a plugin by index. Does not dlclose — just marks it
-    /// so createActivity/createProvider skip it.
-    pub fn disablePlugin(
+    /// so create_activity/create_provider skip it.
+    pub fn disable_plugin(
         self: *PluginLoader,
         index: usize,
     ) void
@@ -382,7 +382,7 @@ pub const PluginLoader = struct {
     /// Activity or Provider instances that were created from this
     /// plugin, since their function pointers become invalid after
     /// dlclose.
-    pub fn unloadPlugin(
+    pub fn unload_plugin(
         self: *PluginLoader,
         index: usize,
     ) void
@@ -411,21 +411,21 @@ pub const PluginLoader = struct {
         // invalidates the dylib-owned strings.
         if (info.name.len > 0)
         {
-            info.name = info.dupeAndOwn(
+            info.name = info.dupe_and_own(
                 self.allocator,
                 info.name,
             );
         }
         if (info.version.len > 0)
         {
-            info.version = info.dupeAndOwn(
+            info.version = info.dupe_and_own(
                 self.allocator,
                 info.version,
             );
         }
         if (info.provenance.len > 0)
         {
-            info.provenance = info.dupeAndOwn(
+            info.provenance = info.dupe_and_own(
                 self.allocator,
                 info.provenance,
             );
@@ -452,7 +452,7 @@ pub const PluginLoader = struct {
     /// Load (or reload) a plugin at the given index. The entry
     /// must already exist in the plugins list with a valid path.
     /// Returns true on success.
-    pub fn loadPluginAt(
+    pub fn load_plugin_at(
         self: *PluginLoader,
         index: usize,
     ) bool
@@ -472,18 +472,18 @@ pub const PluginLoader = struct {
         // for tearing down activities before calling this).
         if (info.loaded)
         {
-            self.unloadPlugin(index);
+            self.unload_plugin(index);
             info = &self.plugins.items[index];
         }
 
         // Free any heap-owned strings from the previous load
-        info.freeOwnedStrings(self.allocator);
+        info.free_owned_strings(self.allocator);
 
-        return self.doLoad(info);
+        return self.do_load(info);
     }
 
     /// Re-enable a previously disabled plugin by index.
-    pub fn enablePlugin(
+    pub fn enable_plugin(
         self: *PluginLoader,
         index: usize,
     ) void
@@ -530,7 +530,7 @@ pub const PluginLoader = struct {
             {
                 continue;
             }
-            if (!isPluginExtension(entry.name))
+            if (!is_plugin_extension(entry.name))
             {
                 continue;
             }
@@ -544,7 +544,7 @@ pub const PluginLoader = struct {
             ) catch continue;
 
             // Skip if already known (loaded or unloaded)
-            if (self.isPathKnown(full_path))
+            if (self.is_path_known(full_path))
             {
                 continue;
             }
@@ -568,7 +568,7 @@ pub const PluginLoader = struct {
 
     /// Check if an activity name belongs to a disabled or unloaded
     /// plugin.
-    pub fn isActivityDisabled(
+    pub fn is_activity_disabled(
         self: *const PluginLoader,
         activity_name: []const u8,
     ) bool
@@ -594,7 +594,7 @@ pub const PluginLoader = struct {
 
     /// Check if a plugin at the given path is already known
     /// (loaded or unloaded).
-    fn isPathKnown(
+    fn is_path_known(
         self: *PluginLoader,
         path: []const u8,
     ) bool
@@ -611,7 +611,7 @@ pub const PluginLoader = struct {
     }
 
     /// Destroy a Provider instance via the owning plugin.
-    pub fn destroyProvider(
+    pub fn destroy_provider(
         self: *PluginLoader,
         provider: *MeshulaLab.Provider,
     ) void
@@ -649,7 +649,7 @@ pub const PluginLoader = struct {
     // ---------------------------------------------------------------
 
     /// Add a new plugin entry and attempt to load it.
-    fn loadPlugin(
+    fn load_plugin(
         self: *PluginLoader,
         path: []const u8,
     ) void
@@ -666,7 +666,7 @@ pub const PluginLoader = struct {
 
         var info = PluginInfo{ .path = owned_path };
 
-        _ = self.doLoad(&info);
+        _ = self.do_load(&info);
 
         self.plugins.append(self.allocator, info) catch {
             info.deinit(self.allocator);
@@ -676,7 +676,7 @@ pub const PluginLoader = struct {
     /// dlopen a plugin, extract its descriptor, and populate the
     /// info's live fields. The info must already have a valid path.
     /// Returns true on success.
-    fn doLoad(
+    fn do_load(
         self: *PluginLoader,
         info: *PluginInfo,
     ) bool
@@ -862,7 +862,7 @@ pub const PluginLoader = struct {
         return true;
     }
 
-    fn isPluginExtension(
+    fn is_plugin_extension(
         name: []const u8,
     ) bool
     {

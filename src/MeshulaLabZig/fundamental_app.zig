@@ -99,7 +99,7 @@ pub const FundamentalApp = struct {
         if (!IS_WASM)
         {
             log.info("plugin directory: {s}", .{PLUGIN_DIR});
-            self.plugin_loader.discoverPluginsInDirectory(PLUGIN_DIR);
+            self.plugin_loader.discover_plugins_in_directory(PLUGIN_DIR);
         }
 
         // Start CSP engine
@@ -139,15 +139,15 @@ pub const FundamentalApp = struct {
 
         app_wrapper.sokol_main(
             .{
-                .draw = &drawThunk,
+                .draw = &draw_thunk,
                 .title = config.title,
                 .dimensions = config.dimensions,
                 .logger = config.logger,
                 .max_vertices = config.max_vertices,
-                .maybe_post_zgui_init = &postZguiInitThunk,
+                .maybe_post_zgui_init = &post_zgui_init_thunk,
                 .maybe_pre_zgui_shutdown_cleanup =
-                &preZguiShutdownThunk,
-                .event = &eventThunk,
+                &pre_zgui_shutdown_thunk,
+                .event = &event_thunk,
                 .enable_dragndrop = true,
                 .max_dropped_files = 8,
                 .max_dropped_file_path_length = 8192,
@@ -159,28 +159,28 @@ pub const FundamentalApp = struct {
     // Delegation helpers
     // -----------------------------------------------------------------
 
-    pub fn registerActivity(
+    pub fn register_activity(
         self: *FundamentalApp,
         activity: *Activity,
     ) void
     {
-        self.orchestrator.registerActivity(activity);
+        self.orchestrator.register_activity(activity);
     }
 
-    pub fn registerStudio(
+    pub fn register_studio(
         self: *FundamentalApp,
         studio: *Studio,
     ) void
     {
-        self.orchestrator.registerStudio(studio);
+        self.orchestrator.register_studio(studio);
     }
 
-    pub fn activateStudio(
+    pub fn activate_studio(
         self: *FundamentalApp,
         studio_name: [*:0]const u8,
     ) void
     {
-        self.orchestrator.activateStudio(studio_name);
+        self.orchestrator.activate_studio(studio_name);
     }
 
     // -----------------------------------------------------------------
@@ -189,7 +189,7 @@ pub const FundamentalApp = struct {
 
     /// Create Activity instances from discovered plugins and register
     /// them with the orchestrator.
-    fn loadPluginActivities(
+    fn load_plugin_activities(
         self: *FundamentalApp,
     ) void
     {
@@ -200,12 +200,12 @@ pub const FundamentalApp = struct {
             {
                 continue;
             }
-            self.loadActivitiesForPlugin(&info);
+            self.load_activities_for_plugin(&info);
         }
     }
 
     /// Create and register Activity instances for a single plugin.
-    pub fn loadActivitiesForPlugin(
+    pub fn load_activities_for_plugin(
         self: *FundamentalApp,
         info: *const PluginInfo,
     ) void
@@ -224,7 +224,7 @@ pub const FundamentalApp = struct {
                 act_name.ptr[0..act_name.len :0]
             );
 
-            const maybe_c_activity = self.plugin_loader.createActivity(
+            const maybe_c_activity = self.plugin_loader.create_activity(
                 name_z,
             );
             const c_activity = maybe_c_activity orelse {
@@ -250,7 +250,7 @@ pub const FundamentalApp = struct {
                 .lab = c_activity.*,
                 .maybe_plugin_activity = c_activity,
             };
-            self.orchestrator.registerActivity(wrapper);
+            self.orchestrator.register_activity(wrapper);
 
             log.info(
                 "registered plugin activity: {s}",
@@ -261,7 +261,7 @@ pub const FundamentalApp = struct {
 
     /// Create Studio instances from discovered plugins and register
     /// them with the orchestrator.
-    fn loadPluginStudios(
+    fn load_plugin_studios(
         self: *FundamentalApp,
     ) void
     {
@@ -272,12 +272,12 @@ pub const FundamentalApp = struct {
             {
                 continue;
             }
-            self.loadStudiosForPlugin(&info);
+            self.load_studios_for_plugin(&info);
         }
     }
 
     /// Create and register Studio instances for a single plugin.
-    pub fn loadStudiosForPlugin(
+    pub fn load_studios_for_plugin(
         self: *FundamentalApp,
         info: *const PluginInfo,
     ) void
@@ -289,7 +289,7 @@ pub const FundamentalApp = struct {
                 st_name.ptr[0..st_name.len :0]
             );
 
-            const maybe_c_studio = self.plugin_loader.createStudio(
+            const maybe_c_studio = self.plugin_loader.create_studio(
                 name_z,
             );
             const c_studio = maybe_c_studio orelse {
@@ -301,7 +301,7 @@ pub const FundamentalApp = struct {
             };
 
             // Read configs from the C studio's vtable callbacks
-            const configs = self.readStudioConfigs(c_studio) orelse {
+            const configs = self.read_studio_configs(c_studio) orelse {
                 log.warn(
                     "failed to read configs for studio: {s}",
                     .{st_name},
@@ -324,7 +324,7 @@ pub const FundamentalApp = struct {
                 .configs = configs,
                 .maybe_plugin_studio = c_studio,
             };
-            self.orchestrator.registerStudio(wrapper);
+            self.orchestrator.register_studio(wrapper);
 
             log.info(
                 "registered plugin studio: {s}",
@@ -335,7 +335,7 @@ pub const FundamentalApp = struct {
 
     /// Read ActivityConfig entries from a C studio's vtable callbacks,
     /// returning a heap-allocated slice of Zig ActivityConfigs.
-    fn readStudioConfigs(
+    fn read_studio_configs(
         self: *FundamentalApp,
         c_studio: *MeshulaLab.Studio,
     ) ?[]const ActivityConfig
@@ -377,7 +377,7 @@ pub const FundamentalApp = struct {
     /// deactivate (if active), unregister from orchestrator, destroy
     /// via plugin, and free the wrapper. Must be called before
     /// unloading a plugin.
-    pub fn teardownPluginActivities(
+    pub fn teardown_plugin_activities(
         self: *FundamentalApp,
         info: *const PluginInfo,
     ) void
@@ -391,7 +391,7 @@ pub const FundamentalApp = struct {
             // Only deactivate if the activity is currently active,
             // to avoid double-calling the plugin's Deactivate
             // callback (which may free resources).
-            if (self.orchestrator.findActivity(act_name))
+            if (self.orchestrator.find_activity(act_name))
                 |activity|
             {
                 if (activity.lab.active)
@@ -403,14 +403,14 @@ pub const FundamentalApp = struct {
                     );
                     @memcpy(name_buf[0..nlen], act_name[0..nlen]);
                     name_buf[nlen] = 0;
-                    self.orchestrator.deactivateActivity(
+                    self.orchestrator.deactivate_activity(
                         @ptrCast(&name_buf),
                     );
                 }
             }
 
             // Unregister from orchestrator
-            if (self.orchestrator.unregisterActivity(act_name))
+            if (self.orchestrator.unregister_activity(act_name))
                 |wrapper|
             {
                 // Destroy via the plugin using the original pointer
@@ -439,14 +439,14 @@ pub const FundamentalApp = struct {
     // Power save
     // -----------------------------------------------------------------
 
-    pub fn powerSave(
+    pub fn is_power_save(
         self: *const FundamentalApp,
     ) bool
     {
         return self.power_save and self.suspend_power_save <= 0;
     }
 
-    pub fn setPowerSave(
+    pub fn set_power_save(
         self: *FundamentalApp,
         enable: bool,
     ) void
@@ -454,7 +454,7 @@ pub const FundamentalApp = struct {
         self.power_save = enable;
     }
 
-    pub fn suspendPowerSave(
+    pub fn set_suspend_power_save(
         self: *FundamentalApp,
         frames: i32,
     ) void
@@ -466,7 +466,7 @@ pub const FundamentalApp = struct {
     // Diagnostics
     // -----------------------------------------------------------------
 
-    pub fn printStatus(
+    pub fn print_status(
         self: *const FundamentalApp,
     ) void
     {
@@ -491,13 +491,13 @@ pub const FundamentalApp = struct {
         ) catch {};
         {
             var orch = @constCast(&self.orchestrator);
-            var it = orch.studioNames();
+            var it = orch.studio_names();
             var count: usize = 0;
             while (it.next())
                 |name|
             {
                 const active = (
-                    if (orch.currentStudio())
+                    if (orch.current_studio())
                         |cs|
                         std.mem.eql(u8, cs.name(), name)
                     else false
@@ -524,19 +524,19 @@ pub const FundamentalApp = struct {
         ) catch {};
         {
             var orch = @constCast(&self.orchestrator);
-            var it = orch.activityNames();
+            var it = orch.activity_names();
             var count: usize = 0;
             while (it.next())
                 |name|
             {
-                if (orch.findActivity(name))
+                if (orch.find_activity(name))
                     |activity|
                 {
                     writer.print("  - {s}", .{name}) catch {};
-                    if (activity.isActive())
+                    if (activity.is_active())
                     {
                         writer.print(" (active", .{}) catch {};
-                        if (activity.isUIVisible())
+                        if (activity.is_ui_visible())
                         {
                             writer.print(", visible", .{}) catch {};
                         }
@@ -620,7 +620,7 @@ pub const FundamentalApp = struct {
         const dt: f32 = @floatCast(sapp.frameDuration());
 
         // Process CSP events (non-blocking poll)
-        self.csp_engine.processAll();
+        self.csp_engine.process_all();
 
         // Service orchestrator (deferred activations + update)
         self.orchestrator.service(dt);
@@ -628,12 +628,12 @@ pub const FundamentalApp = struct {
         // --- Main menu bar ---
         if (zgui.beginMainMenuBar())
         {
-            self.drawStudioMenu();
-            self.drawActivitiesMenu();
-            self.orchestrator.runMainMenu();
+            self.draw_studio_menu();
+            self.draw_activities_menu();
+            self.orchestrator.run_main_menu();
             if (ENABLE_DOCKING)
             {
-                self.drawWindowMenu();
+                self.draw_window_menu();
             }
             zgui.endMainMenuBar();
         }
@@ -641,17 +641,17 @@ pub const FundamentalApp = struct {
         // --- Workspace area ---
         if (ENABLE_DOCKING)
         {
-            self.drawDockingWorkspace(dt);
+            self.draw_docking_workspace(dt);
         }
         else
         {
-            self.drawTabBarWorkspace(dt);
+            self.draw_tab_bar_workspace(dt);
         }
 
         // --- Floating windows ---
         if (self.show_plugin_manager)
         {
-            self.drawPluginManagerWindow();
+            self.draw_plugin_manager_window();
         }
     }
 
@@ -659,13 +659,13 @@ pub const FundamentalApp = struct {
     // Menu rendering
     // -----------------------------------------------------------------
 
-    fn drawStudioMenu(
+    fn draw_studio_menu(
         self: *FundamentalApp,
     ) void
     {
         // Build the menu title from the current studio name
         const current_name = (
-            if (self.orchestrator.currentStudio()) |cs| cs.name()
+            if (self.orchestrator.current_studio()) |cs| cs.name()
             else "Welcome"
         );
 
@@ -686,7 +686,7 @@ pub const FundamentalApp = struct {
 
         if (zgui.beginMenu(menu_title, true))
         {
-            var names_it = self.orchestrator.studioNames();
+            var names_it = self.orchestrator.studio_names();
             while (names_it.next())
                 |name|
             {
@@ -720,7 +720,7 @@ pub const FundamentalApp = struct {
                             name[0..nlen],
                         );
                         act_buf[nlen] = 0;
-                        self.orchestrator.activateStudio(
+                        self.orchestrator.activate_studio(
                             @ptrCast(&act_buf),
                         );
                     }
@@ -747,26 +747,26 @@ pub const FundamentalApp = struct {
         }
     }
 
-    fn drawActivitiesMenu(
+    fn draw_activities_menu(
         self: *FundamentalApp,
     ) void
     {
         if (zgui.beginMenu("Activities##mmenu", true))
         {
-            var names_it = self.orchestrator.activityNames();
+            var names_it = self.orchestrator.activity_names();
             while (names_it.next())
                 |name|
             {
-                const activity = self.orchestrator.findActivity(
+                const activity = self.orchestrator.find_activity(
                     name,
                 ) orelse continue;
 
                 const disabled_by_plugin = (
-                    self.plugin_loader.isActivityDisabled(name)
+                    self.plugin_loader.is_activity_disabled(name)
                 );
 
                 const is_active = (
-                    activity.isActive() and activity.isUIVisible()
+                    activity.is_active() and activity.is_ui_visible()
                 );
 
                 var name_buf: [256:0]u8 = undefined;
@@ -790,13 +790,13 @@ pub const FundamentalApp = struct {
                     act_buf[nlen] = 0;
                     if (is_active)
                     {
-                        self.orchestrator.deactivateActivity(
+                        self.orchestrator.deactivate_activity(
                             @ptrCast(&act_buf),
                         );
                     }
                     else
                     {
-                        self.orchestrator.activateActivity(
+                        self.orchestrator.activate_activity(
                             @ptrCast(&act_buf),
                         );
                     }
@@ -806,7 +806,7 @@ pub const FundamentalApp = struct {
         }
     }
 
-    fn drawWindowMenu(
+    fn draw_window_menu(
         _: *FundamentalApp,
     ) void
     {
@@ -828,7 +828,7 @@ pub const FundamentalApp = struct {
     // Floating windows
     // -----------------------------------------------------------------
 
-    fn drawPluginManagerWindow(
+    fn draw_plugin_manager_window(
         self: *FundamentalApp,
     ) void
     {
@@ -860,7 +860,7 @@ pub const FundamentalApp = struct {
     // Workspace rendering — docking variant
     // -----------------------------------------------------------------
 
-    fn drawDockingWorkspace(
+    fn draw_docking_workspace(
         self: *FundamentalApp,
         dt: f32,
     ) void
@@ -908,7 +908,7 @@ pub const FundamentalApp = struct {
             zgui.dockBuilderGetCentralNode(dockspace_id)
         );
 
-        var lab_vi = self.vi.toLab();
+        var lab_vi = self.vi.to_lab();
         lab_vi.dt = dt;
         lab_vi.view.w = vp_size[0];
         lab_vi.view.h = vp_size[1];
@@ -925,17 +925,17 @@ pub const FundamentalApp = struct {
         }
 
         // Run Activity UIs (they create their own dockable windows)
-        self.orchestrator.runActivityUIs(&lab_vi);
+        self.orchestrator.run_activity_uis(&lab_vi);
 
         // Viewport interaction
-        self.processViewportInteraction(&lab_vi);
+        self.process_viewport_interaction(&lab_vi);
     }
 
     // -----------------------------------------------------------------
     // Workspace rendering — tab bar variant (no docking)
     // -----------------------------------------------------------------
 
-    fn drawTabBarWorkspace(
+    fn draw_tab_bar_workspace(
         self: *FundamentalApp,
         dt: f32,
     ) void
@@ -971,7 +971,7 @@ pub const FundamentalApp = struct {
             },
         );
 
-        var lab_vi = self.vi.toLab();
+        var lab_vi = self.vi.to_lab();
         lab_vi.dt = dt;
         lab_vi.view.w = vp_size[0];
         lab_vi.view.h = vp_size[1];
@@ -983,7 +983,7 @@ pub const FundamentalApp = struct {
         // Tab bar with active activities
         if (zgui.beginTabBar("Activities", .{}))
         {
-            var it = self.orchestrator.activeUIActivities();
+            var it = self.orchestrator.active_ui_activities();
             while (it.next())
                 |activity|
             {
@@ -1012,14 +1012,14 @@ pub const FundamentalApp = struct {
         zgui.end();
 
         // Viewport interaction
-        self.processViewportInteraction(&lab_vi);
+        self.process_viewport_interaction(&lab_vi);
     }
 
     // -----------------------------------------------------------------
     // Viewport interaction (hover/drag bidding)
     // -----------------------------------------------------------------
 
-    fn processViewportInteraction(
+    fn process_viewport_interaction(
         self: *FundamentalApp,
         lab_vi: *MeshulaLab.ViewInteraction,
     ) void
@@ -1037,7 +1037,7 @@ pub const FundamentalApp = struct {
         {
             lab_vi.start = !self.was_dragging;
             lab_vi.end = false;
-            self.orchestrator.runViewportDragging(lab_vi);
+            self.orchestrator.run_viewport_dragging(lab_vi);
         }
         else
         {
@@ -1045,24 +1045,24 @@ pub const FundamentalApp = struct {
             {
                 lab_vi.start = false;
                 lab_vi.end = true;
-                self.orchestrator.runViewportDragging(lab_vi);
+                self.orchestrator.run_viewport_dragging(lab_vi);
             }
             else
             {
-                self.orchestrator.runViewportHovering(lab_vi);
+                self.orchestrator.run_viewport_hovering(lab_vi);
             }
         }
         self.was_dragging = is_dragging;
 
         // Update stored ViewInteraction for next frame
-        self.vi = ViewInteraction.fromLab(lab_vi.*);
+        self.vi = ViewInteraction.from_lab(lab_vi.*);
     }
 
     // -----------------------------------------------------------------
     // Event handling
     // -----------------------------------------------------------------
 
-    fn handleEvent(
+    fn handle_event(
         self: *FundamentalApp,
         ev: [*c]const sapp.Event,
     ) void
@@ -1108,22 +1108,22 @@ pub const FundamentalApp = struct {
     // Static thunks — bridge comptime callbacks to instance methods
     // -----------------------------------------------------------------
 
-    fn drawThunk(
+    fn draw_thunk(
     ) anyerror!void
     {
         const self = INSTANCE orelse return;
         try self.draw();
     }
 
-    fn eventThunk(
+    fn event_thunk(
         ev: [*c]const sapp.Event,
     ) callconv(.c) void
     {
         const self = INSTANCE orelse return;
-        self.handleEvent(ev);
+        self.handle_event(ev);
     }
 
-    fn postZguiInitThunk(
+    fn post_zgui_init_thunk(
     ) void
     {
         const self = INSTANCE orelse return;
@@ -1133,8 +1133,8 @@ pub const FundamentalApp = struct {
         // callbacks can safely create GPU resources.
         if (!IS_WASM)
         {
-            self.loadPluginActivities();
-            self.loadPluginStudios();
+            self.load_plugin_activities();
+            self.load_plugin_studios();
         }
 
         if (self.maybe_post_zgui_init)
@@ -1144,7 +1144,7 @@ pub const FundamentalApp = struct {
         }
     }
 
-    fn preZguiShutdownThunk(
+    fn pre_zgui_shutdown_thunk(
     ) void
     {
         const self = INSTANCE orelse return;

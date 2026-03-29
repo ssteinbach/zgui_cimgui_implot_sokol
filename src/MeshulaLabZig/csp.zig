@@ -29,7 +29,7 @@ pub const CspModule = struct {
     processes: std.ArrayListUnmanaged(*CspProcess) = .{},
     maybe_engine: ?*CspEngine = null,
 
-    pub fn addProcess(
+    pub fn add_process(
         self: *CspModule,
         allocator: std.mem.Allocator,
         process: *CspProcess,
@@ -45,17 +45,17 @@ pub const CspModule = struct {
     ) void
     {
         const engine = self.maybe_engine orelse return;
-        engine.registerModule(self);
+        engine.register_module(self);
     }
 
     /// Emit an event for the given process (immediate, no delay).
-    pub fn emitEvent(
+    pub fn emit_event(
         self: *CspModule,
         process: *const CspProcess,
     ) void
     {
         const engine = self.maybe_engine orelse return;
-        engine.emitEvent(process, 0);
+        engine.emit_event(process, 0);
     }
 
     pub fn deinit(
@@ -76,7 +76,7 @@ const TimedEvent = struct {
 /// Central event coordinator.
 ///
 /// All event processing is single-threaded (main thread). Timed
-/// events are promoted to the immediate queue during processAll(),
+/// events are promoted to the immediate queue during process_all(),
 /// which should be called once per frame. On WASM the behaviour
 /// is identical — no ZMQ or threads are used on any platform.
 pub const CspEngine = struct {
@@ -105,7 +105,7 @@ pub const CspEngine = struct {
     }
 
     /// Register a module, assigning unique IDs to all its processes.
-    pub fn registerModule(
+    pub fn register_module(
         self: *CspEngine,
         module: *CspModule,
     ) void
@@ -132,7 +132,7 @@ pub const CspEngine = struct {
     }
 
     /// Unregister a module and remove its processes.
-    pub fn unregisterModule(
+    pub fn unregister_module(
         self: *CspEngine,
         module_name: []const u8,
     ) void
@@ -150,7 +150,7 @@ pub const CspEngine = struct {
 
     /// Queue an event for a process, with an optional delay in
     /// milliseconds. A delay of 0 means immediate.
-    pub fn emitEvent(
+    pub fn emit_event(
         self: *CspEngine,
         process: *const CspProcess,
         ms_delay: i32,
@@ -172,7 +172,7 @@ pub const CspEngine = struct {
             return;
         }
 
-        // Immediate event — queue for next processAll()
+        // Immediate event — queue for next process_all()
         self.immediate_queue.append(
             self.allocator,
             process.id,
@@ -198,7 +198,7 @@ pub const CspEngine = struct {
 
     /// Process all pending events synchronously.
     /// Call once per frame from the main thread.
-    pub fn processAll(
+    pub fn process_all(
         self: *CspEngine,
     ) void
     {

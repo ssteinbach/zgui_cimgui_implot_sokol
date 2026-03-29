@@ -101,7 +101,7 @@ pub const Activity = struct {
     }
 
     /// Check if the Activity is currently active.
-    pub fn isActive(
+    pub fn is_active(
         self: *const Activity,
     ) bool
     {
@@ -109,7 +109,7 @@ pub const Activity = struct {
     }
 
     /// Check if the Activity's UI is currently visible.
-    pub fn isUIVisible(
+    pub fn is_ui_visible(
         self: *const Activity,
     ) bool
     {

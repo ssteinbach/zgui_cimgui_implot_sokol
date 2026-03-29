@@ -18,7 +18,7 @@ pub const ViewDimensions = struct {
     ww: f32 = 0,
     wh: f32 = 0,
 
-    pub fn toLab(
+    pub fn to_lab(
         self: ViewDimensions,
     ) MeshulaLab.ViewDimensions
     {
@@ -32,7 +32,7 @@ pub const ViewDimensions = struct {
         };
     }
 
-    pub fn fromLab(
+    pub fn from_lab(
         lab: MeshulaLab.ViewDimensions,
     ) ViewDimensions
     {
@@ -62,12 +62,12 @@ pub const ViewInteraction = struct {
     start: bool = false,
     end: bool = false,
 
-    pub fn toLab(
+    pub fn to_lab(
         self: ViewInteraction,
     ) MeshulaLab.ViewInteraction
     {
         return .{
-            .view = self.view.toLab(),
+            .view = self.view.to_lab(),
             .x = self.x,
             .y = self.y,
             .dt = self.dt,
@@ -76,12 +76,12 @@ pub const ViewInteraction = struct {
         };
     }
 
-    pub fn fromLab(
+    pub fn from_lab(
         lab: MeshulaLab.ViewInteraction,
     ) ViewInteraction
     {
         return .{
-            .view = ViewDimensions.fromLab(lab.view),
+            .view = ViewDimensions.from_lab(lab.view),
             .x = lab.x,
             .y = lab.y,
             .dt = lab.dt,

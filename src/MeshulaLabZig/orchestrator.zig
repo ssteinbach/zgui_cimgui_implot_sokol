@@ -43,7 +43,7 @@ pub const Orchestrator = struct {
 
     /// Register an Activity. The Activity pointer must remain valid
     /// for the lifetime of the Orchestrator.
-    pub fn registerActivity(
+    pub fn register_activity(
         self: *Orchestrator,
         activity: *Activity,
     ) void
@@ -58,7 +58,7 @@ pub const Orchestrator = struct {
 
     /// Register a Studio. The Studio pointer must remain valid
     /// for the lifetime of the Orchestrator.
-    pub fn registerStudio(
+    pub fn register_studio(
         self: *Orchestrator,
         studio: *Studio,
     ) void
@@ -75,7 +75,7 @@ pub const Orchestrator = struct {
 
     /// Request activation of a Studio by name.
     /// Activation is deferred until the next `service()` call.
-    pub fn activateStudio(
+    pub fn activate_studio(
         self: *Orchestrator,
         studio_name: [*:0]const u8,
     ) void
@@ -94,7 +94,7 @@ pub const Orchestrator = struct {
         if (self.maybe_pending_studio)
             |pending_name|
         {
-            self.doActivateStudio(pending_name);
+            self.do_activate_studio(pending_name);
             self.maybe_pending_studio = null;
         }
 
@@ -119,7 +119,7 @@ pub const Orchestrator = struct {
     /// Caller is responsible for providing the tab/window context.
     /// Returns an iterator-like interface — typically called from
     /// a tab bar loop.
-    pub fn activeUIActivities(
+    pub fn active_ui_activities(
         self: *Orchestrator,
     ) ActivityIterator
     {
@@ -150,7 +150,7 @@ pub const Orchestrator = struct {
     };
 
     /// Run the main menu contributions from all active Activities.
-    pub fn runMainMenu(
+    pub fn run_main_menu(
         self: *Orchestrator,
     ) void
     {
@@ -172,7 +172,7 @@ pub const Orchestrator = struct {
 
     /// Run the UI for all active, UI-visible Activities, passing
     /// the current ViewInteraction.
-    pub fn runActivityUIs(
+    pub fn run_activity_uis(
         self: *Orchestrator,
         vi: *const MeshulaLab.ViewInteraction,
     ) void
@@ -196,7 +196,7 @@ pub const Orchestrator = struct {
     /// Run viewport hovering using the bidding system.
     /// Each active Activity with a ViewportHoverBid callback submits
     /// a bid; the highest bidder's ViewportHovering callback is invoked.
-    pub fn runViewportHovering(
+    pub fn run_viewport_hovering(
         self: *Orchestrator,
         vi: *const MeshulaLab.ViewInteraction,
     ) void
@@ -238,7 +238,7 @@ pub const Orchestrator = struct {
     /// Run viewport dragging using the bidding system.
     /// Each active Activity with a ViewportDragBid callback submits
     /// a bid; the highest bidder's ViewportDragging callback is invoked.
-    pub fn runViewportDragging(
+    pub fn run_viewport_dragging(
         self: *Orchestrator,
         vi: *const MeshulaLab.ViewInteraction,
     ) void
@@ -278,7 +278,7 @@ pub const Orchestrator = struct {
     }
 
     /// Run rendering for all active Activities that have a Render callback.
-    pub fn runActivityRendering(
+    pub fn run_activity_rendering(
         self: *Orchestrator,
         vi: *const MeshulaLab.ViewInteraction,
     ) void
@@ -301,7 +301,7 @@ pub const Orchestrator = struct {
 
     /// Unregister an Activity by name, removing it from the map.
     /// Returns the Activity pointer so the caller can destroy it.
-    pub fn unregisterActivity(
+    pub fn unregister_activity(
         self: *Orchestrator,
         activity_name: []const u8,
     ) ?*Activity
@@ -315,7 +315,7 @@ pub const Orchestrator = struct {
     }
 
     /// Find an Activity by name.
-    pub fn findActivity(
+    pub fn find_activity(
         self: *Orchestrator,
         activity_name: []const u8,
     ) ?*Activity
@@ -324,7 +324,7 @@ pub const Orchestrator = struct {
     }
 
     /// Find a Studio by name.
-    pub fn findStudio(
+    pub fn find_studio(
         self: *Orchestrator,
         studio_name: []const u8,
     ) ?*Studio
@@ -333,7 +333,7 @@ pub const Orchestrator = struct {
     }
 
     /// Get the currently active Studio, if any.
-    pub fn currentStudio(
+    pub fn current_studio(
         self: *const Orchestrator,
     ) ?*Studio
     {
@@ -341,7 +341,7 @@ pub const Orchestrator = struct {
     }
 
     /// Iterator over registered Studio names.
-    pub fn studioNames(
+    pub fn studio_names(
         self: *Orchestrator,
     ) NameIterator(StudioMap)
     {
@@ -349,7 +349,7 @@ pub const Orchestrator = struct {
     }
 
     /// Iterator over registered Activity names.
-    pub fn activityNames(
+    pub fn activity_names(
         self: *Orchestrator,
     ) NameIterator(ActivityMap)
     {
@@ -380,7 +380,7 @@ pub const Orchestrator = struct {
     /// Activate a specific Activity by name.
     /// No-op if the Activity is already active, to avoid
     /// double-calling the plugin's Activate callback.
-    pub fn activateActivity(
+    pub fn activate_activity(
         self: *Orchestrator,
         activity_name: [*:0]const u8,
     ) void
@@ -406,7 +406,7 @@ pub const Orchestrator = struct {
     /// Deactivate a specific Activity by name.
     /// No-op if the Activity is already inactive, to avoid
     /// double-calling the plugin's Deactivate callback.
-    pub fn deactivateActivity(
+    pub fn deactivate_activity(
         self: *Orchestrator,
         activity_name: [*:0]const u8,
     ) void
@@ -430,7 +430,7 @@ pub const Orchestrator = struct {
     }
 
     /// Toggle an Activity's active/visible state.
-    pub fn toggleActivity(
+    pub fn toggle_activity(
         self: *Orchestrator,
         activity_name: [*:0]const u8,
     ) void
@@ -441,11 +441,11 @@ pub const Orchestrator = struct {
         {
             if (activity.lab.active)
             {
-                self.deactivateActivity(activity_name);
+                self.deactivate_activity(activity_name);
             }
             else
             {
-                self.activateActivity(activity_name);
+                self.activate_activity(activity_name);
             }
         }
     }
@@ -454,7 +454,7 @@ pub const Orchestrator = struct {
     // Internal
     // ---------------------------------------------------------------
 
-    fn doActivateStudio(
+    fn do_activate_studio(
         self: *Orchestrator,
         studio_name: [*:0]const u8,
     ) void
@@ -466,7 +466,7 @@ pub const Orchestrator = struct {
         if (self.maybe_current_studio)
             |current|
         {
-            self.deactivateStudioActivities(current);
+            self.deactivate_studio_activities(current);
             current.lab.active = false;
         }
 
@@ -492,7 +492,7 @@ pub const Orchestrator = struct {
         self.maybe_current_studio = studio;
     }
 
-    fn deactivateStudioActivities(
+    fn deactivate_studio_activities(
         self: *Orchestrator,
         studio: *Studio,
     ) void

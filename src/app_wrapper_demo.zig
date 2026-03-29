@@ -205,7 +205,7 @@ fn draw() !void
 
             // Iterate active, UI-visible Activities and render each
             // as a tab
-            var it = ORCHESTRATOR.activeUIActivities();
+            var it = ORCHESTRATOR.active_ui_activities();
             while (it.next())
                 |activity|
             {
@@ -263,21 +263,21 @@ pub fn init() void
     // Initialize orchestrator and register Activities + Studio
     ORCHESTRATOR = MeshulaLab.Orchestrator.init(allocator);
 
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.undo_journal);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.plot);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.big_plot);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.stairs_plot);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.polygon_plot);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.inflines_pie);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.texture);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.canvas);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.json_pie);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.big_text);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.list_clipper);
-    ORCHESTRATOR.registerActivity(&ACTIVITIES.sortable_table);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.undo_journal);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.plot);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.big_plot);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.stairs_plot);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.polygon_plot);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.inflines_pie);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.texture);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.canvas);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.json_pie);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.big_text);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.list_clipper);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.sortable_table);
 
-    ORCHESTRATOR.registerStudio(&DEMO_STUDIO);
-    ORCHESTRATOR.activateStudio("ZIIS Demo Studio");
+    ORCHESTRATOR.register_studio(&DEMO_STUDIO);
+    ORCHESTRATOR.activate_studio("ZIIS Demo Studio");
 }
 
 pub fn main() !void

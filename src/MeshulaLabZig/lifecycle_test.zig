@@ -26,21 +26,21 @@ const MockState = struct {
     }
 };
 
-fn mockActivate(
+fn mock_activate(
     _: ?*anyopaque,
 ) callconv(.c) void
 {
     MockState.init_count += 1;
 }
 
-fn mockDeactivate(
+fn mock_deactivate(
     _: ?*anyopaque,
 ) callconv(.c) void
 {
     MockState.deinit_count += 1;
 }
 
-fn mockRunUI(
+fn mock_run_ui(
     _: ?*anyopaque,
     _: ?*const MeshulaLab.ViewInteraction,
 ) callconv(.c) void
@@ -49,21 +49,21 @@ fn mockRunUI(
 const MOCK_NAME: [*:0]const u8 = "MockActivity";
 
 /// Create a mock MeshulaLab.Activity as a plugin would.
-fn createMockCActivity(
+fn create_mock_c_activity(
     allocator: std.mem.Allocator,
 ) !*MeshulaLab.Activity
 {
     const act = try allocator.create(MeshulaLab.Activity);
     act.* = std.mem.zeroes(MeshulaLab.Activity);
     act.name = MOCK_NAME;
-    act.Activate = &mockActivate;
-    act.Deactivate = &mockDeactivate;
-    act.RunUI = &mockRunUI;
+    act.Activate = &mock_activate;
+    act.Deactivate = &mock_deactivate;
+    act.RunUI = &mock_run_ui;
     return act;
 }
 
 /// Destroy a mock activity as a plugin's DestroyActivity would.
-fn destroyMockCActivity(
+fn destroy_mock_c_activity(
     allocator: std.mem.Allocator,
     act: *MeshulaLab.Activity,
 ) void
@@ -72,8 +72,8 @@ fn destroyMockCActivity(
 }
 
 /// Wrap a C activity into a Zig Activity + register, mimicking
-/// FundamentalApp.loadActivitiesForPlugin.
-fn wrapAndRegister(
+/// FundamentalApp.load_activities_for_plugin.
+fn wrap_and_register(
     allocator: std.mem.Allocator,
     orchestrator: *Orchestrator,
     c_activity: *MeshulaLab.Activity,
@@ -84,13 +84,13 @@ fn wrapAndRegister(
         .lab = c_activity.*,
         .maybe_plugin_activity = c_activity,
     };
-    orchestrator.registerActivity(wrapper);
+    orchestrator.register_activity(wrapper);
     return wrapper;
 }
 
 /// Teardown a wrapper, mimicking
-/// FundamentalApp.teardownPluginActivities.
-fn teardownWrapper(
+/// FundamentalApp.teardown_plugin_activities.
+fn teardown_wrapper(
     allocator: std.mem.Allocator,
     orchestrator: *Orchestrator,
     wrapper: *Activity,
@@ -106,14 +106,14 @@ fn teardownWrapper(
         const nlen = @min(name_slice.len, name_buf.len - 1);
         @memcpy(name_buf[0..nlen], name_slice[0..nlen]);
         name_buf[nlen] = 0;
-        orchestrator.deactivateActivity(@ptrCast(&name_buf));
+        orchestrator.deactivate_activity(@ptrCast(&name_buf));
     }
 
     // Unregister
-    _ = orchestrator.unregisterActivity(name_slice);
+    _ = orchestrator.unregister_activity(name_slice);
 
     // Destroy C activity
-    destroyMockCActivity(allocator, c_activity);
+    destroy_mock_c_activity(allocator, c_activity);
 
     // Free wrapper
     allocator.destroy(wrapper);
@@ -131,25 +131,25 @@ test "Orchestrator: activate then deactivate"
     var orch = Orchestrator.init(allocator);
     defer orch.deinit();
 
-    const c_act = try createMockCActivity(allocator);
-    const wrapper = try wrapAndRegister(
+    const c_act = try create_mock_c_activity(allocator);
+    const wrapper = try wrap_and_register(
         allocator,
         &orch,
         c_act,
     );
 
     // Activate
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.init_count);
     try std.testing.expect(wrapper.lab.active);
 
     // Deactivate
-    orch.deactivateActivity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.deinit_count);
     try std.testing.expect(!wrapper.lab.active);
 
     // Cleanup
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
 }
 
 test "Orchestrator: double activate is no-op"
@@ -160,18 +160,18 @@ test "Orchestrator: double activate is no-op"
     var orch = Orchestrator.init(allocator);
     defer orch.deinit();
 
-    const c_act = try createMockCActivity(allocator);
-    const wrapper = try wrapAndRegister(
+    const c_act = try create_mock_c_activity(allocator);
+    const wrapper = try wrap_and_register(
         allocator,
         &orch,
         c_act,
     );
 
-    orch.activateActivity(MOCK_NAME);
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.init_count);
 
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
 }
 
 test "Orchestrator: double deactivate is no-op"
@@ -182,19 +182,19 @@ test "Orchestrator: double deactivate is no-op"
     var orch = Orchestrator.init(allocator);
     defer orch.deinit();
 
-    const c_act = try createMockCActivity(allocator);
-    const wrapper = try wrapAndRegister(
+    const c_act = try create_mock_c_activity(allocator);
+    const wrapper = try wrap_and_register(
         allocator,
         &orch,
         c_act,
     );
 
-    orch.activateActivity(MOCK_NAME);
-    orch.deactivateActivity(MOCK_NAME);
-    orch.deactivateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.deinit_count);
 
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
 }
 
 test "Orchestrator: deactivate without activate is no-op"
@@ -205,18 +205,18 @@ test "Orchestrator: deactivate without activate is no-op"
     var orch = Orchestrator.init(allocator);
     defer orch.deinit();
 
-    const c_act = try createMockCActivity(allocator);
-    const wrapper = try wrapAndRegister(
+    const c_act = try create_mock_c_activity(allocator);
+    const wrapper = try wrap_and_register(
         allocator,
         &orch,
         c_act,
     );
 
     // Activity starts inactive — deactivate should be a no-op
-    orch.deactivateActivity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 0), MockState.deinit_count);
 
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
 }
 
 test "Orchestrator: activate-deactivate-activate cycle"
@@ -227,24 +227,24 @@ test "Orchestrator: activate-deactivate-activate cycle"
     var orch = Orchestrator.init(allocator);
     defer orch.deinit();
 
-    const c_act = try createMockCActivity(allocator);
-    const wrapper = try wrapAndRegister(
+    const c_act = try create_mock_c_activity(allocator);
+    const wrapper = try wrap_and_register(
         allocator,
         &orch,
         c_act,
     );
 
     // Simulate: Load → Disable → Enable
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.init_count);
 
-    orch.deactivateActivity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.deinit_count);
 
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 2), MockState.init_count);
 
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
 }
 
 test "Orchestrator: unregister then re-register (simulate reload)"
@@ -256,38 +256,38 @@ test "Orchestrator: unregister then re-register (simulate reload)"
     defer orch.deinit();
 
     // First load
-    const c_act1 = try createMockCActivity(allocator);
-    const wrapper1 = try wrapAndRegister(
+    const c_act1 = try create_mock_c_activity(allocator);
+    const wrapper1 = try wrap_and_register(
         allocator,
         &orch,
         c_act1,
     );
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.init_count);
 
     // Teardown (simulate unload)
-    teardownWrapper(allocator, &orch, wrapper1, c_act1);
+    teardown_wrapper(allocator, &orch, wrapper1, c_act1);
     try std.testing.expectEqual(@as(u32, 1), MockState.deinit_count);
-    try std.testing.expect(orch.findActivity("MockActivity") == null);
+    try std.testing.expect(orch.find_activity("MockActivity") == null);
 
     // Second load (simulate reload)
-    const c_act2 = try createMockCActivity(allocator);
-    const wrapper2 = try wrapAndRegister(
+    const c_act2 = try create_mock_c_activity(allocator);
+    const wrapper2 = try wrap_and_register(
         allocator,
         &orch,
         c_act2,
     );
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 2), MockState.init_count);
 
     // Disable then enable after reload
-    orch.deactivateActivity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 2), MockState.deinit_count);
 
-    orch.activateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 3), MockState.init_count);
 
-    teardownWrapper(allocator, &orch, wrapper2, c_act2);
+    teardown_wrapper(allocator, &orch, wrapper2, c_act2);
 }
 
 test "Orchestrator: teardown inactive activity skips deactivate"
@@ -298,20 +298,20 @@ test "Orchestrator: teardown inactive activity skips deactivate"
     var orch = Orchestrator.init(allocator);
     defer orch.deinit();
 
-    const c_act = try createMockCActivity(allocator);
-    const wrapper = try wrapAndRegister(
+    const c_act = try create_mock_c_activity(allocator);
+    const wrapper = try wrap_and_register(
         allocator,
         &orch,
         c_act,
     );
 
     // Activate then disable (deactivate)
-    orch.activateActivity(MOCK_NAME);
-    orch.deactivateActivity(MOCK_NAME);
+    orch.activate_activity(MOCK_NAME);
+    orch.deactivate_activity(MOCK_NAME);
     try std.testing.expectEqual(@as(u32, 1), MockState.deinit_count);
 
     // Teardown should NOT call deactivate again
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
     try std.testing.expectEqual(@as(u32, 1), MockState.deinit_count);
 }
 
@@ -373,7 +373,7 @@ const ALL_ACTIVITY_SPECS = [_]ActivitySpec{
     .{ .name = "TextureDemoActivity", .variant = .stateful_update },
 };
 
-fn mockCountingActivate(
+fn mock_counting_activate(
     instance: ?*anyopaque,
 ) callconv(.c) void
 {
@@ -381,7 +381,7 @@ fn mockCountingActivate(
     counters.activate_count += 1;
 }
 
-fn mockCountingDeactivate(
+fn mock_counting_deactivate(
     instance: ?*anyopaque,
 ) callconv(.c) void
 {
@@ -389,7 +389,7 @@ fn mockCountingDeactivate(
     counters.deactivate_count += 1;
 }
 
-fn mockCountingUpdate(
+fn mock_counting_update(
     instance: ?*anyopaque,
     _: f32,
 ) callconv(.c) void
@@ -398,7 +398,7 @@ fn mockCountingUpdate(
     counters.update_count += 1;
 }
 
-fn mockCountingRunUI(
+fn mock_counting_run_ui(
     instance: ?*anyopaque,
     _: ?*const MeshulaLab.ViewInteraction,
 ) callconv(.c) void
@@ -409,7 +409,7 @@ fn mockCountingRunUI(
 
 /// Create a C activity with callbacks matching the given variant,
 /// wired to write into the supplied counters.
-fn createVariantCActivity(
+fn create_variant_c_activity(
     allocator: std.mem.Allocator,
     activity_name: [*:0]const u8,
     variant: ActivityVariant,
@@ -420,26 +420,26 @@ fn createVariantCActivity(
     act.* = std.mem.zeroes(MeshulaLab.Activity);
     act.name = activity_name;
     act.instance = @ptrCast(counters);
-    act.RunUI = &mockCountingRunUI;
+    act.RunUI = &mock_counting_run_ui;
 
     switch (variant) {
         .stateless => {},
         .stateful =>
         {
-            act.Activate = &mockCountingActivate;
-            act.Deactivate = &mockCountingDeactivate;
+            act.Activate = &mock_counting_activate;
+            act.Deactivate = &mock_counting_deactivate;
         },
         .stateful_update =>
         {
-            act.Activate = &mockCountingActivate;
-            act.Update = &mockCountingUpdate;
+            act.Activate = &mock_counting_activate;
+            act.Update = &mock_counting_update;
         },
     }
     return act;
 }
 
 /// Run the full lifecycle gauntlet for a single activity spec.
-fn runLifecycleForSpec(
+fn run_lifecycle_for_spec(
     allocator: std.mem.Allocator,
     spec: ActivitySpec,
 ) !void
@@ -449,17 +449,17 @@ fn runLifecycleForSpec(
     defer orch.deinit();
 
     // --- Create and register ---
-    const c_act = try createVariantCActivity(
+    const c_act = try create_variant_c_activity(
         allocator,
         spec.name,
         spec.variant,
         &counters,
     );
-    const wrapper = try wrapAndRegister(allocator, &orch, c_act);
+    const wrapper = try wrap_and_register(allocator, &orch, c_act);
     try std.testing.expect(!wrapper.lab.active);
 
     // --- Activate ---
-    orch.activateActivity(spec.name);
+    orch.activate_activity(spec.name);
     try std.testing.expect(wrapper.lab.active);
     try std.testing.expect(wrapper.lab.uiVisible);
 
@@ -475,7 +475,7 @@ fn runLifecycleForSpec(
     }
 
     // --- Double activate is idempotent ---
-    orch.activateActivity(spec.name);
+    orch.activate_activity(spec.name);
     switch (spec.variant) {
         .stateless => {},
         .stateful, .stateful_update =>
@@ -496,7 +496,7 @@ fn runLifecycleForSpec(
     }
 
     // --- Deactivate ---
-    orch.deactivateActivity(spec.name);
+    orch.deactivate_activity(spec.name);
     try std.testing.expect(!wrapper.lab.active);
     try std.testing.expect(!wrapper.lab.uiVisible);
 
@@ -510,37 +510,37 @@ fn runLifecycleForSpec(
     }
 
     // --- Double deactivate is idempotent ---
-    orch.deactivateActivity(spec.name);
+    orch.deactivate_activity(spec.name);
     if (spec.variant == .stateful)
     {
         try std.testing.expectEqual(@as(u32, 1), counters.deactivate_count);
     }
 
     // --- Toggle on (re-activate) ---
-    orch.toggleActivity(spec.name);
+    orch.toggle_activity(spec.name);
     try std.testing.expect(wrapper.lab.active);
 
     // --- Toggle off (deactivate again) ---
-    orch.toggleActivity(spec.name);
+    orch.toggle_activity(spec.name);
     try std.testing.expect(!wrapper.lab.active);
 
     // --- Unregister then re-register (simulate plugin reload) ---
-    _ = orch.unregisterActivity(std.mem.span(spec.name));
+    _ = orch.unregister_activity(std.mem.span(spec.name));
     try std.testing.expect(
-        orch.findActivity(std.mem.span(spec.name)) == null,
+        orch.find_activity(std.mem.span(spec.name)) == null,
     );
 
-    orch.registerActivity(wrapper);
+    orch.register_activity(wrapper);
     try std.testing.expect(
-        orch.findActivity(std.mem.span(spec.name)) != null,
+        orch.find_activity(std.mem.span(spec.name)) != null,
     );
 
     // Activate after reload
-    orch.activateActivity(spec.name);
+    orch.activate_activity(spec.name);
     try std.testing.expect(wrapper.lab.active);
 
     // --- Teardown ---
-    teardownWrapper(allocator, &orch, wrapper, c_act);
+    teardown_wrapper(allocator, &orch, wrapper, c_act);
 }
 
 test "Orchestrator: lifecycle for each stateless activity"
@@ -551,7 +551,7 @@ test "Orchestrator: lifecycle for each stateless activity"
     {
         if (spec.variant == .stateless)
         {
-            try runLifecycleForSpec(allocator, spec);
+            try run_lifecycle_for_spec(allocator, spec);
         }
     }
 }
@@ -564,7 +564,7 @@ test "Orchestrator: lifecycle for each stateful activity"
     {
         if (spec.variant == .stateful)
         {
-            try runLifecycleForSpec(allocator, spec);
+            try run_lifecycle_for_spec(allocator, spec);
         }
     }
 }
@@ -577,7 +577,7 @@ test "Orchestrator: lifecycle for each stateful+update activity"
     {
         if (spec.variant == .stateful_update)
         {
-            try runLifecycleForSpec(allocator, spec);
+            try run_lifecycle_for_spec(allocator, spec);
         }
     }
 }
@@ -593,20 +593,20 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         var orch = Orchestrator.init(allocator);
         defer orch.deinit();
 
-        const c_act = try createVariantCActivity(
+        const c_act = try create_variant_c_activity(
             allocator,
             spec.name,
             spec.variant,
             &counters,
         );
-        const wrapper = try wrapAndRegister(
+        const wrapper = try wrap_and_register(
             allocator,
             &orch,
             c_act,
         );
 
         // --- Activate ---
-        orch.activateActivity(spec.name);
+        orch.activate_activity(spec.name);
         try std.testing.expect(wrapper.lab.active);
         try std.testing.expect(wrapper.lab.uiVisible);
 
@@ -617,7 +617,7 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         try std.testing.expectEqual(expect_activate, counters.activate_count);
 
         // --- Deactivate ---
-        orch.deactivateActivity(spec.name);
+        orch.deactivate_activity(spec.name);
         try std.testing.expect(!wrapper.lab.active);
         try std.testing.expect(!wrapper.lab.uiVisible);
 
@@ -631,7 +631,7 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         );
 
         // --- Re-activate ---
-        orch.activateActivity(spec.name);
+        orch.activate_activity(spec.name);
         try std.testing.expect(wrapper.lab.active);
         try std.testing.expect(wrapper.lab.uiVisible);
 
@@ -652,7 +652,7 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         }
 
         // --- Final deactivate ---
-        orch.deactivateActivity(spec.name);
+        orch.deactivate_activity(spec.name);
         try std.testing.expect(!wrapper.lab.active);
         try std.testing.expectEqual(
             expect_deactivate * 2,
@@ -660,7 +660,7 @@ test "Orchestrator: activate-deactivate-reactivate for every activity"
         );
 
         // --- Teardown (already inactive, should not fire deactivate) ---
-        teardownWrapper(allocator, &orch, wrapper, c_act);
+        teardown_wrapper(allocator, &orch, wrapper, c_act);
         try std.testing.expectEqual(
             expect_deactivate * 2,
             counters.deactivate_count,
@@ -686,13 +686,13 @@ test "Orchestrator: all activities coexist in one orchestrator"
         |spec, i|
     {
         counters[i] = .{};
-        c_activities[i] = try createVariantCActivity(
+        c_activities[i] = try create_variant_c_activity(
             allocator,
             spec.name,
             spec.variant,
             &counters[i],
         );
-        wrappers[i] = try wrapAndRegister(
+        wrappers[i] = try wrap_and_register(
             allocator,
             &orch,
             c_activities[i],
@@ -703,7 +703,7 @@ test "Orchestrator: all activities coexist in one orchestrator"
     for (ALL_ACTIVITY_SPECS)
         |spec|
     {
-        orch.activateActivity(spec.name);
+        orch.activate_activity(spec.name);
     }
 
     // Service one tick
@@ -742,7 +742,7 @@ test "Orchestrator: all activities coexist in one orchestrator"
     for (ALL_ACTIVITY_SPECS)
         |spec|
     {
-        orch.deactivateActivity(spec.name);
+        orch.deactivate_activity(spec.name);
     }
 
     // Teardown all
@@ -750,7 +750,7 @@ test "Orchestrator: all activities coexist in one orchestrator"
         |_, i|
     {
         const idx = ALL_ACTIVITY_SPECS.len - 1 - i;
-        teardownWrapper(
+        teardown_wrapper(
             allocator,
             &orch,
             wrappers[idx],

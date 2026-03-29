@@ -50,7 +50,7 @@ pub const Studio = struct {
     }
 
     /// Check if the Studio is currently active.
-    pub fn isActive(
+    pub fn is_active(
         self: *const Studio,
     ) bool
     {
@@ -79,7 +79,7 @@ pub const Studio = struct {
         instance: ?*anyopaque,
     ) callconv(.c) c_int
     {
-        const studio = studioFromInstance(instance) orelse return 0;
+        const studio = studio_from_instance(instance) orelse return 0;
         return @intCast(studio.configs.len);
     }
 
@@ -88,7 +88,7 @@ pub const Studio = struct {
         index: c_int,
     ) callconv(.c) ?*const MeshulaLab.ActivityConfig
     {
-        const studio = studioFromInstance(instance) orelse return null;
+        const studio = studio_from_instance(instance) orelse return null;
         const i: usize = @intCast(index);
         if (i >= studio.configs.len)
         {
@@ -113,7 +113,7 @@ pub const Studio = struct {
         return true;
     }
 
-    fn studioFromInstance(
+    fn studio_from_instance(
         instance: ?*anyopaque,
     ) ?*const Studio
     {
