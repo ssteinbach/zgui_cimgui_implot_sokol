@@ -52,8 +52,12 @@ pub const FundamentalApp = struct {
     suspend_power_save: i32 = 0,
     should_terminate: bool = false,
     was_dragging: bool = false,
-    show_plugin_manager: bool = false,
     allocator: std.mem.Allocator,
+
+    show_plugin_manager: bool = false,
+    show_demo_studio: bool = false,
+    show_imgui_demo: bool = false,
+    show_implot_demo: bool = false,
 
     // User-provided callbacks
     maybe_post_zgui_init: ?*const fn () void = null,
@@ -630,6 +634,7 @@ pub const FundamentalApp = struct {
         {
             self.draw_studio_menu();
             self.draw_activities_menu();
+            self.draw_help_menu();
             self.orchestrator.run_main_menu();
             if (ENABLE_DOCKING)
             {
@@ -652,6 +657,21 @@ pub const FundamentalApp = struct {
         if (self.show_plugin_manager)
         {
             self.draw_plugin_manager_window();
+        }
+
+        if (self.show_demo_studio)
+        {
+            self.draw_demo_studio_window();
+        }
+        
+        if (self.show_imgui_demo)
+        {
+            zgui.showDemoWindow(&self.show_imgui_demo);
+        }
+
+        if (self.show_implot_demo)
+        {
+            zgui.plot.showDemoWindow(&self.show_implot_demo);
         }
     }
 
@@ -745,6 +765,7 @@ pub const FundamentalApp = struct {
             }
             zgui.endMenu();
         }
+
     }
 
     fn draw_activities_menu(
@@ -824,6 +845,49 @@ pub const FundamentalApp = struct {
         }
     }
 
+    fn draw_help_menu(
+        self: *@This(),
+    ) void
+    {
+        // help menu
+        if (zgui.beginMenu("Help", true))
+        {
+            defer zgui.endMenu();
+
+            if (
+                zgui.menuItem(
+                    "ZIIS Demo Studio",
+                    .{ .selected = self.show_demo_studio },
+                )
+            )
+            {
+                self.show_demo_studio = !self.show_demo_studio;
+            }
+
+            zgui.separator();
+
+            if (
+                zgui.menuItem(
+                    "ImGui Demo Page",
+                    .{ .selected = self.show_imgui_demo },
+                )
+            )
+            {
+                self.show_imgui_demo = !self.show_imgui_demo;
+            }
+
+            if (
+                zgui.menuItem(
+                    "ImPlot Demo Page",
+                    .{ .selected = self.show_implot_demo },
+                )
+            )
+            {
+                self.show_implot_demo = !self.show_implot_demo;
+            }
+        }
+    }
+
     // -----------------------------------------------------------------
     // Floating windows
     // -----------------------------------------------------------------
@@ -852,6 +916,76 @@ pub const FundamentalApp = struct {
                 @ptrCast(self),
                 null,
             );
+        }
+        zgui.end();
+    }
+
+    fn draw_demo_studio_window(
+        self: *FundamentalApp,
+    ) void
+    {
+        zgui.setNextWindowSize(
+            .{
+                .w = 800,
+                .h = 500,
+                .cond = .first_use_ever,
+            },
+        );
+        if (
+            zgui.begin(
+                "Demo Studio###DemoStd",
+                .{
+                    .popen = &self.show_demo_studio,
+                },
+            )
+        )
+        {
+            // XXX
+            if (self.orchestrator.find_studio("DemoStudio"))
+                |studio|
+            {
+                if (zgui.beginTabBar("Demo Activities", .{}))
+                {
+                    defer zgui.endTabBar();
+
+                    for (studio.configs)
+                        |activity_config|
+                    {
+                        const act_name = (
+                            std.mem.span(activity_config.name)
+                        );
+                        if (self.orchestrator.find_activity(act_name))
+                            |activity|
+                        {
+                            const BUFLEN = 256;
+                            var name_buf:[BUFLEN:0]u8 = undefined;
+                            const name_z = std.fmt.bufPrintZ(
+                                &name_buf,
+                                "{s}",
+                                .{ act_name[0..@min(BUFLEN, act_name.len)] },
+                            ) catch unreachable;
+
+                            if (zgui.beginTabItem(name_z, .{}))
+                            {
+                                defer zgui.endTabItem();
+
+                                if (activity.lab.RunUI)
+                                    |run_ui_fn|
+                                {
+                                    run_ui_fn(activity.lab.instance, null);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else 
+            {
+                zgui.text(
+                    "Unable to find the Demo Studio - check logs?",
+                    .{}
+                );
+            }
         }
         zgui.end();
     }
