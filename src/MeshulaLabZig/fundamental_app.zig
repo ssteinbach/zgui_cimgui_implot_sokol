@@ -54,10 +54,12 @@ pub const FundamentalApp = struct {
     was_dragging: bool = false,
     allocator: std.mem.Allocator,
 
-    show_plugin_manager: bool = false,
-    show_demo_studio: bool = false,
-    show_imgui_demo: bool = false,
-    show_implot_demo: bool = false,
+    show: struct {
+        plugin_manager: bool = false,
+        demo_studio: bool = false,
+        imgui_demo: bool = false,
+        implot_demo: bool = false,
+    } = .{},
 
     // User-provided callbacks
     maybe_post_zgui_init: ?*const fn () void = null,
@@ -654,24 +656,24 @@ pub const FundamentalApp = struct {
         }
 
         // --- Floating windows ---
-        if (self.show_plugin_manager)
+        if (self.show.plugin_manager)
         {
             self.draw_plugin_manager_window();
         }
 
-        if (self.show_demo_studio)
+        if (self.show.demo_studio)
         {
             self.draw_demo_studio_window();
         }
         
-        if (self.show_imgui_demo)
+        if (self.show.imgui_demo)
         {
-            zgui.showDemoWindow(&self.show_imgui_demo);
+            zgui.showDemoWindow(&self.show.imgui_demo);
         }
 
-        if (self.show_implot_demo)
+        if (self.show.implot_demo)
         {
-            zgui.plot.showDemoWindow(&self.show_implot_demo);
+            zgui.plot.showDemoWindow(&self.show.implot_demo);
         }
     }
 
@@ -751,11 +753,11 @@ pub const FundamentalApp = struct {
             if (
                 zgui.menuItem(
                     "Plugin Manager",
-                    .{ .selected = self.show_plugin_manager },
+                    .{ .selected = self.show.plugin_manager },
                 )
             )
             {
-                self.show_plugin_manager = !self.show_plugin_manager;
+                self.show.plugin_manager = !self.show.plugin_manager;
             }
             zgui.separator();
             if (zgui.menuItem("Quit", .{}))
@@ -857,11 +859,11 @@ pub const FundamentalApp = struct {
             if (
                 zgui.menuItem(
                     "ZIIS Demo Studio",
-                    .{ .selected = self.show_demo_studio },
+                    .{ .selected = self.show.demo_studio },
                 )
             )
             {
-                self.show_demo_studio = !self.show_demo_studio;
+                self.show.demo_studio = !self.show.demo_studio;
             }
 
             zgui.separator();
@@ -869,21 +871,21 @@ pub const FundamentalApp = struct {
             if (
                 zgui.menuItem(
                     "ImGui Demo Page",
-                    .{ .selected = self.show_imgui_demo },
+                    .{ .selected = self.show.imgui_demo },
                 )
             )
             {
-                self.show_imgui_demo = !self.show_imgui_demo;
+                self.show.imgui_demo = !self.show.imgui_demo;
             }
 
             if (
                 zgui.menuItem(
                     "ImPlot Demo Page",
-                    .{ .selected = self.show_implot_demo },
+                    .{ .selected = self.show.implot_demo },
                 )
             )
             {
-                self.show_implot_demo = !self.show_implot_demo;
+                self.show.implot_demo = !self.show.implot_demo;
             }
         }
     }
@@ -907,7 +909,7 @@ pub const FundamentalApp = struct {
             zgui.begin(
                 "Plugin Manager###PluginMgr",
                 .{
-                    .popen = &self.show_plugin_manager,
+                    .popen = &self.show.plugin_manager,
                 },
             )
         )
@@ -935,7 +937,7 @@ pub const FundamentalApp = struct {
             zgui.begin(
                 "Demo Studio###DemoStd",
                 .{
-                    .popen = &self.show_demo_studio,
+                    .popen = &self.show.demo_studio,
                 },
             )
         )
