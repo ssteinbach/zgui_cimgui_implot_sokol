@@ -335,10 +335,6 @@ pub fn init() void
     ORCHESTRATOR.register_activity(&ACTIVITIES.file_dialog);
     ORCHESTRATOR.register_activity(&ACTIVITIES.layout_demo);
 
-    // Give the layout demo access to the orchestrator so it can
-    // inspect the active studio's layout spec and panel assignments.
-    activities.layout_demo.setOrchestrator(&ORCHESTRATOR);
-
     ORCHESTRATOR.register_studio(&DEMO_STUDIO);
     ORCHESTRATOR.register_studio(&LAYOUT_STUDIO);
     ORCHESTRATOR.activate_studio("ZIIS Demo Studio");

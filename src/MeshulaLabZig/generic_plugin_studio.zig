@@ -47,8 +47,8 @@ const STUDIO_ACTIVITIES = blk:
         configs[i] = .{
             .name = entry.name,
             .uiInitiallyVisible = entry.initially_visible,
-            .panelId = null,
-            .windowName = null,
+            .panelId = entry.panel_id,
+            .windowName = entry.window_name,
         };
     }
     break :blk configs;

@@ -10,6 +10,9 @@ const Activity = @import("activity.zig").Activity;
 const Studio = @import("studio.zig").Studio;
 const ActivityConfig = @import("studio.zig").ActivityConfig;
 
+/// Internal buffer size for studio names to bridge into the c-api.
+const STUDIO_NAME_BUF_SIZE = 1024;
+
 pub const Orchestrator = struct {
     activities: ActivityMap,
     studios: StudioMap,
@@ -17,7 +20,7 @@ pub const Orchestrator = struct {
     allocator: std.mem.Allocator,
 
     // Deferred activation
-    maybe_pending_studio: ?[*:0]const u8 = null,
+    maybe_pending_studio: ?[]const u8 = null,
 
     const ActivityMap = std.StringHashMapUnmanaged(*Activity);
     const StudioMap = std.StringHashMapUnmanaged(*Studio);
@@ -77,9 +80,17 @@ pub const Orchestrator = struct {
     /// Activation is deferred until the next `service()` call.
     pub fn activate_studio(
         self: *Orchestrator,
-        studio_name: [*:0]const u8,
+        studio_name: []const u8,
     ) void
     {
+        if (studio_name.len > STUDIO_NAME_BUF_SIZE)
+        {
+            std.log.err(
+                "Studio name is too long to activate: {s} ({d}, max: {d})",
+                .{ studio_name, studio_name.len, STUDIO_NAME_BUF_SIZE },
+            );
+            return;
+        }
         self.maybe_pending_studio = studio_name;
     }
 
@@ -94,7 +105,16 @@ pub const Orchestrator = struct {
         if (self.maybe_pending_studio)
             |pending_name|
         {
-            self.do_activate_studio(pending_name);
+            std.log.info("Attempting to start {s}", .{pending_name});
+            var name_buf: [1024:0]u8 = undefined;
+            const name_z = std.fmt.bufPrintZ(
+                &name_buf,
+                "{s}",
+                .{pending_name},
+                // the error for this was checked earlier in activating the
+                // service
+            ) catch unreachable;
+            self.do_activate_studio(name_z);
             self.maybe_pending_studio = null;
         }
 

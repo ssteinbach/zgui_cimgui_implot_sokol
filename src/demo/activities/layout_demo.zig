@@ -1,131 +1,112 @@
 //! Layout Demo Activity
 //!
-//! Shows the current studio's LabLayout spec and panel assignments,
-//! demonstrating that layout data flows through the C API.
+//! Demonstrates the LabLayout panel system. When this activity runs
+//! inside the LayoutDemoStudio, the studio's LAYOUT_SPEC arranges
+//! windows into named panels. The activity displays the expected
+//! layout structure so the user can verify it matches what they see.
 
-const std = @import("std");
 const MeshulaLab = @import("MeshulaLab");
-const MeshulaLabZig = @import("MeshulaLabZig");
 const ziis = @import("zgui_cimgui_implot_sokol");
 const zgui = ziis.zgui;
-
-var maybe_orchestrator: ?*MeshulaLabZig.Orchestrator = null;
-
-pub fn setOrchestrator(
-    orch: *MeshulaLabZig.Orchestrator,
-) void
-{
-    maybe_orchestrator = orch;
-}
 
 pub fn runUI(
     _: ?*anyopaque,
     _: ?*const MeshulaLab.ViewInteraction,
 ) callconv(.c) void
 {
-    zgui.textUnformatted("LabLayout Data Plumbing Demo");
+    zgui.textUnformatted("LabLayout Panel Demo");
     zgui.separator();
+    zgui.spacing();
 
-    const orch = maybe_orchestrator orelse
-    {
-        zgui.textUnformatted("No orchestrator set.");
-        return;
-    };
+    zgui.textUnformatted("Expected Layout Structure:");
+    zgui.spacing();
 
-    // Show current studio info
-    if (orch.maybe_current_studio)
-        |studio|
-    {
-        zgui.text(
-            "Active Studio: {s}",
-            .{std.mem.span(studio.lab.name)},
-        );
+    zgui.indent(.{});
+    zgui.textWrapped("{s}", .{LAYOUT_DESCRIPTION});
+    zgui.unindent(.{});
 
-        // Show layout spec
-        zgui.spacing();
-        zgui.textUnformatted("Layout Spec:");
-        if (studio.layout_spec)
-            |spec|
-        {
-            zgui.indent(.{});
-            zgui.textWrapped(
-                "{s}",
-                .{std.mem.span(spec)},
-            );
-            zgui.unindent(.{});
-        }
-        else
-        {
-            zgui.indent(.{});
-            zgui.textDisabled("{s}", .{"(none — using default ImGui layout)"});
-            zgui.unindent(.{});
-        }
+    zgui.spacing();
+    zgui.separator();
+    zgui.spacing();
 
-        // Show activity panel assignments
-        zgui.spacing();
-        zgui.textUnformatted("Activity Panel Assignments:");
+    zgui.textUnformatted("Panel Assignments:");
+    zgui.spacing();
 
-        if (
-            zgui.beginTable(
-                "##panels",
-                .{
-                    .column = 3,
-                    .flags = .{
-                        .row_bg = true,
-                        .borders = .{
-                            .inner_h = true,
-                            .inner_v = true,
-                            .outer_h = true,
-                            .outer_v = true,
-                        },
+    if (
+        zgui.beginTable(
+            "##panels",
+            .{
+                .column = 3,
+                .flags = .{
+                    .row_bg = true,
+                    .borders = .{
+                        .inner_h = true,
+                        .inner_v = true,
+                        .outer_h = true,
+                        .outer_v = true,
                     },
                 },
-            )
+            },
         )
+    )
+    {
+        defer zgui.endTable();
+        zgui.tableSetupColumn("Activity", .{});
+        zgui.tableSetupColumn("Panel", .{});
+        zgui.tableSetupColumn("Window", .{});
+        zgui.tableHeadersRow();
+
+        for (PANEL_ENTRIES)
+            |entry|
         {
-            defer zgui.endTable();
-            zgui.tableSetupColumn("Activity", .{});
-            zgui.tableSetupColumn("Panel ID", .{});
-            zgui.tableSetupColumn("Window Name", .{});
-            zgui.tableHeadersRow();
+            zgui.tableNextRow(.{});
 
-            for (studio.configs)
-                |cfg|
-            {
-                zgui.tableNextRow(.{});
+            _ = zgui.tableNextColumn();
+            zgui.textUnformatted(entry.activity);
 
-                _ = zgui.tableNextColumn();
-                zgui.text(
-                    "{s}",
-                    .{std.mem.span(cfg.name)},
-                );
+            _ = zgui.tableNextColumn();
+            zgui.textUnformatted(entry.panel);
 
-                _ = zgui.tableNextColumn();
-                if (cfg.panel_id)
-                    |pid|
-                {
-                    zgui.text("{s}", .{std.mem.span(pid)});
-                }
-                else
-                {
-                    zgui.textDisabled("{s}", .{"(none)"});
-                }
-
-                _ = zgui.tableNextColumn();
-                if (cfg.window_name)
-                    |wn|
-                {
-                    zgui.text("{s}", .{std.mem.span(wn)});
-                }
-                else
-                {
-                    zgui.textDisabled("{s}", .{"(none)"});
-                }
-            }
+            _ = zgui.tableNextColumn();
+            zgui.textUnformatted(entry.window);
         }
     }
-    else
-    {
-        zgui.textUnformatted("No studio active.");
-    }
+
+    zgui.spacing();
+    zgui.textDisabled(
+        "{s}",
+        .{"Activate the LayoutDemoStudio to see this layout applied."},
+    );
 }
+
+const PanelEntry = struct {
+    activity: []const u8,
+    panel: []const u8,
+    window: []const u8,
+};
+
+const PANEL_ENTRIES = [_]PanelEntry{
+    .{
+        .activity = "LayoutDemoActivity",
+        .panel = "main-panel",
+        .window = "Layout Inspector",
+    },
+    .{
+        .activity = "PlotDemoActivity",
+        .panel = "sidebar-panel",
+        .window = "Plot",
+    },
+    .{
+        .activity = "FileDialogActivity",
+        .panel = "bottom-panel",
+        .window = "File Dialog",
+    },
+};
+
+const LAYOUT_DESCRIPTION =
+    \\root (horizontal)
+    \\  main-panel (grow, grow)
+    \\  right-area (vertical, fixed 400px)
+    \\    sidebar-panel (grow, grow)
+    \\    bottom-panel (grow, fixed 200px)
+;

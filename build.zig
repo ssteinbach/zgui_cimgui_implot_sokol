@@ -651,6 +651,16 @@ pub fn build(
                 .provenance = "ZIIS",
             },
         );
+
+        pb.add_studio(
+            "studio_layout_demo",
+            b.path("src/demo/studios/layout_demo_config.zig"),
+            .{
+                .studio_name = "LayoutDemoStudio",
+                .plugin_name = "LayoutDemoStudioPlugin",
+                .provenance = "ZIIS",
+            },
+        );
     }
 }
 

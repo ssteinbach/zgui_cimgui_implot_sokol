@@ -3,6 +3,8 @@
 pub const ActivityEntry = struct {
     name: [*:0]const u8,
     initially_visible: bool = true,
+    panel_id: ?[*:0]const u8 = null,
+    window_name: ?[*:0]const u8 = null,
 };
 
 pub const ACTIVITIES = [_]ActivityEntry{

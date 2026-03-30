@@ -183,7 +183,7 @@ pub const FundamentalApp = struct {
 
     pub fn activate_studio(
         self: *FundamentalApp,
-        studio_name: [*:0]const u8,
+        studio_name: []const u8,
     ) void
     {
         self.orchestrator.activate_studio(studio_name);
@@ -737,16 +737,8 @@ pub const FundamentalApp = struct {
                 {
                     if (!is_active)
                     {
-                        // Need sentinel-terminated for orchestrator
-                        var act_buf: [256:0]u8 = undefined;
-                        @memcpy(
-                            act_buf[0..nlen],
-                            name[0..nlen],
-                        );
-                        act_buf[nlen] = 0;
-                        self.orchestrator.activate_studio(
-                            @ptrCast(&act_buf),
-                        );
+                        self.orchestrator.activate_studio(name);
+                        std.log.info("Activating studio {s}", .{name});
                     }
                 }
             }
