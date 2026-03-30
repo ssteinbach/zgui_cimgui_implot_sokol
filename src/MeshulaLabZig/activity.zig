@@ -54,9 +54,14 @@ pub const Activity = struct {
         viewport_dragging: ?RunUIFn = null,
     };
 
+    /// The ViewInteraction pointer type used in RunUI/Render callbacks.
+    /// Use this to write conforming signatures without importing the
+    /// C MeshulaLab module directly.
+    pub const RunUIArg = ?*const MeshulaLab.ViewInteraction;
+
     pub const RunUIFn = *const fn (
         ?*anyopaque,
-        ?*const MeshulaLab.ViewInteraction,
+        RunUIArg,
     ) callconv(.c) void;
 
     pub const UpdateFn = *const fn (

@@ -1,34 +1,57 @@
-//! Studio Plugin: DemoStudio
+//! Generic Studio Plugin
 //!
-//! Exports a LabPluginDescriptor providing one Studio.
-//! Edit STUDIO_ACTIVITIES to declare which activities belong
-//! in this studio.
+//! Comptime-generated plugin boilerplate for a single Studio.
+//! Build options select the studio name, plugin name, and provenance.
+//! The `studio_config` module must provide:
+//!
+//!   pub const ACTIVITIES: []const ActivityConfig
+//!
+//! Where ActivityConfig is a struct with fields:
+//!   name: [*:0]const u8
+//!   initially_visible: bool  (default true)
+//!
+//! Optional declarations detected via @hasDecl on studio_config:
+//!
+//!   pub const MUST_DEACTIVATE_UNRELATED: bool
+//!   pub const LAYOUT_SPEC: [*:0]const u8
 
 const std = @import("std");
 const MeshulaLab = @import("MeshulaLab");
+const options = @import("studio_plugin_options");
 
-const PLUGIN_NAME = "DemoStudioPlugin";
-const PLUGIN_VERSION = "1.0.0";
-const PROVENANCE = "ZIIS";
-const STUDIO_NAME: [*c]const u8 = "DemoStudio";
+const studio_config = @import("studio_config");
+
+const STUDIO_NAME = @as(
+    [*:0]const u8,
+    @ptrCast(options.studio_name.ptr),
+);
+const PLUGIN_NAME = @as(
+    [*:0]const u8,
+    @ptrCast(options.plugin_name.ptr),
+);
+const PROVENANCE = @as(
+    [*:0]const u8,
+    @ptrCast(options.provenance.ptr),
+);
 
 // -----------------------------------------------------------------
-// Studio activity configuration — add your activities here
+// Build the C-compatible activity config array at comptime
 // -----------------------------------------------------------------
 
-const STUDIO_ACTIVITIES = [_]MeshulaLab.ActivityConfig{
-    .{ .name = "UndoJournalDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "PlotDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "BigPlotDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "StairsPlotDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "PolygonPlotDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "InfLinesPieChartDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "TextureDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "CanvasDrawingDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "JSONPieChartDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "BigTextDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "ListClipperDemoActivity", .uiInitiallyVisible = true },
-    .{ .name = "SortableTableDemoActivity", .uiInitiallyVisible = true },
+const STUDIO_ACTIVITIES = blk:
+{
+    var configs: [studio_config.ACTIVITIES.len]MeshulaLab.ActivityConfig = undefined;
+    for (studio_config.ACTIVITIES, 0..)
+        |entry, i|
+    {
+        configs[i] = .{
+            .name = entry.name,
+            .uiInitiallyVisible = entry.initially_visible,
+            .panelId = null,
+            .windowName = null,
+        };
+    }
+    break :blk configs;
 };
 
 // -----------------------------------------------------------------
@@ -52,7 +75,7 @@ fn getPluginName() callconv(.c) [*c]const u8
 
 fn getPluginVersion() callconv(.c) [*c]const u8
 {
-    return PLUGIN_VERSION;
+    return "1.0.0";
 }
 
 fn getStudioCount() callconv(.c) c_int
@@ -64,7 +87,7 @@ fn getStudioName(
     index: c_int,
 ) callconv(.c) [*c]const u8
 {
-    if (index == 0) return "DemoStudio";
+    if (index == 0) return STUDIO_NAME;
     return null;
 }
 
@@ -76,10 +99,14 @@ fn createStudio(
         MeshulaLab.Studio,
     ) catch return null;
     studio.* = std.mem.zeroes(MeshulaLab.Studio);
-    studio.name = "DemoStudio";
+    studio.name = STUDIO_NAME;
     studio.GetActivityCount = &studioGetActivityCount;
     studio.GetActivityConfig = &studioGetActivityConfig;
     studio.MustDeactivateUnrelatedActivities = &studioMustDeactivate;
+    if (@hasDecl(studio_config, "LAYOUT_SPEC"))
+    {
+        studio.GetLayoutSpec = &studioGetLayoutSpec;
+    }
     return studio;
 }
 
@@ -116,7 +143,20 @@ fn studioMustDeactivate(
     _: ?*anyopaque,
 ) callconv(.c) bool
 {
-    return true;
+    return if (@hasDecl(studio_config, "MUST_DEACTIVATE_UNRELATED"))
+        studio_config.MUST_DEACTIVATE_UNRELATED
+    else
+        true;
+}
+
+fn studioGetLayoutSpec(
+    _: ?*anyopaque,
+) callconv(.c) [*c]const u8
+{
+    return if (@hasDecl(studio_config, "LAYOUT_SPEC"))
+        studio_config.LAYOUT_SPEC
+    else
+        null;
 }
 
 // -----------------------------------------------------------------
@@ -133,6 +173,10 @@ const DESCRIPTOR = MeshulaLab.PluginDescriptor{
     .CreateStudio = &createStudio,
     .DestroyStudio = &destroyStudio,
 };
+
+// -----------------------------------------------------------------
+// Exported entry point
+// -----------------------------------------------------------------
 
 export fn LabGetPluginDescriptor() ?*const MeshulaLab.PluginDescriptor
 {

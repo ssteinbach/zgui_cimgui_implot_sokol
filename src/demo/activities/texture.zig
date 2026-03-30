@@ -41,6 +41,14 @@ pub fn initState() void
     texid = ziis.sokol.imgui.imtextureid(view);
 }
 
+/// Plugin lifecycle callback — wraps initState for the generic plugin template.
+pub fn activate(
+    _: ?*anyopaque,
+) callconv(.c) void
+{
+    initState();
+}
+
 /// Per-frame texture buffer update — called by the orchestrator as
 /// the Activity's Update callback.
 pub fn update(

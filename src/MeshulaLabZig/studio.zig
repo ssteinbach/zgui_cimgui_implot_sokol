@@ -10,6 +10,8 @@ const MeshulaLab = @import("MeshulaLab");
 pub const ActivityConfig = struct {
     name: [*:0]const u8,
     ui_initially_visible: bool = true,
+    panel_id: ?[*:0]const u8 = null,
+    window_name: ?[*:0]const u8 = null,
 };
 
 /// A Zig-friendly Studio that wraps a LabStudio C struct.
@@ -26,12 +28,27 @@ pub const Studio = struct {
     /// DestroyStudio. Null for built-in studios.
     maybe_plugin_studio: ?*MeshulaLab.Studio = null,
 
+    /// Optional LabLayout spec string for spatial arrangement.
+    /// null means use default ImGui layout (no LabLayout).
+    layout_spec: ?[*:0]const u8 = null,
+
     /// Create a new Studio with the given name and Activity configuration.
     /// Both `name` and `configs` must have static lifetime (pointers are
     /// stored, not copied).
     pub fn init(
         comptime studio_name: [*:0]const u8,
         configs: []const ActivityConfig,
+    ) Studio
+    {
+        return initWithLayout(studio_name, configs, null);
+    }
+
+    /// Create a new Studio with a LabLayout spec and Activity configuration.
+    /// All arguments must have static lifetime.
+    pub fn initWithLayout(
+        comptime studio_name: [*:0]const u8,
+        configs: []const ActivityConfig,
+        layout_spec: ?[*:0]const u8,
     ) Studio
     {
         var s: MeshulaLab.Studio = std.mem.zeroes(MeshulaLab.Studio);
@@ -42,10 +59,12 @@ pub const Studio = struct {
         s.GetActivityCount = &getActivityCount;
         s.GetActivityConfig = &getActivityConfig;
         s.MustDeactivateUnrelatedActivities = &mustDeactivate;
+        s.GetLayoutSpec = &getLayoutSpec;
 
         return .{
             .lab = s,
             .configs = configs,
+            .layout_spec = layout_spec,
         };
     }
 
@@ -103,6 +122,8 @@ pub const Studio = struct {
         };
         S.c_cfg.name = cfg.name;
         S.c_cfg.uiInitiallyVisible = cfg.ui_initially_visible;
+        S.c_cfg.panelId = if (cfg.panel_id) |p| p else null;
+        S.c_cfg.windowName = if (cfg.window_name) |w| w else null;
         return &S.c_cfg;
     }
 
@@ -111,6 +132,14 @@ pub const Studio = struct {
     ) callconv(.c) bool
     {
         return true;
+    }
+
+    fn getLayoutSpec(
+        instance: ?*anyopaque,
+    ) callconv(.c) ?[*:0]const u8
+    {
+        const studio = studio_from_instance(instance) orelse return null;
+        return studio.layout_spec;
     }
 
     fn studio_from_instance(

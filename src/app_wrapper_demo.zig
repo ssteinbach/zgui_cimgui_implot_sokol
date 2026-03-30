@@ -47,6 +47,8 @@ const ACTIVITY_NAMES = struct
     const BIG_TEXT = "BigTextDemoActivity";
     const LIST_CLIPPER = "ListClipperDemoActivity";
     const SORTABLE_TABLE = "SortableTableDemoActivity";
+    const FILE_DIALOG = "FileDialogDemoActivity";
+    const LAYOUT_DEMO = "LayoutDemoActivity";
 };
 
 var ACTIVITIES = struct
@@ -102,6 +104,14 @@ var ACTIVITIES = struct
         ACTIVITY_NAMES.SORTABLE_TABLE,
         .{ .run_ui = &activities.sortable_table.runUI },
     ),
+    file_dialog: MeshulaLab.Activity = MeshulaLab.Activity.init(
+        ACTIVITY_NAMES.FILE_DIALOG,
+        .{ .run_ui = &activities.file_dialog.runUI },
+    ),
+    layout_demo: MeshulaLab.Activity = MeshulaLab.Activity.init(
+        ACTIVITY_NAMES.LAYOUT_DEMO,
+        .{ .run_ui = &activities.layout_demo.runUI },
+    ),
 }{};
 
 const STUDIO_CONFIGS = [_]MeshulaLab.ActivityConfig{
@@ -117,11 +127,58 @@ const STUDIO_CONFIGS = [_]MeshulaLab.ActivityConfig{
     .{ .name = ACTIVITY_NAMES.BIG_TEXT },
     .{ .name = ACTIVITY_NAMES.LIST_CLIPPER },
     .{ .name = ACTIVITY_NAMES.SORTABLE_TABLE },
+    .{ .name = ACTIVITY_NAMES.FILE_DIALOG },
+    .{ .name = ACTIVITY_NAMES.LAYOUT_DEMO },
 };
 
 var DEMO_STUDIO = MeshulaLab.Studio.init(
     "ZIIS Demo Studio",
     &STUDIO_CONFIGS,
+);
+
+// A second studio that demonstrates LabLayout data plumbing.
+// Panel assignments map activities to named layout regions.
+const LAYOUT_STUDIO_CONFIGS = [_]MeshulaLab.ActivityConfig{
+    .{
+        .name = ACTIVITY_NAMES.LAYOUT_DEMO,
+        .panel_id = "main-panel",
+        .window_name = "Layout Inspector",
+    },
+    .{
+        .name = ACTIVITY_NAMES.PLOT,
+        .panel_id = "sidebar-panel",
+        .window_name = "Plot",
+    },
+    .{
+        .name = ACTIVITY_NAMES.FILE_DIALOG,
+        .panel_id = "bottom-panel",
+        .window_name = "File Dialog",
+    },
+};
+
+const LAYOUT_SPEC =
+    \\panel root
+    \\  direction: horizontal
+    \\  sizing: grow grow
+    \\
+    \\  panel main-panel
+    \\    sizing: grow grow
+    \\
+    \\  panel right-area
+    \\    direction: vertical
+    \\    sizing: fixed(400) grow
+    \\
+    \\    panel sidebar-panel
+    \\      sizing: grow grow
+    \\
+    \\    panel bottom-panel
+    \\      sizing: grow fixed(200)
+;
+
+var LAYOUT_STUDIO = MeshulaLab.Studio.initWithLayout(
+    "Layout Demo Studio",
+    &LAYOUT_STUDIO_CONFIGS,
+    LAYOUT_SPEC,
 );
 
 var ORCHESTRATOR: MeshulaLab.Orchestrator = undefined;
@@ -275,8 +332,15 @@ pub fn init() void
     ORCHESTRATOR.register_activity(&ACTIVITIES.big_text);
     ORCHESTRATOR.register_activity(&ACTIVITIES.list_clipper);
     ORCHESTRATOR.register_activity(&ACTIVITIES.sortable_table);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.file_dialog);
+    ORCHESTRATOR.register_activity(&ACTIVITIES.layout_demo);
+
+    // Give the layout demo access to the orchestrator so it can
+    // inspect the active studio's layout spec and panel assignments.
+    activities.layout_demo.setOrchestrator(&ORCHESTRATOR);
 
     ORCHESTRATOR.register_studio(&DEMO_STUDIO);
+    ORCHESTRATOR.register_studio(&LAYOUT_STUDIO);
     ORCHESTRATOR.activate_studio("ZIIS Demo Studio");
 }
 

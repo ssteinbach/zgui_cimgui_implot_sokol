@@ -61,6 +61,22 @@ pub fn deinitState(
     data_from_json_file = .empty;
 }
 
+/// Plugin lifecycle callback — wraps initState for the generic plugin template.
+pub fn activate(
+    _: ?*anyopaque,
+) callconv(.c) void
+{
+    initState(std.heap.c_allocator);
+}
+
+/// Plugin lifecycle callback — wraps deinitState for the generic plugin template.
+pub fn deactivate(
+    _: ?*anyopaque,
+) callconv(.c) void
+{
+    deinitState(std.heap.c_allocator);
+}
+
 /// Read the JSON from the parsed file blob and populate state
 fn json_parsing_callback(
     fetch_query: *app_wrapper.FetchQuery,

@@ -33,6 +33,10 @@
             .url = "git+https://github.com/uyha/zimq.git#2ffe63d9bdd41d24525975ce2759b37648ae423c",
             .hash = "zimq-0.0.0-nw1ioGioAQCf8tyBYFGi7KgrdZBBB06NGNqw2fbzxm87",
         },
+        .nfd_zig = .{
+            .url = "git+https://github.com/ssteinbach/nfd-zig.git#d6451e7d16dd82945a03845400a69e9fe7c051a3",
+            .hash = "nfd_zig-1.1.6-N3fzYqgiAACqPupnoXYg4sTSPbvk7sfs1nJdMGnURq8C",
+        },
     },
 
     .paths = .{

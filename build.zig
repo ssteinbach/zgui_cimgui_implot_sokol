@@ -18,6 +18,12 @@ pub fn build(
         "Build with ImGui docking branch support",
     ) orelse false;
 
+    const plugin_dir = b.option(
+        []const u8,
+        "plugin_dir",
+        "Override plugin directory path (for downstream projects)",
+    ) orelse b.getInstallPath(.{ .custom = "lib/plugins" }, "");
+
     // Fetch Dependencies
     ///////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +65,12 @@ pub fn build(
         },
     );
     const mod_meshulalab = dep_meshulalab.module("MeshulaLab");
+
+    // Re-export for downstream projects that build plugins
+    b.modules.put(
+        b.dupe("MeshulaLab"),
+        mod_meshulalab,
+    ) catch @panic("OOM");
 
     const dep_undo_journal = b.dependency(
         "do_undo_journal",
@@ -277,7 +289,7 @@ pub fn build(
     fundamental_app_options.addOption(
         []const u8,
         "plugin_dir",
-        b.getInstallPath(.{ .custom = "lib/plugins" }, ""),
+        plugin_dir,
     );
 
     // MeshulaLabZig: Zig-ergonomic wrappers for the MeshulaLab architecture
@@ -307,6 +319,18 @@ pub fn build(
             },
         },
     );
+
+    // NFD: native file dialogs (desktop only, not available on WASM)
+    if (!target.result.cpu.arch.isWasm()) {
+        const dep_nfd = b.dependency(
+            "nfd_zig",
+            .{
+                .target = target,
+                .optimize = optimize,
+            },
+        );
+        mod_meshulalab_zig.addImport("nfd", dep_nfd.module("nfd"));
+    }
 
     // Plugin-variant of MeshulaLabZig — uses mod_ziis_plugin to
     // avoid pulling C libraries into plugin shared libraries.
@@ -573,37 +597,60 @@ pub fn build(
             run_step.dependOn(&run_cmd.step);
         }
 
-        // Plugin shared libraries (native only)
-        const plugin_sources = .{
-            .{ "plugin_undo_journal", "src/demo/plugins/plugin_undo_journal.zig" },
-            .{ "plugin_plot", "src/demo/plugins/plugin_plot.zig" },
-            .{ "plugin_big_plot", "src/demo/plugins/plugin_big_plot.zig" },
-            .{ "plugin_stairs_plot", "src/demo/plugins/plugin_stairs_plot.zig" },
-            .{ "plugin_polygon_plot", "src/demo/plugins/plugin_polygon_plot.zig" },
-            .{ "plugin_inflines_pie", "src/demo/plugins/plugin_inflines_pie.zig" },
-            .{ "plugin_texture", "src/demo/plugins/plugin_texture.zig" },
-            .{ "plugin_canvas", "src/demo/plugins/plugin_canvas.zig" },
-            .{ "plugin_json_pie", "src/demo/plugins/plugin_json_pie.zig" },
-            .{ "plugin_big_text", "src/demo/plugins/plugin_big_text.zig" },
-            .{ "plugin_list_clipper", "src/demo/plugins/plugin_list_clipper.zig" },
-            .{ "plugin_sortable_table", "src/demo/plugins/plugin_sortable_table.zig" },
-            .{ "plugin_template", "src/demo/plugins/plugin_template.zig" },
-            .{ "studio_demo", "src/studios/demo/plugin.zig" },
+        // Plugin shared libraries (native only).
+        // PluginBuilder generates all boilerplate from generic templates.
+        const pb = PluginBuilder.init_self(
+            b,
+            target,
+            optimize,
+            mod_ziis_plugin,
+            mod_meshulalab,
+            mod_meshulalab_zig_plugin,
+        );
+        const demo_activities_root = b.path(
+            "src/demo/activities/root.zig",
+        );
+
+        const activity_plugins = .{
+            .{ "plugin_undo_journal", "undo_journal", "UndoJournalDemoActivity", "UndoJournalDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_plot", "plot", "PlotDemoActivity", "PlotDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_big_plot", "big_plot", "BigPlotDemoActivity", "BigPlotDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_stairs_plot", "stairs_plot", "StairsPlotDemoActivity", "StairsPlotDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_polygon_plot", "polygon_plot", "PolygonPlotDemoActivity", "PolygonPlotDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_inflines_pie", "inflines_pie", "InfLinesPieChartDemoActivity", "InfLinesPieChartDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_texture", "texture", "TextureDemoActivity", "TextureDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_canvas", "canvas", "CanvasDrawingDemoActivity", "CanvasDrawingDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_json_pie", "json_pie", "JSONPieChartDemoActivity", "JSONPieChartDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_big_text", "big_text", "BigTextDemoActivity", "BigTextDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_list_clipper", "list_clipper", "ListClipperDemoActivity", "ListClipperDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_sortable_table", "sortable_table", "SortableTableDemoActivity", "SortableTableDemoPlugin", "ZIIS Demo" },
+            .{ "plugin_template", "template", "TemplateActivity", "TemplatePlugin", "ZIIS Template" },
+            .{ "plugin_layout", "layout_demo", "LayoutDemoActivity", "LayoutDemoPlugin", "ZIIS Demo" },
         };
-        inline for (plugin_sources)
+        inline for (activity_plugins)
             |entry|
         {
-            build_plugin(
-                b,
+            pb.add_activity(
                 entry[0],
-                entry[1],
-                target,
-                optimize,
-                mod_ziis_plugin,
-                mod_meshulalab,
-                mod_meshulalab_zig_plugin,
+                demo_activities_root,
+                .{
+                    .activity_field = entry[1],
+                    .activity_name = entry[2],
+                    .plugin_name = entry[3],
+                    .provenance = entry[4],
+                },
             );
         }
+
+        pb.add_studio(
+            "studio_demo",
+            b.path("src/demo/studios/demo_config.zig"),
+            .{
+                .studio_name = "DemoStudio",
+                .plugin_name = "DemoStudioPlugin",
+                .provenance = "ZIIS",
+            },
+        );
     }
 }
 
@@ -662,7 +709,7 @@ fn build_native(
 /// The plugin leaves imgui/sokol symbols unresolved; the host
 /// executable exports them via -rdynamic, and the dynamic linker
 /// resolves them at dlopen time.
-fn build_plugin(
+pub fn build_plugin(
     b: *std.Build,
     comptime name: []const u8,
     comptime source_path: []const u8,
@@ -737,6 +784,347 @@ fn build_plugin(
 
 
     // Install into lib/plugins/ so the host can discover them.
+    const install = b.addInstallArtifact(
+        lib,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = "lib/plugins",
+                },
+            },
+        },
+    );
+    b.getInstallStep().dependOn(&install.step);
+}
+
+/// Helper for building ZIIS plugin shared libraries from generic
+/// templates.  Resolves template paths from the ZIIS package so
+/// both in-tree and downstream projects share the same codegen.
+///
+/// In-tree (this repo's build.zig):
+///     const pb = PluginBuilder.init_self(b, target, optimize, ...);
+///
+/// Downstream (consumer's build.zig):
+///     const ziis = @import("zgui_cimgui_implot_sokol");
+///     const dep_ziis = b.dependency("zgui_cimgui_implot_sokol", .{...});
+///     const pb = ziis.PluginBuilder.init(b, dep_ziis, target, optimize);
+///     pb.add_activity("my_plugin", b.path("src/activities/root.zig"), .{...});
+pub const PluginBuilder = struct {
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    mod_ziis: *std.Build.Module,
+    mod_meshulalab: *std.Build.Module,
+    mod_meshulalab_zig: *std.Build.Module,
+    template_activity: std.Build.LazyPath,
+    template_studio: std.Build.LazyPath,
+    template_provider: std.Build.LazyPath,
+
+    /// Create a PluginBuilder from a ZIIS dependency.
+    /// Use this in downstream projects.
+    pub fn init(
+        b: *std.Build,
+        dep_ziis: *std.Build.Dependency,
+        target: std.Build.ResolvedTarget,
+        optimize: std.builtin.OptimizeMode,
+    ) PluginBuilder
+    {
+        return .{
+            .b = b,
+            .target = target,
+            .optimize = optimize,
+            .mod_ziis = dep_ziis.module(
+                "zgui_cimgui_implot_sokol_plugin",
+            ),
+            .mod_meshulalab = dep_ziis.module("MeshulaLab"),
+            .mod_meshulalab_zig = dep_ziis.module(
+                "MeshulaLabZig_plugin",
+            ),
+            .template_activity = dep_ziis.path(
+                "src/MeshulaLabZig/generic_plugin_activity.zig",
+            ),
+            .template_studio = dep_ziis.path(
+                "src/MeshulaLabZig/generic_plugin_studio.zig",
+            ),
+            .template_provider = dep_ziis.path(
+                "src/MeshulaLabZig/generic_plugin_provider.zig",
+            ),
+        };
+    }
+
+    /// Create a PluginBuilder for in-tree use (this repo).
+    /// Resolves template paths via b.path().
+    pub fn init_self(
+        b: *std.Build,
+        target: std.Build.ResolvedTarget,
+        optimize: std.builtin.OptimizeMode,
+        mod_ziis: *std.Build.Module,
+        mod_meshulalab: *std.Build.Module,
+        mod_meshulalab_zig: *std.Build.Module,
+    ) PluginBuilder
+    {
+        return .{
+            .b = b,
+            .target = target,
+            .optimize = optimize,
+            .mod_ziis = mod_ziis,
+            .mod_meshulalab = mod_meshulalab,
+            .mod_meshulalab_zig = mod_meshulalab_zig,
+            .template_activity = b.path(
+                "src/MeshulaLabZig/generic_plugin_activity.zig",
+            ),
+            .template_studio = b.path(
+                "src/MeshulaLabZig/generic_plugin_studio.zig",
+            ),
+            .template_provider = b.path(
+                "src/MeshulaLabZig/generic_plugin_provider.zig",
+            ),
+        };
+    }
+
+    pub const ActivityOptions = struct {
+        activity_field: []const u8,
+        activity_name: []const u8,
+        plugin_name: []const u8,
+        provenance: []const u8,
+    };
+
+    /// Build an activity plugin shared library from the generic
+    /// template.  `activities_root` is the LazyPath to the
+    /// activities root.zig module that re-exports the activity
+    /// modules (the field named by `opts.activity_field`).
+    pub fn add_activity(
+        self: PluginBuilder,
+        comptime name: []const u8,
+        activities_root: std.Build.LazyPath,
+        opts: ActivityOptions,
+    ) void
+    {
+        const mod_activities = self.b.createModule(
+            .{
+                .root_source_file = activities_root,
+                .target = self.target,
+                .optimize = self.optimize,
+                .imports = &.{
+                    .{
+                        .name = "zgui_cimgui_implot_sokol",
+                        .module = self.mod_ziis,
+                    },
+                    .{
+                        .name = "MeshulaLab",
+                        .module = self.mod_meshulalab,
+                    },
+                    .{
+                        .name = "MeshulaLabZig",
+                        .module = self.mod_meshulalab_zig,
+                    },
+                },
+            },
+        );
+
+        const plugin_options = self.b.addOptions();
+        plugin_options.addOption(
+            []const u8,
+            "activity_field",
+            opts.activity_field,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "activity_name",
+            opts.activity_name,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "plugin_name",
+            opts.plugin_name,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "provenance",
+            opts.provenance,
+        );
+
+        const mod = self.b.createModule(
+            .{
+                .root_source_file = self.template_activity,
+                .target = self.target,
+                .optimize = self.optimize,
+                .imports = &.{
+                    .{
+                        .name = "zgui_cimgui_implot_sokol",
+                        .module = self.mod_ziis,
+                    },
+                    .{
+                        .name = "MeshulaLab",
+                        .module = self.mod_meshulalab,
+                    },
+                    .{
+                        .name = "MeshulaLabZig",
+                        .module = self.mod_meshulalab_zig,
+                    },
+                    .{
+                        .name = "demo_activities",
+                        .module = mod_activities,
+                    },
+                    .{
+                        .name = "activity_plugin_options",
+                        .module = plugin_options.createModule(),
+                    },
+                },
+            },
+        );
+
+        install_plugin(self.b, name, mod);
+    }
+
+    pub const StudioOptions = struct {
+        studio_name: []const u8,
+        plugin_name: []const u8,
+        provenance: []const u8,
+    };
+
+    /// Build a studio plugin shared library from the generic
+    /// template.  `config_path` is the LazyPath to a Zig file
+    /// that exports `ACTIVITIES` (an array of activity config
+    /// entries).
+    pub fn add_studio(
+        self: PluginBuilder,
+        comptime name: []const u8,
+        config_path: std.Build.LazyPath,
+        opts: StudioOptions,
+    ) void
+    {
+        const plugin_options = self.b.addOptions();
+        plugin_options.addOption(
+            []const u8,
+            "studio_name",
+            opts.studio_name,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "plugin_name",
+            opts.plugin_name,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "provenance",
+            opts.provenance,
+        );
+
+        const mod = self.b.createModule(
+            .{
+                .root_source_file = self.template_studio,
+                .target = self.target,
+                .optimize = self.optimize,
+                .imports = &.{
+                    .{
+                        .name = "MeshulaLab",
+                        .module = self.mod_meshulalab,
+                    },
+                    .{
+                        .name = "studio_plugin_options",
+                        .module = plugin_options.createModule(),
+                    },
+                    .{
+                        .name = "studio_config",
+                        .module = self.b.createModule(
+                            .{
+                                .root_source_file = config_path,
+                                .target = self.target,
+                                .optimize = self.optimize,
+                            },
+                        ),
+                    },
+                },
+            },
+        );
+
+        install_plugin(self.b, name, mod);
+    }
+
+    pub const ProviderOptions = struct {
+        provider_name: []const u8,
+        plugin_name: []const u8,
+        provenance: []const u8,
+    };
+
+    /// Build a provider plugin shared library from the generic
+    /// template.  `impl_path` is the LazyPath to the provider
+    /// implementation module (may export an optional
+    /// `documentation` callback).
+    pub fn add_provider(
+        self: PluginBuilder,
+        comptime name: []const u8,
+        impl_path: std.Build.LazyPath,
+        opts: ProviderOptions,
+    ) void
+    {
+        const plugin_options = self.b.addOptions();
+        plugin_options.addOption(
+            []const u8,
+            "provider_name",
+            opts.provider_name,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "plugin_name",
+            opts.plugin_name,
+        );
+        plugin_options.addOption(
+            []const u8,
+            "provenance",
+            opts.provenance,
+        );
+
+        const mod = self.b.createModule(
+            .{
+                .root_source_file = self.template_provider,
+                .target = self.target,
+                .optimize = self.optimize,
+                .imports = &.{
+                    .{
+                        .name = "MeshulaLab",
+                        .module = self.mod_meshulalab,
+                    },
+                    .{
+                        .name = "provider_plugin_options",
+                        .module = plugin_options.createModule(),
+                    },
+                    .{
+                        .name = "provider_impl",
+                        .module = self.b.createModule(
+                            .{
+                                .root_source_file = impl_path,
+                                .target = self.target,
+                                .optimize = self.optimize,
+                            },
+                        ),
+                    },
+                },
+            },
+        );
+
+        install_plugin(self.b, name, mod);
+    }
+};
+
+/// Install a plugin shared library into lib/plugins/.
+fn install_plugin(
+    b: *std.Build,
+    comptime name: []const u8,
+    mod: *std.Build.Module,
+) void
+{
+    const lib = b.addLibrary(
+        .{
+            .linkage = .dynamic,
+            .name = name,
+            .root_module = mod,
+        },
+    );
+
+    lib.linker_allow_shlib_undefined = true;
+
     const install = b.addInstallArtifact(
         lib,
         .{

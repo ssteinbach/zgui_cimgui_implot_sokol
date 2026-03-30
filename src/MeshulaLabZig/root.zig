@@ -25,3 +25,5 @@ pub const CspProcess = csp.CspProcess;
 const view = @import("view_interaction.zig");
 pub const ViewInteraction = view.ViewInteraction;
 pub const ViewDimensions = view.ViewDimensions;
+
+pub const FileDialog = @import("file_dialog.zig");

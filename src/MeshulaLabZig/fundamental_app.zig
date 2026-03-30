@@ -374,6 +374,8 @@ pub const FundamentalApp = struct {
             configs[i] = .{
                 .name = @ptrCast(c_cfg.*.name),
                 .ui_initially_visible = c_cfg.*.uiInitiallyVisible,
+                .panel_id = @ptrCast(c_cfg.*.panelId),
+                .window_name = @ptrCast(c_cfg.*.windowName),
             };
         }
         return configs;
