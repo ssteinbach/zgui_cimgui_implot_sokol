@@ -796,6 +796,8 @@ const STUDIO_CONFIG_FMT =
     \\pub const ActivityEntry = struct {{
     \\    name: [*:0]const u8,
     \\    initially_visible: bool = true,
+    \\    panel_id: ?[*:0]const u8 = null,
+    \\    window_name: ?[*:0]const u8 = null,
     \\}};
     \\
     \\pub const ACTIVITIES = [_]ActivityEntry{{
@@ -941,7 +943,11 @@ const PROJECT_BUILD_FMT =
     \\    b.installArtifact(exe);
     \\
     \\    const run_step = b.step("run-{s}", "Run {s}");
-    \\    run_step.dependOn(&b.addRunArtifact(exe).step);
+    \\    const run_cmd = b.addRunArtifact(exe);
+    \\    // Ensure plugins are installed before the app runs,
+    \\    // otherwise it starts up with no activities.
+    \\    run_cmd.step.dependOn(b.getInstallStep());
+    \\    run_step.dependOn(&run_cmd.step);
     \\
     \\    // ---------------------------------------------------------------
     \\    // Plugin shared libraries (generated from generic templates)
@@ -1029,6 +1035,8 @@ const PROJECT_STUDIO_CONFIG_FMT =
     \\pub const ActivityEntry = struct {{
     \\    name: [*:0]const u8,
     \\    initially_visible: bool = true,
+    \\    panel_id: ?[*:0]const u8 = null,
+    \\    window_name: ?[*:0]const u8 = null,
     \\}};
     \\
     \\pub const ACTIVITIES = [_]ActivityEntry{{
