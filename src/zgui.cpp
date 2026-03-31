@@ -39,10 +39,12 @@ extern "C"
         ImGui::SetAllocatorFunctions(alloc_func, free_func, nullptr);
     }
 
-    // ZGUI_API void zguiSetNextWindowViewport(ImGuiID viewport_id)
-    // {
-    //     ImGui::SetNextWindowViewport(viewport_id);
-    // }
+#ifdef ZGUI_ENABLE_DOCKING
+    ZGUI_API void zguiSetNextWindowViewport(ImGuiID viewport_id)
+    {
+        ImGui::SetNextWindowViewport(viewport_id);
+    }
+#endif
 
     ZGUI_API void zguiSetNextWindowPos(float x, float y, ImGuiCond cond, float pivot_x, float pivot_y)
     {

@@ -30,6 +30,9 @@ const PluginInfo = plugin_loader_mod.PluginInfo;
 const plugin_manager = @import("plugin_manager_activity.zig");
 const ViewInteraction = @import("view_interaction.zig").ViewInteraction;
 const ViewDimensions = @import("view_interaction.zig").ViewDimensions;
+const layout_mod = @import("layout.zig");
+const Layout = layout_mod.Layout;
+const LayoutRect = layout_mod.Rect;
 
 const options = @import("fundamental_app_options");
 const ENABLE_DOCKING = options.enable_docking;
@@ -53,6 +56,11 @@ pub const FundamentalApp = struct {
     should_terminate: bool = false,
     was_dragging: bool = false,
     allocator: std.mem.Allocator,
+
+    /// Parsed layout for the current studio (if it has a layout_spec).
+    maybe_layout: ?Layout = null,
+    /// Track which studio the layout was parsed for.
+    layout_studio_ptr: ?*Studio = null,
 
     show: struct {
         plugin_manager: bool = false,
@@ -633,6 +641,9 @@ pub const FundamentalApp = struct {
         // Service orchestrator (deferred activations + update)
         self.orchestrator.service(dt);
 
+        // Reparse layout if the studio changed
+        self.update_layout();
+
         // --- Main menu bar ---
         if (zgui.beginMainMenuBar())
         {
@@ -835,7 +846,13 @@ pub const FundamentalApp = struct {
         {
             if (zgui.menuItem("Reset Layout", .{}))
             {
-                zgui.dockBuilderRemoveNode(zgui.getID("DockSpace"));
+                zgui.dockBuilderRemoveNode(
+                    zgui.DockSpace(
+                        "DockSpace",
+                        .{ 0.0, 0.0 },
+                        .{},
+                    ),
+                );
             }
             zgui.endMenu();
         }
@@ -987,6 +1004,117 @@ pub const FundamentalApp = struct {
     }
 
     // -----------------------------------------------------------------
+    // Layout positioning
+    // -----------------------------------------------------------------
+
+    /// Reparse the layout if the active studio changed.
+    fn update_layout(
+        self: *FundamentalApp,
+    ) void
+    {
+        const current = self.orchestrator.maybe_current_studio;
+        if (current != self.layout_studio_ptr)
+        {
+            self.layout_studio_ptr = current;
+            if (current)
+                |studio|
+            {
+                if (studio.layout_spec)
+                    |spec|
+                {
+                    self.maybe_layout = Layout.parse(
+                        std.mem.span(spec),
+                    );
+                }
+                else
+                {
+                    self.maybe_layout = null;
+                }
+            }
+            else
+            {
+                self.maybe_layout = null;
+            }
+        }
+    }
+
+    /// If a layout is active, position each activity's ImGui window
+    /// according to its panel assignment before running its UI.
+    fn position_activity_windows(
+        self: *FundamentalApp,
+        layout: *Layout,
+        area: LayoutRect,
+    ) void
+    {
+        layout.solve(area);
+
+        const studio = self.orchestrator.maybe_current_studio orelse return;
+        for (studio.configs)
+            |cfg|
+        {
+            const panel_id = cfg.panel_id orelse continue;
+            const window_name = cfg.window_name orelse continue;
+
+            const rect = layout.find_panel(
+                std.mem.span(panel_id),
+            ) orelse continue;
+
+            zgui.setNextWindowPos(.{
+                .x = rect.x,
+                .y = rect.y,
+                .cond = .always,
+            });
+            zgui.setNextWindowSize(.{
+                .w = rect.w,
+                .h = rect.h,
+                .cond = .always,
+            });
+
+            // Run this activity's UI inside a positioned window
+            const act_name = std.mem.span(cfg.name);
+            if (self.orchestrator.find_activity(act_name))
+                |activity|
+            {
+                if (activity.lab.active and activity.lab.uiVisible)
+                {
+                    if (activity.lab.RunUI)
+                        |run_ui_fn|
+                    {
+                        const wn_span = std.mem.span(window_name);
+                        var name_buf: [256:0]u8 = undefined;
+                        const nlen = @min(
+                            wn_span.len,
+                            name_buf.len - 1,
+                        );
+                        @memcpy(name_buf[0..nlen], wn_span[0..nlen]);
+                        name_buf[nlen] = 0;
+                        const name_z: [:0]const u8 = (
+                            name_buf[0..nlen :0]
+                        );
+
+                        if (
+                            zgui.begin(
+                                name_z,
+                                .{
+                                    .flags = .{
+                                        .no_move = true,
+                                        .no_resize = true,
+                                        .no_collapse = true,
+                                    },
+                                },
+                            )
+                        )
+                        {
+                            run_ui_fn(activity.lab.instance, null);
+                        }
+                        zgui.end();
+                    }
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------
     // Workspace rendering — docking variant
     // -----------------------------------------------------------------
 
@@ -1006,13 +1134,13 @@ pub const FundamentalApp = struct {
         const vp_work_size = viewport.getWorkSize();
 
         // Set up the host window for the dockspace
-        zgui.setNextWindowPos(vp_pos);
-        zgui.setNextWindowSize(vp_work_size);
+        zgui.setNextWindowPos(.{ .x = vp_pos[0], .y = vp_pos[1] });
+        zgui.setNextWindowSize(.{ .w = vp_work_size[0], .h = vp_work_size[1] });
         zgui.setNextWindowViewport(viewport.getId());
 
-        zgui.pushStyleVar(.{ .window_rounding = 0.0 });
-        zgui.pushStyleVar(.{ .window_border_size = 0.0 });
-        zgui.pushStyleVar(.{ .window_padding = .{ 0.0, 0.0 } });
+        zgui.pushStyleVar1f(.{ .idx = .window_rounding, .v = 0.0 });
+        zgui.pushStyleVar1f(.{ .idx = .window_border_size, .v = 0.0 });
+        zgui.pushStyleVar2f(.{ .idx = .window_padding, .v = .{ 0.0, 0.0 } });
 
         _ = zgui.begin(
             "DockSpaceHost",
@@ -1054,8 +1182,26 @@ pub const FundamentalApp = struct {
             lab_vi.view.wh = node_rect[3] - node_rect[1];
         }
 
-        // Run Activity UIs (they create their own dockable windows)
-        self.orchestrator.run_activity_uis(&lab_vi);
+        // If a layout is active, use panel positioning instead of
+        // free-form docking.
+        if (self.maybe_layout)
+            |*layout|
+        {
+            self.position_activity_windows(
+                layout,
+                .{
+                    .x = vp_pos[0],
+                    .y = vp_pos[1],
+                    .w = vp_work_size[0],
+                    .h = vp_work_size[1],
+                },
+            );
+        }
+        else
+        {
+            // Run Activity UIs (they create their own dockable windows)
+            self.orchestrator.run_activity_uis(&lab_vi);
+        }
 
         // Viewport interaction
         self.process_viewport_interaction(&lab_vi);
@@ -1074,6 +1220,34 @@ pub const FundamentalApp = struct {
         const vp_size = viewport.getSize();
         const work_pos = viewport.getWorkPos();
         const work_size = viewport.getWorkSize();
+
+        var lab_vi = self.vi.to_lab();
+        lab_vi.dt = dt;
+        lab_vi.view.w = vp_size[0];
+        lab_vi.view.h = vp_size[1];
+        lab_vi.view.wx = work_pos[0];
+        lab_vi.view.wy = work_pos[1];
+        lab_vi.view.ww = work_size[0];
+        lab_vi.view.wh = work_size[1];
+
+        // If a layout is active, use panel positioning instead of tabs
+        if (self.maybe_layout)
+            |*layout|
+        {
+            self.position_activity_windows(
+                layout,
+                .{
+                    .x = work_pos[0],
+                    .y = work_pos[1],
+                    .w = work_size[0],
+                    .h = work_size[1],
+                },
+            );
+
+            // Viewport interaction
+            self.process_viewport_interaction(&lab_vi);
+            return;
+        }
 
         // Fill the work area (below the main menu bar)
         zgui.setNextWindowPos(
@@ -1100,15 +1274,6 @@ pub const FundamentalApp = struct {
                 },
             },
         );
-
-        var lab_vi = self.vi.to_lab();
-        lab_vi.dt = dt;
-        lab_vi.view.w = vp_size[0];
-        lab_vi.view.h = vp_size[1];
-        lab_vi.view.wx = work_pos[0];
-        lab_vi.view.wy = work_pos[1];
-        lab_vi.view.ww = work_size[0];
-        lab_vi.view.wh = work_size[1];
 
         // Tab bar with active activities
         if (zgui.beginTabBar("Activities", .{}))

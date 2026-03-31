@@ -479,6 +479,25 @@ pub fn build(
         test_step.dependOn(
             &b.addRunArtifact(lifecycle_tests).step,
         );
+
+        // Layout parser/solver tests (pure Zig, no dependencies)
+        const layout_test_mod = b.createModule(
+            .{
+                .root_source_file = b.path(
+                    "src/MeshulaLabZig/layout.zig",
+                ),
+                .target = target,
+                .optimize = optimize,
+            },
+        );
+        const layout_tests = b.addTest(
+            .{
+                .root_module = layout_test_mod,
+            },
+        );
+        test_step.dependOn(
+            &b.addRunArtifact(layout_tests).step,
+        );
     }
 
     // Dispatch to build function based on target
