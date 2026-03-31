@@ -333,10 +333,20 @@ pub const FundamentalApp = struct {
                 );
                 continue;
             };
+            // Read the layout spec from the plugin's C callback.
+            const maybe_spec: ?[*:0]const u8 = (
+                if (c_studio.GetLayoutSpec)
+                    |get_spec|
+                    get_spec(c_studio.instance)
+                else
+                    null
+            );
+
             wrapper.* = .{
                 .lab = c_studio.*,
                 .configs = configs,
                 .maybe_plugin_studio = c_studio,
+                .layout_spec = maybe_spec,
             };
             self.orchestrator.register_studio(wrapper);
 
@@ -1199,8 +1209,34 @@ pub const FundamentalApp = struct {
         }
         else
         {
-            // Run Activity UIs (they create their own dockable windows)
-            self.orchestrator.run_activity_uis(&lab_vi);
+            // Wrap each activity in its own dockable window so
+            // beginChild/endChild calls don't collide.
+            var it = self.orchestrator.active_ui_activities();
+            while (it.next())
+                |activity|
+            {
+                if (activity.lab.RunUI)
+                    |run_ui_fn|
+                {
+                    const act_name = activity.name();
+                    var name_buf: [256:0]u8 = undefined;
+                    const nlen = @min(
+                        act_name.len,
+                        name_buf.len - 1,
+                    );
+                    @memcpy(name_buf[0..nlen], act_name[0..nlen]);
+                    name_buf[nlen] = 0;
+                    const name_z: [:0]const u8 = (
+                        name_buf[0..nlen :0]
+                    );
+
+                    if (zgui.begin(name_z, .{}))
+                    {
+                        run_ui_fn(activity.lab.instance, &lab_vi);
+                    }
+                    zgui.end();
+                }
+            }
         }
 
         // Viewport interaction

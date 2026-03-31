@@ -95,6 +95,14 @@ export fn init(
     };
 
     zgui.init(STATE.allocator);
+
+    // Enable docking if built with -Denable_docking=true.
+    // Must be set before the first NewFrame() call.
+    if (@import("zgui_options").enable_docking)
+    {
+        zgui.io.setConfigFlags(.{ .dock_enable = true });
+    }
+
     zgui.plot.init();
 
     // set up style and load the font

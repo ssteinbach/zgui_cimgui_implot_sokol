@@ -80,11 +80,28 @@ pub fn build(
         },
     );
 
-    // inject the cimgui header search path into the sokol C library compile
-    // step
-    dep_sokol.artifact("sokol_clib").addIncludePath(
+    // Inject the cimgui header search path into the sokol C library
+    // compile step so that sokol_imgui.c finds the correct cimgui.h.
+    //
+    // When docking is enabled, both src/ (non-docking) and src-docking/
+    // directories contain a cimgui.h. Zig's build system may add the
+    // non-docking path first via transitive dependencies. To ensure the
+    // correct header is always used, we override CIMGUI_HEADER_PATH to
+    // use a directory-qualified include so the preprocessor resolves it
+    // unambiguously via the include path we inject.
+    const sokol_clib = dep_sokol.artifact("sokol_clib");
+    sokol_clib.addIncludePath(
         dep_cimgui.path(cimgui_conf.include_dir),
     );
+    if (enable_docking)
+    {
+        sokol_clib.root_module.addCMacro(
+            "CIMGUI_HEADER_PATH",
+            "\"src-docking/cimgui.h\"",
+        );
+        // Also add the parent directory so "src-docking/cimgui.h" resolves.
+        sokol_clib.addIncludePath(dep_cimgui.path("."));
+    }
 
     // Assemble Module
     ///////////////////////////////////////////////////////////////////////////
@@ -93,6 +110,7 @@ pub fn build(
     const zgui_options = b.addOptions();
     zgui_options.addOption(bool, "use_wchar32", false);
     zgui_options.addOption(bool, "use_32bit_draw_idx", false);
+    zgui_options.addOption(bool, "enable_docking", enable_docking);
 
     const mod_ziis = b.addModule(
         "zgui_cimgui_implot_sokol",
@@ -730,7 +748,10 @@ fn build_native(
         "run-" ++ name,
         "Run " ++ name,
     );
-    run_step.dependOn(&b.addRunArtifact(exe).step);
+    const run_cmd = b.addRunArtifact(exe);
+    // Ensure plugins are installed before the app runs.
+    run_cmd.step.dependOn(b.getInstallStep());
+    run_step.dependOn(&run_cmd.step);
 }
 
 /// Build a plugin shared library (.dylib/.so/.dll).
