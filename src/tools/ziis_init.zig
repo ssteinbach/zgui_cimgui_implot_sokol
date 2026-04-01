@@ -225,6 +225,7 @@ pub fn create_project(
     project_name: []const u8,
     output_dir: []const u8,
     local_ziis: bool,
+    add_missing: bool,
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
 ) !void
@@ -261,8 +262,8 @@ pub fn create_project(
     );
     defer allocator.free(dest_dir);
 
-    // Check destination doesn't already exist
-    if (dir_exists(dest_dir))
+    // Check destination doesn't already exist (unless --add-missing)
+    if (dir_exists(dest_dir) and !add_missing)
     {
         try stderr.print("error: {s} already exists\n", .{dest_dir});
         fatal(stderr);
@@ -282,6 +283,12 @@ pub fn create_project(
             .{ src_dir, err },
         );
         fatal(stderr);
+    };
+
+    // Collect file paths and contents for generation.
+    const FileEntry = struct {
+        path: []const u8,
+        content: []const u8,
     };
 
     // Generate build.zig.zon
@@ -305,7 +312,6 @@ pub fn create_project(
             .{project_name},
         );
     defer allocator.free(zon_content);
-    try write_file(zon_path, zon_content);
 
     // Generate build.zig
     const build_path = try std.fmt.allocPrint(
@@ -332,7 +338,6 @@ pub fn create_project(
         },
     );
     defer allocator.free(build_content);
-    try write_file(build_path, build_content);
 
     // Generate src/app.zig
     const app_path = try std.fmt.allocPrint(
@@ -352,7 +357,6 @@ pub fn create_project(
         },
     );
     defer allocator.free(app_content);
-    try write_file(app_path, app_content);
 
     // Generate src/activity.zig
     const activity_path = try std.fmt.allocPrint(
@@ -368,7 +372,6 @@ pub fn create_project(
         .{ pascal_name, pascal_name },
     );
     defer allocator.free(activity_content);
-    try write_file(activity_path, activity_content);
 
     // Generate src/activities.zig (root module re-exporting activities)
     const activities_path = try std.fmt.allocPrint(
@@ -384,7 +387,6 @@ pub fn create_project(
         .{project_name},
     );
     defer allocator.free(activities_content);
-    try write_file(activities_path, activities_content);
 
     // Generate src/studio_config.zig
     const studio_config_path = try std.fmt.allocPrint(
@@ -400,41 +402,98 @@ pub fn create_project(
         .{ pascal_name, pascal_name },
     );
     defer allocator.free(studio_config_content);
-    try write_file(studio_config_path, studio_config_content);
+
+    const entries = [_]FileEntry{
+        .{ .path = zon_path, .content = zon_content },
+        .{ .path = build_path, .content = build_content },
+        .{ .path = app_path, .content = app_content },
+        .{ .path = activity_path, .content = activity_content },
+        .{ .path = activities_path, .content = activities_content },
+        .{ .path = studio_config_path, .content = studio_config_content },
+    };
+
+    var created_count: usize = 0;
+    var skipped_count: usize = 0;
+    var zon_was_written = false;
+
+    for (entries)
+        |entry|
+    {
+        if (add_missing)
+        {
+            if (try write_file_if_missing(entry.path, entry.content))
+            {
+                try stdout.print("  created: {s}\n", .{entry.path});
+                created_count += 1;
+                if (std.mem.eql(u8, entry.path, zon_path))
+                {
+                    zon_was_written = true;
+                }
+            }
+            else
+            {
+                try stdout.print("  skipped: {s} (already exists)\n", .{entry.path});
+                skipped_count += 1;
+            }
+        }
+        else
+        {
+            try write_file(entry.path, entry.content);
+            zon_was_written = true;
+        }
+    }
 
     // Seed fingerprint: run `zig build` to get the suggested value,
     // then rewrite build.zig.zon with the fingerprint inserted.
-    seed_fingerprint(allocator, dest_dir, zon_path, project_name, local_ziis, stderr);
+    // Only seed if build.zig.zon was freshly written (not skipped).
+    if (zon_was_written)
+    {
+        seed_fingerprint(allocator, dest_dir, zon_path, project_name, local_ziis, stderr);
+    }
 
     // Print success
-    try stdout.print(
-        \\
-        \\Created project '{s}':
-        \\  {s}
-        \\  {s}
-        \\  {s}
-        \\  {s}
-        \\  {s}
-        \\  {s}
-        \\
-        \\To get started:
-        \\  cd {s}
-        \\  zig build run-{s}
-        \\
-        \\
-        ,
-        .{
-            project_name,
-            zon_path,
-            build_path,
-            app_path,
-            activity_path,
-            activities_path,
-            studio_config_path,
-            project_name,
-            project_name,
-        },
-    );
+    if (add_missing)
+    {
+        try stdout.print(
+            \\
+            \\add-missing for project '{s}': {d} created, {d} skipped
+            \\
+            \\
+            ,
+            .{ project_name, created_count, skipped_count },
+        );
+    }
+    else
+    {
+        try stdout.print(
+            \\
+            \\Created project '{s}':
+            \\  {s}
+            \\  {s}
+            \\  {s}
+            \\  {s}
+            \\  {s}
+            \\  {s}
+            \\
+            \\To get started:
+            \\  cd {s}
+            \\  zig build run-{s}
+            \\
+            \\
+            ,
+            .{
+                project_name,
+                zon_path,
+                build_path,
+                app_path,
+                activity_path,
+                activities_path,
+                studio_config_path,
+                project_name,
+                project_name,
+            },
+        );
+    }
     try stdout.flush();
 }
 
@@ -461,6 +520,7 @@ pub fn main(
     var maybe_studio_name: ?[]const u8 = null;
     var maybe_project_name: ?[]const u8 = null;
     var local_ziis: bool = false;
+    var add_missing: bool = false;
     var output_dir: []const u8 = ".";
 
     var i: usize = 1;
@@ -519,6 +579,10 @@ pub fn main(
         {
             local_ziis = true;
         }
+        else if (std.mem.eql(u8, args[i], "--add-missing"))
+        {
+            add_missing = true;
+        }
         else if (std.mem.eql(u8, args[i], "--output-dir"))
         {
             i += 1;
@@ -550,6 +614,15 @@ pub fn main(
         try stderr.print(
             "Only one command argument " ++
             "(--studio, --activity, or --project) allowed\n",
+            .{},
+        );
+        fatal(stderr);
+    }
+
+    if (add_missing and maybe_project_name == null)
+    {
+        try stderr.print(
+            "error: --add-missing can only be used with --project\n",
             .{},
         );
         fatal(stderr);
@@ -587,6 +660,7 @@ pub fn main(
             project_name,
             output_dir,
             local_ziis,
+            add_missing,
             stdout,
             stderr,
         );
@@ -695,6 +769,18 @@ fn write_file(
     try file.writeAll(content);
 }
 
+/// Write a file only if it doesn't already exist.
+/// Returns true if the file was written, false if it was skipped.
+fn write_file_if_missing(
+    path: []const u8,
+    content: []const u8,
+) !bool
+{
+    if (file_exists(path)) return false;
+    try write_file(path, content);
+    return true;
+}
+
 /// Convert snake_case to PascalCase: "my_widget" -> "MyWidget"
 fn snake_to_pascal(
     allocator: std.mem.Allocator,
@@ -766,6 +852,7 @@ const HELP_TEXT =
     \\  --activity <name>    Create a new activity
     \\  --studio <name>      Create a new studio configuration
     \\  --project <name>     Create a new standalone project
+    \\  --add-missing        Don't overwrite existing files (--project only)
     \\  --local-ziis         Use local path dependency (--project only)
     \\  --output-dir <path>  Write files under <path> instead of cwd
     \\  --help, -h           Show this help message
