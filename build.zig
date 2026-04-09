@@ -3,7 +3,31 @@
 const std = @import("std");
 
 const sokol = @import("sokol");
-const cimgui = @import("cimgui");
+
+/// cimgui configuration: matching module name, include dir, and C library
+/// name for vanilla imgui vs the docking branch.
+/// Mirrors cimgui's getConfig() so we don't need a direct zon dependency.
+const CimguiConfig = struct {
+    module_name: []const u8,
+    include_dir: []const u8,
+    clib_name: []const u8,
+};
+
+fn getCimguiConfig(docking: bool) CimguiConfig {
+    if (docking) {
+        return .{
+            .module_name = "cimgui_docking",
+            .include_dir = "src-docking",
+            .clib_name = "cimgui_docking_clib",
+        };
+    } else {
+        return .{
+            .module_name = "cimgui",
+            .include_dir = "src",
+            .clib_name = "cimgui_clib",
+        };
+    }
+}
 
 pub fn build(
     b: *std.Build,
@@ -45,18 +69,6 @@ pub fn build(
         },
     );
 
-    const dep_cimgui = b.dependency(
-        "cimgui",
-        .{
-            .target = target,
-            .optimize = optimize,
-        },
-    );
-    // Get the matching Zig module name, C header search path and C library
-    // for vanilla imgui vs the imgui docking branch.
-    const cimgui_conf = cimgui.getConfig(enable_docking);
-    const lib_cimgui = dep_cimgui.artifact(cimgui_conf.clib_name);
-
     const dep_meshulalab = b.dependency(
         "MeshulaLab",
         .{
@@ -64,6 +76,17 @@ pub fn build(
             .optimize = optimize,
         },
     );
+
+    // Get cimgui through MeshulaLab so both packages share the same version.
+    const dep_cimgui = dep_meshulalab.builder.dependency(
+        "cimgui",
+        .{
+            .target = target,
+            .optimize = optimize,
+        },
+    );
+    const cimgui_conf = getCimguiConfig(enable_docking);
+    const lib_cimgui = dep_cimgui.artifact(cimgui_conf.clib_name);
     const mod_meshulalab = dep_meshulalab.module("MeshulaLab");
 
     // Re-export for downstream projects that build plugins
@@ -71,6 +94,14 @@ pub fn build(
         b.dupe("MeshulaLab"),
         mod_meshulalab,
     ) catch @panic("OOM");
+
+    // Expose the cimgui include path so downstream projects can
+    // compile C/C++ code that includes imgui.h without depending
+    // on cimgui directly.
+    b.addNamedLazyPath(
+        "cimgui_include",
+        dep_cimgui.path(cimgui_conf.include_dir),
+    );
 
     const dep_undo_journal = b.dependency(
         "do_undo_journal",
@@ -378,6 +409,23 @@ pub fn build(
             },
         },
     );
+
+    // NFD: native file dialogs (desktop only, not available on WASM)
+    if (!target.result.cpu.arch.isWasm()) {
+        // @TODO: break this out into a top level dependency and optionally
+        //        add it in non-wasm builds
+        const dep_nfd = b.dependency(
+            "nfd_zig",
+            .{
+                .target = target,
+                .optimize = optimize,
+            },
+        );
+        mod_meshulalab_zig_plugin.addImport(
+            "nfd",
+            dep_nfd.module("nfd")
+        );
+    }
 
     // main module with sokol and cimgui imports
     const mod_app_wrapper = b.createModule(
