@@ -49,12 +49,19 @@ pub fn runUI(
 
     zgui.separatorText("Plugin Manager");
 
+
     // Plugin directory + refresh button
     zgui.text("Plugin directory: {s}", .{PLUGIN_DIR});
     zgui.sameLine(.{});
     if (zgui.smallButton("Refresh"))
     {
-        loader.rescan(PLUGIN_DIR);
+        var threaded: std.Io.Threaded = .init_single_threaded;
+        const io = threaded.io();
+        // TODO:should we plumb the Io context/monad through ZIIS?
+        loader.rescan(
+            io,
+            PLUGIN_DIR,
+        );
     }
 
     zgui.text(

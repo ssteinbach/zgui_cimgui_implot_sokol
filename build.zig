@@ -91,6 +91,7 @@ pub fn build(
 
     // Re-export for downstream projects that build plugins
     b.modules.put(
+        b.allocator,
         b.dupe("MeshulaLab"),
         mod_meshulalab,
     ) catch @panic("OOM");
@@ -121,7 +122,7 @@ pub fn build(
     // use a directory-qualified include so the preprocessor resolves it
     // unambiguously via the include path we inject.
     const sokol_clib = dep_sokol.artifact("sokol_clib");
-    sokol_clib.addIncludePath(
+    sokol_clib.root_module.addIncludePath(
         dep_cimgui.path(cimgui_conf.include_dir),
     );
     if (enable_docking)
@@ -131,7 +132,7 @@ pub fn build(
             "\"src-docking/cimgui.h\"",
         );
         // Also add the parent directory so "src-docking/cimgui.h" resolves.
-        sokol_clib.addIncludePath(dep_cimgui.path("."));
+        sokol_clib.root_module.addIncludePath(dep_cimgui.path("."));
     }
 
     // Assemble Module
@@ -185,7 +186,7 @@ pub fn build(
         },
     );
 
-    lib_imgui.addIncludePath(dep_sokol.path("src/sokol/c"));
+    lib_imgui.root_module.addIncludePath(dep_sokol.path("src/sokol/c"));
 
     const cflags = [_][]const u8 {
         "-fno-sanitize=undefined",
@@ -193,7 +194,7 @@ pub fn build(
         "-Wno-error=date-time",
     };
 
-    lib_imgui.addCSourceFiles(
+    lib_imgui.root_module.addCSourceFiles(
         .{
             .root = b.path("src"),
             .files = &.{
@@ -203,7 +204,7 @@ pub fn build(
             .flags = &cflags,
         },
     );
-    lib_imgui.addCSourceFiles(
+    lib_imgui.root_module.addCSourceFiles(
         .{
             .root = dep_implot.path("."),
             .files = &.{
@@ -214,10 +215,10 @@ pub fn build(
             .flags = &cflags,
         },
     );
-    lib_imgui.addIncludePath(
+    lib_imgui.root_module.addIncludePath(
         dep_cimgui.path(cimgui_conf.include_dir),
     );
-    lib_imgui.addIncludePath(
+    lib_imgui.root_module.addIncludePath(
         dep_implot.path("implot.h").dirname(),
     );
 
@@ -312,15 +313,17 @@ pub fn build(
     // Only add worker interop for WASM targets
     if (target.result.cpu.arch.isWasm())
     {
-        lib_worker_interop.addCSourceFiles(
-            .{
-                .root = b.path("src"),
-                .files = &.{
-                    "worker_js_interop.c",
-                },
-                .flags = &cflags,
-            },
-        );
+        _ = lib_worker_interop;
+        // XXX: disabling for now, will come back to WASI thread builds
+        // lib_worker_interop.addCSourceFiles(
+        //     .{
+        //         .root = b.path("src"),
+        //         .files = &.{
+        //             "worker_js_interop.c",
+        //         },
+        //         .flags = &cflags,
+        //     },
+        // );
     }
 
     // zimq: ZeroMQ bindings (native only, used by CSP engine)
@@ -1263,7 +1266,7 @@ pub fn build_wasm(
     for (opts.dep_c_libs)
         |lib|
     {
-        main_app.linkLibrary(lib);
+        main_app.root_module.linkLibrary(lib);
     }
 
     const dep_sokol = opts.dep_ziis_builder.dependency(
@@ -1295,7 +1298,7 @@ pub fn build_wasm(
     for (opts.dep_c_libs)
         |lib|
     {
-        lib.addSystemIncludePath(emsdk_incl_path);
+        lib.root_module.addSystemIncludePath(emsdk_incl_path);
         lib.step.dependOn(&dep_sokol.artifact("sokol_clib").step);
     }
 

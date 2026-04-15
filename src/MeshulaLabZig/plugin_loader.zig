@@ -30,9 +30,9 @@ pub const PluginInfo = struct {
     enabled: bool = true,
     loaded: bool = false,
 
-    activity_names: std.ArrayListUnmanaged([]const u8) = .{},
-    provider_names: std.ArrayListUnmanaged([]const u8) = .{},
-    studio_names: std.ArrayListUnmanaged([]const u8) = .{},
+    activity_names: std.ArrayList([]const u8) = .empty,
+    provider_names: std.ArrayList([]const u8) = .empty,
+    studio_names: std.ArrayList([]const u8) = .empty,
 
     /// The raw descriptor pointer, valid as long as the library is loaded.
     maybe_descriptor: ?*const MeshulaLab.PluginDescriptor = null,
@@ -48,7 +48,7 @@ pub const PluginInfo = struct {
     /// Strings obtained from the plugin descriptor point into the
     /// dylib and become invalid after dlclose, so on unload we
     /// copy them to the heap and track them here.
-    owned_strings: std.ArrayListUnmanaged([]const u8) = .{},
+    owned_strings: std.ArrayList([]const u8) = .empty,
 
     pub fn total_exports(
         self: *const PluginInfo,
@@ -110,7 +110,7 @@ pub const PluginInfo = struct {
 
 /// Plugin loader — discovers and loads .dylib/.so/.dll plugins at runtime.
 pub const PluginLoader = struct {
-    plugins: std.ArrayListUnmanaged(PluginInfo) = .{},
+    plugins: std.ArrayList(PluginInfo) = .empty,
     allocator: std.mem.Allocator,
 
     pub fn init(
@@ -143,6 +143,7 @@ pub const PluginLoader = struct {
     /// Scan a specific directory for plugin shared libraries.
     pub fn discover_plugins_in_directory(
         self: *PluginLoader,
+        io: std.Io,
         dir_path: []const u8,
     ) void
     {
@@ -151,7 +152,8 @@ pub const PluginLoader = struct {
             return;
         }
 
-        var dir = std.fs.cwd().openDir(
+        var dir = std.Io.Dir.cwd().openDir(
+            io,
             dir_path,
             .{ .iterate = true },
         ) catch |err| {
@@ -161,10 +163,10 @@ pub const PluginLoader = struct {
             );
             return;
         };
-        defer dir.close();
+        defer dir.close(io);
 
         var iter = dir.iterate();
-        while (iter.next() catch null)
+        while (iter.next(io) catch null)
             |entry|
         {
             if (entry.kind != .file)
@@ -502,6 +504,7 @@ pub const PluginLoader = struct {
     /// list (unloaded). Already-known paths are left as-is.
     pub fn rescan(
         self: *PluginLoader,
+        io: std.Io,
         dir_path: []const u8,
     ) void
     {
@@ -510,7 +513,8 @@ pub const PluginLoader = struct {
             return;
         }
 
-        var dir = std.fs.cwd().openDir(
+        var dir = std.Io.Dir.cwd().openDir(
+            io,
             dir_path,
             .{ .iterate = true },
         ) catch |err| {
@@ -520,10 +524,10 @@ pub const PluginLoader = struct {
             );
             return;
         };
-        defer dir.close();
+        defer dir.close(io);
 
         var iter = dir.iterate();
-        while (iter.next() catch null)
+        while (iter.next(io) catch null)
             |entry|
         {
             if (entry.kind != .file)

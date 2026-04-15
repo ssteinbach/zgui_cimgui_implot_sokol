@@ -89,19 +89,19 @@ pub const Layout = struct {
         while (line_iter.next())
             |raw_line|
         {
-            const line = std.mem.trimRight(u8, raw_line, &.{ ' ', '\r' });
+            const line = std.mem.trimEnd(u8, raw_line, &.{ ' ', '\r' });
             if (line.len == 0)
             {
                 continue;
             }
 
             const indent = count_indent(line);
-            const trimmed = std.mem.trimLeft(u8, line, &.{' '});
+            const trimmed = std.mem.trimStart(u8, line, &.{' '});
             const depth: u8 = @intCast(indent / 2);
 
             if (std.mem.startsWith(u8, trimmed, "panel "))
             {
-                const name = std.mem.trimLeft(
+                const name = std.mem.trimStart(
                     u8,
                     trimmed["panel ".len..],
                     &.{' '},
@@ -156,11 +156,12 @@ pub const Layout = struct {
                 if (current)
                     |ci|
                 {
-                    const val = std.mem.trimLeft(
+                    const val = std.mem.trimStart(
                         u8,
                         trimmed["direction:".len..],
                         &.{' '},
                     );
+
                     if (std.mem.eql(u8, val, "horizontal"))
                     {
                         layout.panels[ci].direction = .horizontal;
@@ -176,7 +177,7 @@ pub const Layout = struct {
                 if (current)
                     |ci|
                 {
-                    const val = std.mem.trimLeft(
+                    const val = std.mem.trimStart(
                         u8,
                         trimmed["sizing:".len..],
                         &.{' '},

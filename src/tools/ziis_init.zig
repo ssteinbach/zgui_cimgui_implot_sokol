@@ -12,6 +12,7 @@ const std = @import("std");
 
 pub fn create_activity(
     allocator: std.mem.Allocator,
+    io: std.Io,
     activity_name: []const u8,
     output_dir: []const u8,
     stdout: *std.Io.Writer,
@@ -58,14 +59,14 @@ pub fn create_activity(
     defer allocator.free(activity_path);
 
     // Check destination doesn't already exist
-    if (dir_exists(dest_dir))
+    if (dir_exists(io, dest_dir))
     {
         try stderr.print("error: {s} already exists\n", .{dest_dir});
         fatal(stderr);
     }
 
     // Create directory
-    std.fs.cwd().makePath(dest_dir) catch |err| {
+    std.Io.Dir.cwd().createDirPath(io, dest_dir) catch |err| {
         try stderr.print(
             "error: could not create {s}: {}\n",
             .{ dest_dir, err },
@@ -80,7 +81,7 @@ pub fn create_activity(
         .{ pascal_name, pascal_name },
     );
     defer allocator.free(activity_content);
-    try write_file(activity_path, activity_content);
+    try write_file(io, activity_path, activity_content);
 
     // Print success and build.zig instructions
     try stdout.print(
@@ -123,6 +124,7 @@ pub fn create_activity(
 
 pub fn create_studio(
     allocator: std.mem.Allocator,
+    io: std.Io,
     studio_name: []const u8,
     output_dir: []const u8,
     stdout: *std.Io.Writer,
@@ -169,7 +171,7 @@ pub fn create_studio(
     defer allocator.free(config_path);
 
     // Create directory if needed
-    std.fs.cwd().makePath(dest_dir) catch |err| {
+    std.Io.Dir.cwd().createDirPath(io, dest_dir) catch |err| {
         try stderr.print(
             "error: could not create {s}: {}\n",
             .{ dest_dir, err },
@@ -178,7 +180,7 @@ pub fn create_studio(
     };
 
     // Check config file doesn't already exist
-    if (file_exists(config_path))
+    if (file_exists(io, config_path))
     {
         try stderr.print("error: {s} already exists\n", .{config_path});
         fatal(stderr);
@@ -191,7 +193,7 @@ pub fn create_studio(
         .{pascal_name},
     );
     defer allocator.free(config_content);
-    try write_file(config_path, config_content);
+    try write_file(io, config_path, config_content);
 
     // Print success and build.zig instructions
     try stdout.print(
@@ -222,6 +224,7 @@ pub fn create_studio(
 
 pub fn create_project(
     allocator: std.mem.Allocator,
+    io: std.Io,
     project_name: []const u8,
     output_dir: []const u8,
     local_ziis: bool,
@@ -263,7 +266,7 @@ pub fn create_project(
     defer allocator.free(dest_dir);
 
     // Check destination doesn't already exist (unless --add-missing)
-    if (dir_exists(dest_dir) and !add_missing)
+    if (dir_exists(io, dest_dir) and !add_missing)
     {
         try stderr.print("error: {s} already exists\n", .{dest_dir});
         fatal(stderr);
@@ -277,7 +280,7 @@ pub fn create_project(
     );
     defer allocator.free(src_dir);
 
-    std.fs.cwd().makePath(src_dir) catch |err| {
+    std.Io.Dir.cwd().createDirPath(io, src_dir) catch |err| {
         try stderr.print(
             "error: could not create {s}: {}\n",
             .{ src_dir, err },
@@ -421,7 +424,7 @@ pub fn create_project(
     {
         if (add_missing)
         {
-            if (try write_file_if_missing(entry.path, entry.content))
+            if (try write_file_if_missing(io, entry.path, entry.content))
             {
                 try stdout.print("  created: {s}\n", .{entry.path});
                 created_count += 1;
@@ -438,7 +441,7 @@ pub fn create_project(
         }
         else
         {
-            try write_file(entry.path, entry.content);
+            try write_file(io, entry.path, entry.content);
             zon_was_written = true;
         }
     }
@@ -448,7 +451,15 @@ pub fn create_project(
     // Only seed if build.zig.zon was freshly written (not skipped).
     if (zon_was_written)
     {
-        seed_fingerprint(allocator, dest_dir, zon_path, project_name, local_ziis, stderr);
+        seed_fingerprint(
+            allocator,
+            io,
+            dest_dir,
+            zon_path,
+            project_name,
+            local_ziis,
+            stderr,
+        );
     }
 
     // Print success
@@ -497,22 +508,35 @@ pub fn create_project(
     try stdout.flush();
 }
 
+fn fatal_needs_argument(
+    stderr_writer: *std.Io.Writer,
+    arg_name: []const u8,
+) void
+{
+    stderr_writer.print(
+        "error: {s} requires a name argument\n",
+        .{arg_name},
+    ) catch {};
+    fatal(stderr_writer);
+}
+
 pub fn main(
+    init: std.process.Init,
 ) !void
 {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    const allocator = init.gpa;
+    const io = init.io;
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.minimal.args.toSlice(
+        init.arena.allocator()
+    );
 
     var stdout_buf: [4096]u8 = undefined;
-    var stdout_w = std.fs.File.stdout().writer(&stdout_buf);
+    var stdout_w = std.Io.File.stdout().writer(io, &stdout_buf);
     const stdout = &stdout_w.interface;
 
     var stderr_buf: [4096]u8 = undefined;
-    var stderr_w = std.fs.File.stderr().writer(&stderr_buf);
+    var stderr_w = std.Io.File.stderr().writer(io, &stderr_buf);
     const stderr = &stderr_w.interface;
 
     // Parse arguments
@@ -523,86 +547,82 @@ pub fn main(
     var add_missing: bool = false;
     var output_dir: []const u8 = ".";
 
-    var i: usize = 1;
-    while (i < args.len)
-        : (i += 1)
+    // indicates that the next_arg was consumed in the previous loop
+    var skip_next = false;
+    const ArgEnum = enum {
+        h, @"--help",
+        @"--activity",
+        @"--studio",
+        @"--project",
+        @"--local-ziis",
+        @"--add-missing",
+        @"--output-dir",
+        @"--invalid--",
+    };
+    for (args, 0..)
+        |arg, i|
     {
-        if (
-            std.mem.eql(u8, args[i], "--help")
-            or std.mem.eql(u8, args[i], "-h")
-        )
+        if (skip_next)
         {
-            try stdout.print(HELP_TEXT, .{});
-            try stdout.flush();
-            return;
+            skip_next = false;
+            continue;
         }
-        else if (std.mem.eql(u8, args[i], "--activity"))
+
+
+        // map the argument into the enum or mark it as invalid
+        const arg_enum = (
+            if (std.meta.stringToEnum(ArgEnum, arg)) |a_e| a_e 
+            else .@"--invalid--"
+        );
+
+        // check if it needs an argument
+        switch (arg_enum)
         {
-            i += 1;
-            if (i >= args.len)
+            .@"--activity", .@"--studio", .@"--output-dir", .@"--project" =>
             {
-                try stderr.print(
-                    "error: --activity requires a name argument\n",
-                    .{},
-                );
-                fatal(stderr);
-            }
-            maybe_activity_name = args[i];
+                if (i >= args.len - 1)
+                {
+                    fatal_needs_argument(stderr, arg);
+                }
+                else 
+                {
+                    skip_next = true;
+                }
+            },
+            else => {},
         }
-        else if (std.mem.eql(u8, args[i], "--studio"))
+
+        switch (arg_enum)
         {
-            i += 1;
-            if (i >= args.len)
-            {
-                try stderr.print(
-                    "error: --studio requires a name argument\n",
-                    .{},
-                );
-                fatal(stderr);
-            }
-            maybe_studio_name = args[i];
-        }
-        else if (std.mem.eql(u8, args[i], "--project"))
-        {
-            i += 1;
-            if (i >= args.len)
-            {
-                try stderr.print(
-                    "error: --project requires a name argument\n",
-                    .{},
-                );
-                fatal(stderr);
-            }
-            maybe_project_name = args[i];
-        }
-        else if (std.mem.eql(u8, args[i], "--local-ziis"))
-        {
-            local_ziis = true;
-        }
-        else if (std.mem.eql(u8, args[i], "--add-missing"))
-        {
-            add_missing = true;
-        }
-        else if (std.mem.eql(u8, args[i], "--output-dir"))
-        {
-            i += 1;
-            if (i >= args.len)
-            {
-                try stderr.print(
-                    "error: --output-dir requires a path argument\n",
-                    .{},
-                );
-                fatal(stderr);
-            }
-            output_dir = args[i];
-        }
-        else
-        {
-            try stderr.print(
-                "error: unknown argument: {s}\n",
-                .{args[i]},
-            );
-            fatal(stderr);
+            .h, .@"--help" => {
+                try stdout.print(HELP_TEXT, .{});
+                try stdout.flush();
+                return;
+            },
+            .@"--invalid--" => {
+                try stderr.print("Invalid argument: '{s}'\n\n", .{arg});
+                try stdout.print(HELP_TEXT, .{});
+                try stdout.flush();
+                return;
+            },
+            .@"--activity" => {
+                maybe_activity_name = args[i+1];
+            },
+            .@"--studio" => {
+                maybe_studio_name = args[i+1];
+            },
+            .@"--project" => {
+                maybe_project_name = args[i+1];
+            },
+            .@"--local-ziis" => {
+                local_ziis = true;
+            },
+            .@"--add-missing" => {
+                add_missing = true;
+            },
+            .@"--output-dir" => {
+                output_dir = args[i+1];
+            },
         }
     }
 
@@ -633,6 +653,7 @@ pub fn main(
     {
         try create_activity(
             allocator,
+            io,
             activity_name,
             output_dir,
             stdout,
@@ -645,6 +666,7 @@ pub fn main(
     {
         try create_studio(
             allocator,
+            io,
             studio_name,
             output_dir,
             stdout,
@@ -657,6 +679,7 @@ pub fn main(
     {
         try create_project(
             allocator,
+            io,
             project_name,
             output_dir,
             local_ziis,
@@ -673,6 +696,7 @@ pub fn main(
 /// the fingerprint inserted.
 fn seed_fingerprint(
     allocator: std.mem.Allocator,
+    io: std.Io,
     dest_dir: []const u8,
     zon_path: []const u8,
     project_name: []const u8,
@@ -680,11 +704,12 @@ fn seed_fingerprint(
     stderr: *std.Io.Writer,
 ) void
 {
-    const result = std.process.Child.run(
+    const result = std.process.run(
+        allocator,
+        io,
         .{
-            .allocator = allocator,
             .argv = &.{ "zig", "build" },
-            .cwd = dest_dir,
+            .cwd = .{ .path = dest_dir },
         },
     ) catch {
         // zig not found or other exec error — skip silently,
@@ -703,11 +728,14 @@ fn seed_fingerprint(
 
     // Find end of hex literal (0x...)
     var end = start;
-    while (end < result.stderr.len and
-        (result.stderr[end] == '0' or
-        result.stderr[end] == 'x' or
-        std.ascii.isHex(result.stderr[end])))
-        : (end += 1)
+    while (
+        end < result.stderr.len 
+        and (
+            result.stderr[end] == '0' 
+            or result.stderr[end] == 'x' 
+            or std.ascii.isHex(result.stderr[end])
+        )
+    ) : (end += 1)
     {}
 
     if (end <= start) return;
@@ -727,7 +755,7 @@ fn seed_fingerprint(
             .{ project_name, fingerprint },
         ) catch return;
     defer allocator.free(zon_content);
-    write_file(zon_path, zon_content) catch |err| {
+    write_file(io, zon_path, zon_content) catch |err| {
         stderr.print(
             "warning: could not update fingerprint: {}\n",
             .{err},
@@ -743,41 +771,54 @@ fn fatal(
     std.process.exit(1);
 }
 
+/// return true if the directory exists and is a directory
 fn dir_exists(
+    io: std.Io,
     path: []const u8,
 ) bool
 {
-    const stat = std.fs.cwd().statFile(path) catch return false;
+    const stat = std.Io.Dir.cwd().statFile(
+        io,
+        path,
+        .{},
+    ) catch return false;
+
     return stat.kind == .directory;
 }
 
 fn file_exists(
+    io: std.Io,
     path: []const u8,
 ) bool
 {
-    _ = std.fs.cwd().statFile(path) catch return false;
+    _ = std.Io.Dir.cwd().statFile(io, path, .{}) catch return false;
     return true;
 }
 
 fn write_file(
+    io: std.Io,
     path: []const u8,
     content: []const u8,
 ) !void
 {
-    const file = try std.fs.cwd().createFile(path, .{});
-    defer file.close();
-    try file.writeAll(content);
+    const file = try std.Io.Dir.cwd().createFile(io, path, .{});
+    defer file.close(io);
+    var buf: [1024]u8 = undefined;
+    var file_writer = file.writer(io, &buf);
+    const writer = &file_writer.interface;
+    try writer.writeAll(content);
 }
 
 /// Write a file only if it doesn't already exist.
 /// Returns true if the file was written, false if it was skipped.
 fn write_file_if_missing(
+    io: std.Io,
     path: []const u8,
     content: []const u8,
 ) !bool
 {
-    if (file_exists(path)) return false;
-    try write_file(path, content);
+    if (file_exists(io, path)) return false;
+    try write_file(io, path, content);
     return true;
 }
 
@@ -787,7 +828,7 @@ fn snake_to_pascal(
     snake: []const u8,
 ) ![]u8
 {
-    var result: std.ArrayListUnmanaged(u8) = .{};
+    var result: std.ArrayList(u8) = .empty;
     var capitalize_next = true;
     for (snake)
         |c|

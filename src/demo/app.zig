@@ -32,9 +32,16 @@ fn post_init(
 // =========================================================================
 
 pub fn main(
+    init: std.process.Init,
 ) !void
 {
-    APP = MeshulaLab.FundamentalApp.init(std.heap.c_allocator);
+    const allocator = init.gpa;
+    const io = init.io;
+
+    APP = MeshulaLab.FundamentalApp.init(
+        allocator,
+        io,
+    );
 
     APP.run(
         .{

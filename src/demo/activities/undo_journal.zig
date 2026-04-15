@@ -13,6 +13,7 @@ pub var maybe_journal: ?ziis.undo.Journal = null;
 pub var demo_window_gui = false;
 pub var demo_window_plot = false;
 var state_allocator: std.mem.Allocator = undefined;
+var state_io: std.Io = undefined;
 
 pub fn initState(
     allocator: std.mem.Allocator,
@@ -24,6 +25,8 @@ pub fn initState(
         allocator,
         journal_capacity,
     ) catch null;
+    var threaded: std.Io.Threaded = .init_single_threaded;
+    state_io = threaded.io();
 }
 
 pub fn deinitState() void
@@ -31,7 +34,7 @@ pub fn deinitState() void
     if (maybe_journal)
         |*definitely_journal|
     {
-        definitely_journal.deinit();
+        definitely_journal.deinit(state_allocator, state_io);
     }
     maybe_journal = null;
 }
@@ -71,7 +74,7 @@ pub fn runUI(
             "texture offset",
         ) catch return;
         cmd.do() catch return;
-        maybe_journal.?.update_if_new_or_add(cmd) catch return;
+        maybe_journal.?.update_if_new_or_add(state_allocator, state_io, cmd) catch return;
     }
 
     for (maybe_journal.?.entries.items, 0..)
@@ -93,14 +96,14 @@ pub fn runUI(
 
     if (zgui.button("undo", .{}))
     {
-        maybe_journal.?.undo() catch {};
+        maybe_journal.?.undo(state_io) catch unreachable;
     }
 
     zgui.sameLine(.{});
 
     if (zgui.button("redo", .{}))
     {
-        maybe_journal.?.redo() catch {};
+        maybe_journal.?.redo(state_io) catch unreachable;
     }
 
     if (zgui.button("show gui demo", .{}))

@@ -19,8 +19,8 @@
             .hash = "sokol-0.1.0-pb1HK_-oNgARi7JDvtvcu9fo8-5ArHCZ3u2bcBsFsu0y",
         },
         .do_undo_journal = .{
-            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#1dbc411ff56ba14181b640714e77b7297d850919",
-            .hash = "do_undo_journal-1.0.0-1UllC4VrAACW9W1bVNXnDJPJqrQax5a02ubMqNpgESvd",
+            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#6d5b05243012eca907b273267197c95b1b3d0d05",
+            .hash = "do_undo_journal-1.0.0-1UllCyR0AACotN7z4ivZZ1oS_6lRUqrq2L790oH7hm6E",
         },
         .MeshulaLab = .{
             .path = "../../../external_sources/MeshulaLab",
@@ -30,8 +30,8 @@
             .hash = "zimq-0.0.0-nw1ioGioAQCf8tyBYFGi7KgrdZBBB06NGNqw2fbzxm87",
         },
         .nfd_zig = .{
-            .url = "git+https://github.com/ssteinbach/nfd-zig.git#d6451e7d16dd82945a03845400a69e9fe7c051a3",
-            .hash = "nfd_zig-1.1.6-N3fzYqgiAACqPupnoXYg4sTSPbvk7sfs1nJdMGnURq8C",
+            .url = "git+https://github.com/ssteinbach/nfd-zig.git#031b6b08c28b4c209fde1d7cfc2387aa956febb2",
+            .hash = "nfd-0.1.0-y82kbsSLBgBgSEauGFsHxH7RmcL4AEOqZEqOvA8-NEFq",
         },
     },
 

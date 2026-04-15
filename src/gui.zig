@@ -38,7 +38,7 @@ pub fn init(allocator: std.mem.Allocator) void {
             _ = zguiCreateContext(null);
         }
 
-        temp_buffer = std.ArrayList(u8){};
+        temp_buffer = .empty;
         temp_buffer.?.resize(allocator, 3 * 1024 + 1) catch unreachable;
 
         // if (te_enabled) {
@@ -100,7 +100,7 @@ pub fn deinit() void {
 }
 pub fn initNoContext(allocator: std.mem.Allocator) void {
     if (temp_buffer == null) {
-        temp_buffer = std.ArrayList(u8){};
+        temp_buffer = .empty;
         temp_buffer.?.resize(allocator, 3 * 1024 + 1) catch unreachable;
     }
 }
@@ -113,7 +113,7 @@ extern fn zguiCreateContext(shared_font_atlas: ?*const anyopaque) Context;
 extern fn zguiDestroyContext(ctx: ?Context) void;
 extern fn zguiGetCurrentContext() ?Context;
 extern fn zguiSetCurrentContext(ctx: ?Context) void;
-//--------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 var mem_allocator: ?std.mem.Allocator = null;
 var mem_allocations: ?std.AutoHashMap(usize, usize) = null;
 var mem_mutex: std.Thread.Mutex = .{};

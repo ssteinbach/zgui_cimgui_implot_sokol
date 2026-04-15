@@ -70,7 +70,7 @@ pub const CspModule = struct {
 /// Timed event with a target timestamp (used for delayed events).
 const TimedEvent = struct {
     process_id: i32,
-    send_time_ns: i128,
+    send_time_ns: i96,
 };
 
 /// Central event coordinator.
@@ -80,18 +80,20 @@ const TimedEvent = struct {
 /// which should be called once per frame. On WASM the behaviour
 /// is identical — no ZMQ or threads are used on any platform.
 pub const CspEngine = struct {
-    modules: std.StringHashMapUnmanaged(*CspModule) = .{},
-    processes: std.AutoHashMapUnmanaged(i32, *CspProcess) = .{},
-    timed_queue: std.ArrayListUnmanaged(TimedEvent) = .{},
-    immediate_queue: std.ArrayListUnmanaged(i32) = .{},
+    modules: std.StringHashMapUnmanaged(*CspModule) = .empty,
+    processes: std.AutoHashMapUnmanaged(i32, *CspProcess) = .empty,
+    timed_queue: std.ArrayList(TimedEvent) = .empty,
+    immediate_queue: std.ArrayList(i32) = .empty,
     next_process_id: i32 = 1,
     allocator: std.mem.Allocator,
+    io: std.Io,
 
     pub fn init(
         allocator: std.mem.Allocator,
+        io: std.Io,
     ) CspEngine
     {
-        return .{ .allocator = allocator };
+        return .{ .allocator = allocator, .io = io };
     }
 
     pub fn deinit(
@@ -153,14 +155,21 @@ pub const CspEngine = struct {
     pub fn emit_event(
         self: *CspEngine,
         process: *const CspProcess,
+        // TODO: note that in the body of the code, this is used as an i96
+        // rather than a i32, should this be converted to that in the
+        // interface?
+        /// Optional delay.  0 means immediate
         ms_delay: i32,
     ) void
     {
         if (ms_delay > 0)
         {
-            const now_ns = std.time.nanoTimestamp();
-            const delay_ns: i128 = (
-                @as(i128, ms_delay) * std.time.ns_per_ms
+            const now_ns = std.Io.Timestamp.now(
+                self.io,
+                .realtime,
+            ).toNanoseconds();
+            const delay_ns: i96 = (
+                @as(i96, ms_delay) * std.time.ns_per_ms
             );
             self.timed_queue.append(
                 self.allocator,
@@ -203,7 +212,10 @@ pub const CspEngine = struct {
     ) void
     {
         // Promote expired timed events to the immediate queue.
-        const now_ns = std.time.nanoTimestamp();
+        const now_ns = std.Io.Timestamp.now(
+            self.io,
+            .real,
+        ).toNanoseconds();
         var i: usize = 0;
         while (i < self.timed_queue.items.len)
         {

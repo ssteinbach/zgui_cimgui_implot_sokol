@@ -98,11 +98,12 @@ pub const FundamentalApp = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
+        io: std.Io,
     ) FundamentalApp
     {
         var self = FundamentalApp{
             .orchestrator = Orchestrator.init(allocator),
-            .csp_engine = CspEngine.init(allocator),
+            .csp_engine = CspEngine.init(allocator, io),
             .plugin_loader = PluginLoader.init(allocator),
             .allocator = allocator,
         };
@@ -113,7 +114,7 @@ pub const FundamentalApp = struct {
         if (!IS_WASM)
         {
             log.info("plugin directory: {s}", .{PLUGIN_DIR});
-            self.plugin_loader.discover_plugins_in_directory(PLUGIN_DIR);
+            self.plugin_loader.discover_plugins_in_directory(io, PLUGIN_DIR);
         }
 
         // Start CSP engine
