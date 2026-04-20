@@ -13,14 +13,20 @@ const CimguiConfig = struct {
     clib_name: []const u8,
 };
 
-fn getCimguiConfig(docking: bool) CimguiConfig {
-    if (docking) {
+fn getCimguiConfig(
+    docking: bool,
+) CimguiConfig 
+{
+    if (docking) 
+    {
         return .{
             .module_name = "cimgui_docking",
             .include_dir = "src-docking",
             .clib_name = "cimgui_docking_clib",
         };
-    } else {
+    } 
+    else 
+    {
         return .{
             .module_name = "cimgui",
             .include_dir = "src",
@@ -49,7 +55,7 @@ pub fn build(
     ) orelse b.getInstallPath(.{ .custom = "lib/plugins" }, "");
 
     // Fetch Dependencies
-    ///////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
 
     const dep_implot = b.dependency(
         "implot",
