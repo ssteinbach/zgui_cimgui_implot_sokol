@@ -19,8 +19,8 @@
             .hash = "sokol-0.1.0-pb1HK_-oNgARi7JDvtvcu9fo8-5ArHCZ3u2bcBsFsu0y",
         },
         .do_undo_journal = .{
-            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#6d5b05243012eca907b273267197c95b1b3d0d05",
-            .hash = "do_undo_journal-1.0.0-1UllCyR0AACotN7z4ivZZ1oS_6lRUqrq2L790oH7hm6E",
+            .url = "git+https://github.com/ssteinbach/zig-do-undo-journal.git#6dc712745030e89b1d0da461ebac1aacc4d5b6b8",
+            .hash = "do_undo_journal-1.0.0-1UllC0t1AABACgklKzogxAPMOy-120d5QEcYSuICopp2",
         },
         .MeshulaLab = .{
             .url = "git+https://codeberg.org/stephan_gfx/MeshulaLab.git#07773d92c3617844c2dd7a244b16b97657a775de",
