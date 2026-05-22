@@ -320,6 +320,7 @@ pub fn build(
     if (target.result.cpu.arch.isWasm())
     {
         _ = lib_worker_interop;
+        @panic("Currently unsupported");
         // XXX: disabling for now, will come back to WASI thread builds
         // lib_worker_interop.addCSourceFiles(
         //     .{
